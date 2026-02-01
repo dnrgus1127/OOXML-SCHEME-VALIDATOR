@@ -41,3 +41,8 @@ console.log(result.valid, result.errors);
 npm install
 npm run build
 ```
+
+## MCP 통합 시나리오
+
+MCP 에이전트에서 XLSX 파일을 받아 스키마 검증까지 수행하는 흐름은
+`docs/mcp-integration.md`에 정리했습니다.
