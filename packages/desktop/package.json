@@ -1,0 +1,49 @@
+{
+  "name": "@ooxml/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OOXML Validator desktop application with XML editor",
+  "main": "./dist/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-builder --config electron-builder.yml",
+    "package:mac": "electron-builder --mac --config electron-builder.yml",
+    "package:win": "electron-builder --win --config electron-builder.yml",
+    "package:linux": "electron-builder --linux --config electron-builder.yml",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist release"
+  },
+  "dependencies": {
+    "@ooxml/core": "workspace:*",
+    "@ooxml/parser": "workspace:*",
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zustand": "^4.4.0"
+  },
+  "optionalDependencies": {
+    "monaco-editor": "^0.45.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0",
+    "electron-vite": "^2.0.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "ooxml",
+    "validator",
+    "desktop",
+    "electron",
+    "xml-editor"
+  ],
+  "license": "MIT"
+}

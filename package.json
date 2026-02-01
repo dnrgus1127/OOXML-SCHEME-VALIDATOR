@@ -1,14 +1,22 @@
 {
-  "name": "mcp-ooxml-schema-validator",
+  "name": "ooxml-validator",
   "version": "0.1.0",
-  "description": "OOXML XSD schema validation engine based on runtime schema definitions.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "private": true,
+  "description": "OOXML document validation toolkit - schema validation engine, MCP server, and desktop app",
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "turbo": "^2.0.0",
     "typescript": "^5.3.3"
   }
 }
