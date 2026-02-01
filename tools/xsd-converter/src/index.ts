@@ -217,9 +217,10 @@ function convertParticles(container: any): ParticleSchema[] {
   // Elements
   const elements = ensureArray(container['xsd:element'] || container['xs:element'] || [])
   for (const el of elements) {
+    const element = convertElement(el)
     particles.push({
-      type: 'element',
-      ...convertElement(el),
+      ...element,
+      type: 'element' as const,
       minOccurs: parseInt(el['@_minOccurs'] || '1', 10),
       maxOccurs: el['@_maxOccurs'] === 'unbounded' ? -1 : parseInt(el['@_maxOccurs'] || '1', 10),
     })
@@ -343,14 +344,11 @@ function convertSimpleContent(sc: any): SimpleContentSchema {
   const restriction = sc['xsd:restriction'] || sc['xs:restriction']
 
   if (extension) {
+    const attrs = ensureArray(extension['xsd:attribute'] || extension['xs:attribute'] || [])
     const result: SimpleContentSchema = {
       type: 'extension',
       base: extension['@_base'] || '',
-      attributes: [],
-    }
-    const attrs = ensureArray(extension['xsd:attribute'] || extension['xs:attribute'] || [])
-    for (const attr of attrs) {
-      result.attributes.push(convertAttribute(attr))
+      attributes: attrs.map(convertAttribute),
     }
     return result
   }
@@ -375,34 +373,24 @@ function convertComplexContent(cc: any): ComplexContentSchema {
     return { type: 'extension', base: '' }
   }
 
-  const result: ComplexContentSchema = {
-    type: extension ? 'extension' : 'restriction',
-    base: source['@_base'] || '',
-    attributes: [],
-    attributeGroups: [],
-  }
-
   // Extract content model
   const sequence = source['xsd:sequence'] || source['xs:sequence']
   const choice = source['xsd:choice'] || source['xs:choice']
 
-  if (sequence) {
-    result.content = { type: 'sequence', particles: convertParticles(sequence) }
-  } else if (choice) {
-    result.content = { type: 'choice', particles: convertParticles(choice) }
-  }
-
   // Extract attributes
   const attrs = ensureArray(source['xsd:attribute'] || source['xs:attribute'] || [])
-  for (const attr of attrs) {
-    result.attributes.push(convertAttribute(attr))
-  }
-
   const attrGroups = ensureArray(source['xsd:attributeGroup'] || source['xs:attributeGroup'] || [])
-  for (const ref of attrGroups) {
-    if (ref['@_ref']) {
-      result.attributeGroups.push(ref['@_ref'])
-    }
+
+  const result: ComplexContentSchema = {
+    type: extension ? 'extension' : 'restriction',
+    base: source['@_base'] || '',
+    content: sequence
+      ? { type: 'sequence', particles: convertParticles(sequence) }
+      : choice
+        ? { type: 'choice', particles: convertParticles(choice) }
+        : undefined,
+    attributes: attrs.map(convertAttribute),
+    attributeGroups: attrGroups.filter((ref) => ref['@_ref']).map((ref) => ref['@_ref']),
   }
 
   return result
