@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * @ooxml/mcp
  *
@@ -9,9 +10,20 @@
  * - get_ooxml_part: Retrieve specific part content
  */
 
-// TODO: Implement MCP server
-// export * from './server'
-// export * from './tools'
+export { createServer, runServer } from './server.js'
+export {
+  validateOoxml,
+  validateOoxmlTool,
+  analyzeOoxmlStructure,
+  analyzeOoxmlStructureTool,
+  getOoxmlPart,
+  getOoxmlPartTool,
+} from './tools/index.js'
 
-console.log('@ooxml/mcp - MCP Server for OOXML Validation')
-console.log('Implementation pending...')
+// Run server if executed directly
+import { runServer } from './server.js'
+
+runServer().catch((error) => {
+  console.error('Failed to start server:', error)
+  process.exit(1)
+})
