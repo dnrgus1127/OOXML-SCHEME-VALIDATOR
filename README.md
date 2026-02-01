@@ -46,3 +46,33 @@ npm run build
 
 MCP 에이전트에서 XLSX 파일을 받아 스키마 검증까지 수행하는 흐름은
 `docs/mcp-integration.md`에 정리했습니다.
+
+## MCP 에이전트 등록(개요)
+
+이 프로젝트는 OOXML 검증 **엔진 라이브러리**이므로, MCP 에이전트 등록을 위해서는
+엔진을 호출하는 **별도 MCP 서버/도구 래퍼**가 필요합니다. 상세 설계는
+`docs/mcp-integration.md`를 참고하세요.
+
+1. 패키지 빌드
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+2. MCP 클라이언트 설정에 서버/도구 등록
+
+   ```json
+   {
+     "mcpServers": {
+       "ooxml-validator": {
+         "command": "node",
+         "args": ["path/to/your-mcp-server.js"]
+       }
+     }
+   }
+   ```
+
+3. 에이전트가 도구를 호출하도록 연결
+   - XLSX 파일 수신 → 압축 해제 → XML 이벤트 스트리밍 → 검증 결과 리포트 생성
+   - 실제 호출 스펙/입출력 포맷은 `docs/mcp-integration.md`에서 정의한 예시를 기준으로 조정
