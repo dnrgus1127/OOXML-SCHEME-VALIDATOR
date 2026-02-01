@@ -6,6 +6,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Generated schemas (built from XSD at build time)
+packages/core/src/schemas/
+
 # IDE
 .idea/
 .vscode/

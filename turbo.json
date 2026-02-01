@@ -3,8 +3,13 @@
   "globalDependencies": ["tsconfig.base.json"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate:schemas"],
       "outputs": ["dist/**"]
+    },
+    "generate:schemas": {
+      "inputs": ["../../schemas/**/*.xsd", "../../tools/xsd-converter/src/**"],
+      "outputs": ["src/schemas/**"],
+      "cache": true
     },
     "dev": {
       "cache": false,
@@ -18,7 +23,7 @@
       "inputs": ["src/**"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate:schemas"],
       "inputs": ["src/**", "tsconfig.json"]
     },
     "clean": {
