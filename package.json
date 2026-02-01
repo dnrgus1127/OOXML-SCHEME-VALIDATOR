@@ -1,0 +1,14 @@
+{
+  "name": "mcp-ooxml-schema-validator",
+  "version": "0.1.0",
+  "description": "OOXML XSD schema validation engine based on runtime schema definitions.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
