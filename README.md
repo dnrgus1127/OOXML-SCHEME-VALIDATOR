@@ -2,12 +2,20 @@
 
 OOXML XSD 스키마를 JSON 런타임 타입으로 변환해 XML 문서를 스트리밍 방식으로 검증하는 엔진 구현입니다.
 `docs/ooxml-validation-engine-design.md`와 `docs/ooxml-schema-types.ts` 설계를 기반으로 핵심 런타임을 구성했습니다.
+현재 저장소는 **모노레포**로 구성되어 검증 엔진, MCP 서버, 데스크톱 UI가 함께 관리됩니다.
 
 ## 주요 구성
 
 - `SchemaRegistry`/`SchemaRegistryBuilder`: 네임스페이스별 스키마 관리
 - `CompositorState`: sequence/choice/all 검증 상태 관리
 - `ValidationEngine`: 이벤트 기반 XML 검증
+
+## 패키지 구성
+
+- `packages/core`: OOXML 스키마 검증 엔진
+- `packages/parser`: XML 이벤트 스트리밍 파서
+- `packages/mcp`: MCP 서버/도구 래퍼
+- `packages/desktop`: 데스크톱 UI
 
 ## 사용 예시
 
@@ -38,8 +46,17 @@ console.log(result.valid, result.errors);
 ## 개발
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm run build
+```
+
+### 자주 쓰는 스크립트
+
+```bash
+pnpm run dev
+pnpm run test
+pnpm run lint
+pnpm run typecheck
 ```
 
 ## MCP 통합 시나리오
@@ -56,8 +73,8 @@ MCP 에이전트에서 XLSX 파일을 받아 스키마 검증까지 수행하는
 1. 패키지 빌드
 
    ```bash
-   npm install
-   npm run build
+   pnpm install
+   pnpm run build
    ```
 
 2. MCP 클라이언트 설정에 서버/도구 등록
