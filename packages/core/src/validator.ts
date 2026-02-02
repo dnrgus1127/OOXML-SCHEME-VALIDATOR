@@ -27,9 +27,10 @@ import {
 import { checkMissingRequiredElements, initCompositorState, validateCompositorChild } from './compositor';
 
 export class ValidationEngine {
-  private context = createRuntimeContext(this.registry);
+  private context;
 
   constructor(private registry: SchemaRegistry, options?: ValidationOptions) {
+    this.context = createRuntimeContext(this.registry);
     if (options) {
       this.context.options = { ...options };
     }
@@ -111,7 +112,7 @@ export class ValidationEngine {
         currentFrame.compositorState,
         this.registry,
         {
-          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(this.context.namespaceStack[this.context.namespaceStack.length - 1], prefix),
+          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map(), prefix),
         },
       );
 
@@ -129,7 +130,7 @@ export class ValidationEngine {
 
     if (currentFrame.textContent.trim() !== '') {
       this.validateTextContent(currentFrame, currentFrame.textContent);
-    } else if (!this.context.options.allowWhitespace && currentFrame.schemaType && hasElementContent(currentFrame.schemaType.content)) {
+    } else if (!this.context.options.allowWhitespace && isComplexSchemaType(currentFrame.schemaType) && hasElementContent(currentFrame.schemaType.content)) {
       if (currentFrame.textContent.length > 0) {
         this.pushError('UNEXPECTED_TEXT', 'element-only 컨텐츠에서 텍스트가 발견되었습니다.');
       }
@@ -142,6 +143,7 @@ export class ValidationEngine {
   endDocument(): ValidationResult {
     const errors = this.context.errors.map((error) => ({
       ...error,
+      code: error.code as ValidationErrorCode,
       path: this.currentPath(),
     }));
 
@@ -388,7 +390,8 @@ export class ValidationEngine {
         return value.replace(/[-+.]/g, '').length <= facet.value;
       case 'fractionDigits':
         if (value.includes('.')) {
-          return value.split('.')[1].length <= facet.value;
+          const parts = value.split('.');
+          return (parts[1]?.length ?? 0) <= facet.value;
         }
         return true;
       case 'whiteSpace':
@@ -444,9 +447,15 @@ export class ValidationEngine {
       return;
     }
 
+    if (!isComplexSchemaType(schemaType)) {
+      // For simple types, validate as simple type value
+      this.validateSimpleTypeValue(textContent.trim(), schemaType, this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map());
+      return;
+    }
+
     if (hasSimpleContent(schemaType.content)) {
       const baseType = schemaType.content.content.base;
-      this.validateBuiltinOrReferencedType(textContent.trim(), baseType, this.context.namespaceStack[this.context.namespaceStack.length - 1]);
+      this.validateBuiltinOrReferencedType(textContent.trim(), baseType, this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map());
       return;
     }
 

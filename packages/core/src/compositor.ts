@@ -122,6 +122,8 @@ function validateSequenceChild(
 
   for (let i = state.currentIndex; i < state.flattenedParticles.length; i += 1) {
     const particle = state.flattenedParticles[i];
+    if (!particle) continue;
+
     const canMatch = particleAllows(qualifiedName, particle, state, registry, resolver);
 
     if (canMatch) {
@@ -160,7 +162,7 @@ function validateChoiceChild(
 
   if (state.selectedBranch !== null) {
     const particle = state.flattenedParticles[state.selectedBranch];
-    if (particleAllows(qualifiedName, particle, state, registry, resolver)) {
+    if (particle && particleAllows(qualifiedName, particle, state, registry, resolver)) {
       const count = (state.occurrenceCounts.get(state.selectedBranch) ?? 0) + 1;
       state.occurrenceCounts.set(state.selectedBranch, count);
       if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
@@ -174,7 +176,7 @@ function validateChoiceChild(
 
   for (let i = 0; i < state.flattenedParticles.length; i += 1) {
     const particle = state.flattenedParticles[i];
-    if (particleAllows(qualifiedName, particle, state, registry, resolver)) {
+    if (particle && particleAllows(qualifiedName, particle, state, registry, resolver)) {
       state.selectedBranch = i;
       state.occurrenceCounts.set(i, 1);
       return { success: true };

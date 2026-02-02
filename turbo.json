@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "generate:schemas"],
+      "outputs": ["dist/**"]
+    },
+    "generate:schemas": {
+      "inputs": ["../../schemas/**/*.xsd", "../../tools/xsd-converter/src/**"],
+      "outputs": ["src/schemas/**"],
+      "cache": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "lint": {
+      "inputs": ["src/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "generate:schemas"],
+      "inputs": ["src/**", "tsconfig.json"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

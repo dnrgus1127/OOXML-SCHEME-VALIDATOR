@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Generated schemas (built from XSD at build time)
+packages/core/src/schemas/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Electron
+packages/desktop/release/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+
+# Turbo
+.turbo/
+
+# Misc
+*.tgz
+.cache/
