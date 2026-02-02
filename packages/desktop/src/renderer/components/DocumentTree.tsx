@@ -29,6 +29,8 @@ function buildTree(parts: Record<string, PartInfo>): TreeNode[] {
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i]
+      if (!segment) continue
+
       const isLast = i === segments.length - 1
       const currentPath = '/' + segments.slice(0, i + 1).join('/')
 

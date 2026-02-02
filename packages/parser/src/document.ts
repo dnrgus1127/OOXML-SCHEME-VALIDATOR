@@ -138,7 +138,7 @@ export class OoxmlDocumentImpl implements OoxmlDocument {
       unknown: [],
     }
 
-    for (const path of mainPaths[this.documentType]) {
+    for (const path of mainPaths[this.documentType] ?? []) {
       const part = this.getPart(path)
       if (part) return part
     }

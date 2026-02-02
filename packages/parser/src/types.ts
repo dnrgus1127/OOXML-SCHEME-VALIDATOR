@@ -66,6 +66,12 @@ export interface OoxmlDocument {
 
   /** Get relationships for a part */
   getRelationships(partPath: string): Relationship[]
+
+  /** Get the main document part */
+  getMainPart(): OoxmlPart | undefined
+
+  /** Get all XML parts */
+  getXmlParts(): OoxmlPart[]
 }
 
 /**
