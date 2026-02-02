@@ -64,6 +64,11 @@ pnpm run typecheck
 MCP 에이전트에서 XLSX 파일을 받아 스키마 검증까지 수행하는 흐름은
 `docs/mcp-integration.md`에 정리했습니다.
 
+## Electron/MCP 환경설정 가이드
+
+Electron 데스크톱 환경설정, 실행 방법, 그리고 MCP를 Codex/Claude에 연결하는 절차는
+`docs/electron-mcp-setup.md`를 참고하세요.
+
 ## MCP 에이전트 등록(개요)
 
 이 프로젝트는 OOXML 검증 **엔진 라이브러리**이므로, MCP 에이전트 등록을 위해서는
