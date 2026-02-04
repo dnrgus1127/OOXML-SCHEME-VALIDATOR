@@ -42,7 +42,7 @@ export default function App() {
     clearError,
   } = useDocumentStore()
 
-  const [showValidation, setShowValidation] = useState(false)
+  const [showValidation, setShowValidation] = useState(true)
 
   // Handle file open from menu
   useEffect(() => {
@@ -150,6 +150,7 @@ export default function App() {
                   results={validationResults}
                   onClose={() => setShowValidation(false)}
                   onNavigate={handleSelectPart}
+                  onRevalidate={handleValidate}
                 />
               </aside>
             )}
