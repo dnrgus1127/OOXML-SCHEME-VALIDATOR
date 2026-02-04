@@ -95,6 +95,27 @@ export function checkMissingRequiredElements(
 ): string[] {
   const missing: string[] = [];
 
+  if (state.kind === 'choice') {
+    if (state.selectedBranch === null) {
+      return missing;
+    }
+
+    const particle = state.flattenedParticles[state.selectedBranch];
+    if (particle) {
+      const count = state.occurrenceCounts.get(particle.index) ?? 0;
+      if (count < particle.minOccurs) {
+        missing.push(particleDescription(particle));
+      }
+
+      const nestedState = state.nestedStates.get(particle.index);
+      if (nestedState) {
+        missing.push(...checkMissingRequiredElements(nestedState, registry, resolver));
+      }
+    }
+
+    return missing;
+  }
+
   for (const particle of state.flattenedParticles) {
     const count = state.occurrenceCounts.get(particle.index) ?? 0;
     if (count < particle.minOccurs) {
@@ -169,6 +190,13 @@ function validateChoiceChild(
         return { success: false, errorCode: 'TOO_MANY_ELEMENTS' };
       }
       return { success: true };
+    }
+
+    if (particle) {
+      const count = state.occurrenceCounts.get(particle.index) ?? 0;
+      if (count < particle.minOccurs) {
+        return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' };
+      }
     }
 
     state.selectedBranch = null;
