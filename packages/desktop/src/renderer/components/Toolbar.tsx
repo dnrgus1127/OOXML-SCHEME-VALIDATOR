@@ -1,12 +1,14 @@
 interface ToolbarProps {
   onOpenFile: () => void
   onSave: () => void
+  onSaveAs: () => void
   onValidate: () => void
   hasDocument: boolean
   filePath: string | null
+  isDirty: boolean
 }
 
-export function Toolbar({ onOpenFile, onSave, onValidate, hasDocument, filePath }: ToolbarProps) {
+export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument, filePath, isDirty }: ToolbarProps) {
   const fileName = filePath ? filePath.split('/').pop() : null
 
   return (
@@ -15,8 +17,11 @@ export function Toolbar({ onOpenFile, onSave, onValidate, hasDocument, filePath 
         <button onClick={onOpenFile} className="toolbar-btn">
           📂 Open
         </button>
-        <button onClick={onSave} className="toolbar-btn" disabled={!hasDocument}>
+        <button onClick={onSave} className={`toolbar-btn${isDirty ? ' toolbar-btn--dirty' : ''}`} disabled={!hasDocument}>
           💾 Save
+        </button>
+        <button onClick={onSaveAs} className="toolbar-btn" disabled={!hasDocument}>
+          💾 Save As
         </button>
         <button onClick={onValidate} className="toolbar-btn" disabled={!hasDocument}>
           ✓ Validate
@@ -24,7 +29,11 @@ export function Toolbar({ onOpenFile, onSave, onValidate, hasDocument, filePath 
       </div>
 
       <div className="toolbar-center">
-        {fileName && <span className="file-name">{fileName}</span>}
+        {fileName && (
+          <span className={`file-name${isDirty ? ' file-name--dirty' : ''}`}>
+            {isDirty && '● '}{fileName}
+          </span>
+        )}
       </div>
 
       <div className="toolbar-right">

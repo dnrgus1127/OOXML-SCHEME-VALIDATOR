@@ -81,8 +81,17 @@ body {
   cursor: not-allowed;
 }
 
+.toolbar-btn--dirty {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
 .file-name {
   color: var(--text-secondary);
+}
+
+.file-name--dirty {
+  color: var(--warning);
 }
 
 .app-title {

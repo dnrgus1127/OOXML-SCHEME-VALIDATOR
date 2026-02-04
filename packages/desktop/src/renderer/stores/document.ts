@@ -29,6 +29,7 @@ interface DocumentState {
   selectPart: (partPath: string) => Promise<void>
   updatePartContent: (content: string) => void
   saveDocument: (path: string) => Promise<void>
+  saveDocumentAs: (path: string) => Promise<void>
   validate: () => Promise<void>
   clearError: () => void
   reset: () => void
@@ -127,7 +128,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { fileData, modifiedContent, selectedPart } = get()
     if (!fileData) return
 
-    set({ isLoading: true, error: null })
+    set({ error: null })
 
     try {
       let currentFileData = fileData
@@ -149,12 +150,43 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       set({
         fileData: currentFileData,
         modifiedContent: null,
-        isLoading: false,
       })
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
-        isLoading: false,
+      })
+    }
+  },
+
+  saveDocumentAs: async (path) => {
+    const { fileData, modifiedContent, selectedPart } = get()
+    if (!fileData) return
+
+    set({ error: null })
+
+    try {
+      let currentFileData = fileData
+
+      if (modifiedContent !== null && selectedPart) {
+        const updateResult = await window.electronAPI.updatePart(currentFileData, selectedPart, modifiedContent)
+        if (updateResult.success) {
+          currentFileData = updateResult.data!
+        }
+      }
+
+      const writeResult = await window.electronAPI.writeFile(path, currentFileData)
+      if (!writeResult.success) {
+        throw new Error(writeResult.error || 'Failed to write file')
+      }
+
+      set({
+        filePath: path,
+        fileData: currentFileData,
+        modifiedContent: null,
+      })
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
       })
     }
   },
@@ -163,7 +195,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { fileData, modifiedContent, selectedPart } = get()
     if (!fileData) return
 
-    set({ isLoading: true, error: null })
+    set({ error: null })
 
     try {
       let currentFileData = fileData
@@ -183,12 +215,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       set({
         validationResults: result.data,
-        isLoading: false,
       })
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
-        isLoading: false,
       })
     }
   },

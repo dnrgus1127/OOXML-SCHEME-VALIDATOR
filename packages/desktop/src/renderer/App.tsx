@@ -37,12 +37,16 @@ export default function App() {
     loadDocument,
     selectPart,
     updatePartContent,
+    modifiedContent,
     saveDocument,
+    saveDocumentAs,
     validate,
     clearError,
   } = useDocumentStore()
 
   const [showValidation, setShowValidation] = useState(true)
+
+  const isDirty = modifiedContent !== null && modifiedContent !== partContent
 
   // Handle file open from menu
   useEffect(() => {
@@ -58,10 +62,25 @@ export default function App() {
     const cleanup = window.electronAPI.onMenuSave(async () => {
       if (filePath) {
         await saveDocument(filePath)
+        await validate()
+        setShowValidation(true)
       }
     })
     return cleanup
   }, [filePath])
+
+  // Handle save-as from menu
+  useEffect(() => {
+    const cleanup = window.electronAPI.onMenuSaveAs(async () => {
+      const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
+      if (newPath) {
+        await saveDocumentAs(newPath)
+        await validate()
+        setShowValidation(true)
+      }
+    })
+    return cleanup
+  }, [filePath, saveDocumentAs])
 
   // Handle validate from menu
   useEffect(() => {
@@ -77,6 +96,22 @@ export default function App() {
     if (path) {
       setFilePath(path)
       await loadDocument(path)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!filePath) return
+    await saveDocument(filePath)
+    await validate()
+    setShowValidation(true)
+  }
+
+  const handleSaveAs = async () => {
+    const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
+    if (newPath) {
+      await saveDocumentAs(newPath)
+      await validate()
+      setShowValidation(true)
     }
   }
 
@@ -97,10 +132,12 @@ export default function App() {
     <div className="app">
       <Toolbar
         onOpenFile={handleOpenFile}
-        onSave={() => filePath && saveDocument(filePath)}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
         onValidate={handleValidate}
         hasDocument={!!documentData}
         filePath={filePath}
+        isDirty={isDirty}
       />
 
       {error && (
@@ -129,14 +166,14 @@ export default function App() {
             </aside>
 
             <main className="editor-container">
-              {isLoading ? (
-                <div className="loading">Loading...</div>
-              ) : selectedPart && partContent !== null ? (
+              {selectedPart && partContent !== null ? (
                 <XmlEditor
                   content={partContent}
                   partPath={selectedPart}
                   onChange={handleContentChange}
                 />
+              ) : isLoading ? (
+                <div className="loading">Loading...</div>
               ) : (
                 <div className="placeholder">
                   Select a part from the tree to view its content
