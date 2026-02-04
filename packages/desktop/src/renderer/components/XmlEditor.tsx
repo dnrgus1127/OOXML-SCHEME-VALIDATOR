@@ -6,26 +6,86 @@ interface XmlEditorProps {
   onChange: (content: string) => void
 }
 
-// Simple XML syntax highlighter
+// Simple XML syntax highlighter (placeholder 방식으로 순서 충돌 방지)
 function highlightXml(xml: string): string {
-  return xml
-    // Tags
-    .replace(/(&lt;\/?)([\w:-]+)/g, '$1<span class="tag">$2</span>')
-    // Attributes
-    .replace(/([\w:-]+)(=)/g, '<span class="attr">$1</span>$2')
-    // Attribute values
-    .replace(/(".*?")/g, '<span class="value">$1</span>')
-    // Comments
-    .replace(/(&lt;!--.*?--&gt;)/gs, '<span class="comment">$1</span>')
+  let result = xml
+
+  // 1. 주석 (placeholder 사용)
+  result = result.replace(/(&lt;!--.*?--&gt;)/gs, '\x00COMMENT\x01$1\x00/COMMENT\x01')
+
+  // 2. 속성값 먼저 ("..." 패턴)
+  result = result.replace(/(".*?")/g, '\x00VALUE\x01$1\x00/VALUE\x01')
+
+  // 3. 속성이름= 패턴 (값은 이미 placeholder로 대체됨)
+  result = result.replace(/([\w:-]+)(=)/g, '\x00ATTR\x01$1\x00/ATTR\x01$2')
+
+  // 4. 태그 이름
+  result = result.replace(/(&lt;\/?)([\w:-]+)/g, '$1\x00TAG\x01$2\x00/TAG\x01')
+
+  // 5. Placeholder를 실제 span으로 변환
+  result = result
+    .replace(/\x00COMMENT\x01/g, '<span class="comment">')
+    .replace(/\x00\/COMMENT\x01/g, '</span>')
+    .replace(/\x00VALUE\x01/g, '<span class="value">')
+    .replace(/\x00\/VALUE\x01/g, '</span>')
+    .replace(/\x00ATTR\x01/g, '<span class="attr">')
+    .replace(/\x00\/ATTR\x01/g, '</span>')
+    .replace(/\x00TAG\x01/g, '<span class="tag">')
+    .replace(/\x00\/TAG\x01/g, '</span>')
+
+  return result
+}
+
+// Format XML with proper indentation
+function formatXml(xml: string): string {
+  try {
+    let formatted = xml
+      // Remove existing whitespace between tags
+      .replace(/>\s+</g, '><')
+      // Add newlines
+      .replace(/></g, '>\n<')
+
+    // Indent
+    const lines = formatted.split('\n')
+    let indent = 0
+    const indentedLines = lines.map((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return ''
+
+      // Decrease indent for closing tags
+      if (trimmed.startsWith('</')) {
+        indent = Math.max(0, indent - 1)
+      }
+
+      const indentedLine = '  '.repeat(indent) + trimmed
+
+      // Increase indent for opening tags (not self-closing)
+      if (trimmed.startsWith('<') && !trimmed.startsWith('</') &&
+          !trimmed.startsWith('<?') && !trimmed.endsWith('/>')) {
+        indent++
+      }
+
+      return indentedLine
+    })
+
+    return indentedLines.join('\n')
+  } catch {
+    return xml
+  }
 }
 
 export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const preRef = useRef<HTMLPreElement>(null)
+  const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [localContent, setLocalContent] = useState(content)
   const [showHighlighted, setShowHighlighted] = useState(true)
 
   useEffect(() => {
-    setLocalContent(content)
+    // Part 변경 시 자동 포맷팅 적용
+    const formatted = formatXml(content)
+    setLocalContent(formatted)
+    onChange(formatted)
   }, [content, partPath])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -54,44 +114,22 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
     }
   }
 
-  // Format XML
-  const handleFormat = () => {
-    try {
-      // Simple XML formatting
-      let formatted = localContent
-        // Remove existing whitespace between tags
-        .replace(/>\s+</g, '><')
-        // Add newlines
-        .replace(/></g, '>\n<')
-
-      // Indent
-      const lines = formatted.split('\n')
-      let indent = 0
-      const indentedLines = lines.map((line) => {
-        const trimmed = line.trim()
-        if (!trimmed) return ''
-
-        // Decrease indent for closing tags
-        if (trimmed.startsWith('</')) {
-          indent = Math.max(0, indent - 1)
-        }
-
-        const indentedLine = '  '.repeat(indent) + trimmed
-
-        // Increase indent for opening tags (not self-closing)
-        if (trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.startsWith('<?') && !trimmed.endsWith('/>')) {
-          indent++
-        }
-
-        return indentedLine
-      })
-
-      const result = indentedLines.join('\n')
-      setLocalContent(result)
-      onChange(result)
-    } catch (err) {
-      console.error('Format error:', err)
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget
+    if (preRef.current) {
+      preRef.current.scrollTop = textarea.scrollTop
+      preRef.current.scrollLeft = textarea.scrollLeft
     }
+    if (lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = textarea.scrollTop
+    }
+  }
+
+  // Format XML (재포맷팅용)
+  const handleFormat = () => {
+    const result = formatXml(localContent)
+    setLocalContent(result)
+    onChange(result)
   }
 
   const escapedContent = localContent
@@ -114,7 +152,7 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
       </div>
 
       <div className="editor-body">
-        <div className="line-numbers">
+        <div className="line-numbers" ref={lineNumbersRef}>
           {localContent.split('\n').map((_, i) => (
             <div key={i} className="line-number">{i + 1}</div>
           ))}
@@ -123,6 +161,7 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
         <div className="editor-content">
           {showHighlighted ? (
             <pre
+              ref={preRef}
               className="highlighted"
               dangerouslySetInnerHTML={{ __html: highlightXml(escapedContent) }}
             />
@@ -133,6 +172,7 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
             value={localContent}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
             className={showHighlighted ? 'transparent' : ''}
             spellCheck={false}
           />

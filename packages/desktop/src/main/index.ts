@@ -7,7 +7,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
-import { OoxmlParser, OoxmlBuilder } from '@ooxml/parser'
+import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -29,7 +29,6 @@ function createWindow(): void {
   // Load the app
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -252,7 +251,8 @@ function setupIpcHandlers(): void {
         if (path.includes('_rels/')) continue
 
         try {
-          doc.getPartAsXml(path)
+          const xmlContent = part.content.toString('utf-8')
+          parseXmlToEventArray(xmlContent)
           results.push({ path, valid: true })
         } catch (err) {
           results.push({ path, valid: false, error: String(err) })

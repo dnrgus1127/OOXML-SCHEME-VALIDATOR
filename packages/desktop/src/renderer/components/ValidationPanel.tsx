@@ -7,14 +7,16 @@ interface ValidationPanelProps {
   results: ValidationResult | null
   onClose: () => void
   onNavigate: (partPath: string) => void
+  onRevalidate: () => void
 }
 
-export function ValidationPanel({ results, onClose, onNavigate }: ValidationPanelProps) {
+export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: ValidationPanelProps) {
   if (!results) {
     return (
       <div className="validation-results">
         <div className="validation-header">
           <h3>Validation Results</h3>
+          <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
           <button onClick={onClose} className="close-btn">×</button>
         </div>
         <div className="validation-empty">
@@ -31,6 +33,7 @@ export function ValidationPanel({ results, onClose, onNavigate }: ValidationPane
     <div className="validation-results">
       <div className="validation-header">
         <h3>Validation Results</h3>
+        <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
         <button onClick={onClose} className="close-btn">×</button>
       </div>
 
