@@ -57,37 +57,40 @@ function highlightXml(xml: string): string {
 // Format XML with proper indentation
 function formatXml(xml: string): string {
   try {
-    let formatted = xml
-      // Remove existing whitespace between tags
+    const normalized = xml
+      // 태그 사이 공백은 정리
       .replace(/>\s+</g, '><')
-      // Add newlines
-      .replace(/></g, '>\n<')
 
-    // Indent
-    const lines = formatted.split('\n')
+    const tokens = normalized.match(/<[^>]+>|[^<]+/g) ?? []
     let indent = 0
-    const indentedLines = lines.map((line) => {
-      const trimmed = line.trim()
-      if (!trimmed) return ''
+    const lines: string[] = []
 
-      const openingTags = trimmed.match(/<(?!\/|\?|!)/g)?.length ?? 0
-      const closingTags = trimmed.match(/<\//g)?.length ?? 0
-      const selfClosingTags = trimmed.match(/\/>/g)?.length ?? 0
-      const netChange = openingTags - closingTags - selfClosingTags
-      const indentBefore = indent + Math.min(netChange, 0)
+    for (const token of tokens) {
+      const trimmed = token.trim()
+      if (!trimmed) continue
 
-      const indentedLine = '  '.repeat(Math.max(indentBefore, 0)) + trimmed
-      indent += netChange
-      if (indent < 0) indent = 0
+      const isTag = trimmed.startsWith('<')
+      const isClosingTag = /^<\//.test(trimmed)
+      const isDeclarationOrComment = /^<\?|^<!/.test(trimmed)
+      const isSelfClosing = /\/>$/.test(trimmed)
 
-      return indentedLine
-    })
+      if (isTag && isClosingTag) {
+        indent = Math.max(0, indent - 1)
+      }
 
-    return indentedLines.join('\n')
+      lines.push(`${'  '.repeat(indent)}${trimmed}`)
+
+      if (isTag && !isClosingTag && !isSelfClosing && !isDeclarationOrComment) {
+        indent += 1
+      }
+    }
+
+    return lines.join('\n')
   } catch {
     return xml
   }
 }
+
 
 function parseTagName(tagText: string): { qualifiedName: string; localName: string; prefix?: string } | null {
   const match = tagText.match(/^<\s*\/?\s*([^\s/>]+)/)
