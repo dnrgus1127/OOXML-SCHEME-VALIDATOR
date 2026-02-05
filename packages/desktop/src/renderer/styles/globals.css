@@ -86,6 +86,17 @@ body {
   color: var(--warning);
 }
 
+.toolbar-toggle {
+  font-size: 11px;
+  padding: 5px 10px;
+  color: var(--text-secondary);
+}
+
+.toolbar-toggle--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .file-name {
   color: var(--text-secondary);
 }
@@ -408,6 +419,7 @@ body {
   justify-content: space-between;
   padding: 12px;
   border-bottom: 1px solid var(--border-color);
+  gap: 8px;
 }
 
 .validation-header h3 {
@@ -425,6 +437,16 @@ body {
 
 .close-btn:hover {
   color: var(--text-primary);
+}
+
+.auto-validate-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.auto-validate-status.active {
+  color: var(--accent);
 }
 
 .validation-summary {

@@ -8,15 +8,29 @@ interface ValidationPanelProps {
   onClose: () => void
   onNavigate: (partPath: string) => void
   onRevalidate: () => void
+  autoValidateEnabled: boolean
+  isAutoValidating: boolean
 }
 
-export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: ValidationPanelProps) {
+export function ValidationPanel({
+  results,
+  onClose,
+  onNavigate,
+  onRevalidate,
+  autoValidateEnabled,
+  isAutoValidating,
+}: ValidationPanelProps) {
   if (!results) {
     return (
       <div className="validation-results">
         <div className="validation-header">
           <h3>Validation Results</h3>
           <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
+          {autoValidateEnabled && (
+            <span className={`auto-validate-status${isAutoValidating ? ' active' : ''}`}>
+              {isAutoValidating ? '자동 검증 중...' : '자동 검증 대기'}
+            </span>
+          )}
           <button onClick={onClose} className="close-btn">×</button>
         </div>
         <div className="validation-empty">
@@ -34,6 +48,11 @@ export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: 
       <div className="validation-header">
         <h3>Validation Results</h3>
         <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
+        {autoValidateEnabled && (
+          <span className={`auto-validate-status${isAutoValidating ? ' active' : ''}`}>
+            {isAutoValidating ? '자동 검증 중...' : '자동 검증 대기'}
+          </span>
+        )}
         <button onClick={onClose} className="close-btn">×</button>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDocumentStore } from './stores/document'
 import { DocumentTree } from './components/DocumentTree'
 import { XmlEditor } from './components/XmlEditor'
@@ -45,6 +45,11 @@ export default function App() {
   } = useDocumentStore()
 
   const [showValidation, setShowValidation] = useState(true)
+  const [autoFormatOnLoad, setAutoFormatOnLoad] = useState(true)
+  const [autoValidate, setAutoValidate] = useState(true)
+  const [isAutoValidating, setIsAutoValidating] = useState(false)
+  const autoValidateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoValidateInFlight = useRef(false)
 
   const isDirty = modifiedContent !== null && modifiedContent !== partContent
 
@@ -128,6 +133,34 @@ export default function App() {
     setShowValidation(true)
   }
 
+  useEffect(() => {
+    if (autoValidateTimeout.current) {
+      clearTimeout(autoValidateTimeout.current)
+    }
+
+    if (!autoValidate || !documentData || modifiedContent === null) {
+      setIsAutoValidating(false)
+      autoValidateInFlight.current = false
+      return
+    }
+
+    autoValidateTimeout.current = setTimeout(async () => {
+      if (autoValidateInFlight.current) return
+      autoValidateInFlight.current = true
+      setIsAutoValidating(true)
+      await validate()
+      setShowValidation(true)
+      setIsAutoValidating(false)
+      autoValidateInFlight.current = false
+    }, 800)
+
+    return () => {
+      if (autoValidateTimeout.current) {
+        clearTimeout(autoValidateTimeout.current)
+      }
+    }
+  }, [autoValidate, documentData, modifiedContent, validate])
+
   return (
     <div className="app">
       <Toolbar
@@ -135,9 +168,13 @@ export default function App() {
         onSave={handleSave}
         onSaveAs={handleSaveAs}
         onValidate={handleValidate}
+        onToggleAutoFormat={() => setAutoFormatOnLoad((prev) => !prev)}
+        onToggleAutoValidate={() => setAutoValidate((prev) => !prev)}
         hasDocument={!!documentData}
         filePath={filePath}
         isDirty={isDirty}
+        autoFormatEnabled={autoFormatOnLoad}
+        autoValidateEnabled={autoValidate}
       />
 
       {error && (
@@ -171,6 +208,7 @@ export default function App() {
                   content={partContent}
                   partPath={selectedPart}
                   onChange={handleContentChange}
+                  autoFormatOnLoad={autoFormatOnLoad}
                 />
               ) : isLoading ? (
                 <div className="loading">Loading...</div>
@@ -188,6 +226,8 @@ export default function App() {
                   onClose={() => setShowValidation(false)}
                   onNavigate={handleSelectPart}
                   onRevalidate={handleValidate}
+                  autoValidateEnabled={autoValidate}
+                  isAutoValidating={isAutoValidating}
                 />
               </aside>
             )}

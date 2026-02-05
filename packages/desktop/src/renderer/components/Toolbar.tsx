@@ -3,12 +3,28 @@ interface ToolbarProps {
   onSave: () => void
   onSaveAs: () => void
   onValidate: () => void
+  onToggleAutoFormat: () => void
+  onToggleAutoValidate: () => void
   hasDocument: boolean
   filePath: string | null
   isDirty: boolean
+  autoFormatEnabled: boolean
+  autoValidateEnabled: boolean
 }
 
-export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument, filePath, isDirty }: ToolbarProps) {
+export function Toolbar({
+  onOpenFile,
+  onSave,
+  onSaveAs,
+  onValidate,
+  onToggleAutoFormat,
+  onToggleAutoValidate,
+  hasDocument,
+  filePath,
+  isDirty,
+  autoFormatEnabled,
+  autoValidateEnabled,
+}: ToolbarProps) {
   const fileName = filePath ? filePath.split('/').pop() : null
 
   return (
@@ -37,6 +53,20 @@ export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument,
       </div>
 
       <div className="toolbar-right">
+        <button
+          onClick={onToggleAutoFormat}
+          className={`toolbar-btn toolbar-toggle${autoFormatEnabled ? ' toolbar-toggle--active' : ''}`}
+          disabled={!hasDocument}
+        >
+          {autoFormatEnabled ? '자동 포맷: On' : '자동 포맷: Off'}
+        </button>
+        <button
+          onClick={onToggleAutoValidate}
+          className={`toolbar-btn toolbar-toggle${autoValidateEnabled ? ' toolbar-toggle--active' : ''}`}
+          disabled={!hasDocument}
+        >
+          {autoValidateEnabled ? '자동 검증: On' : '자동 검증: Off'}
+        </button>
         <span className="app-title">OOXML Validator</span>
       </div>
     </header>

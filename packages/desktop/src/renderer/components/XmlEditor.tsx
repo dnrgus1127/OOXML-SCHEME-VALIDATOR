@@ -4,6 +4,7 @@ interface XmlEditorProps {
   content: string
   partPath: string
   onChange: (content: string) => void
+  autoFormatOnLoad: boolean
 }
 
 // Simple XML syntax highlighter (placeholder 방식으로 순서 충돌 방지)
@@ -74,7 +75,7 @@ function formatXml(xml: string): string {
   }
 }
 
-export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
+export function XmlEditor({ content, partPath, onChange, autoFormatOnLoad }: XmlEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
@@ -82,11 +83,16 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const [showHighlighted, setShowHighlighted] = useState(true)
 
   useEffect(() => {
-    // Part 변경 시 자동 포맷팅 적용
-    const formatted = formatXml(content)
-    setLocalContent(formatted)
-    onChange(formatted)
-  }, [content, partPath])
+    if (autoFormatOnLoad) {
+      const formatted = formatXml(content)
+      setLocalContent(formatted)
+      if (formatted !== content) {
+        onChange(formatted)
+      }
+    } else {
+      setLocalContent(content)
+    }
+  }, [content, partPath, autoFormatOnLoad, onChange])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value
