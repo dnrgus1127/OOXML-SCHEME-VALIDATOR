@@ -77,9 +77,15 @@ function formatXml(xml: string): string {
 
       const indentedLine = '  '.repeat(indent) + trimmed
 
-      // Increase indent for opening tags (not self-closing)
-      if (trimmed.startsWith('<') && !trimmed.startsWith('</') &&
-          !trimmed.startsWith('<?') && !trimmed.endsWith('/>')) {
+      const isOpeningTag = trimmed.startsWith('<')
+        && !trimmed.startsWith('</')
+        && !trimmed.startsWith('<?')
+        && !trimmed.startsWith('<!')
+      const isSelfClosing = trimmed.endsWith('/>')
+      const hasInlineClosing = isOpeningTag && trimmed.includes('</')
+
+      // Increase indent for opening tags (not self-closing, not inline closing)
+      if (isOpeningTag && !isSelfClosing && !hasInlineClosing) {
         indent++
       }
 
