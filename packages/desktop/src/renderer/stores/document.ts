@@ -6,9 +6,33 @@ interface DocumentData {
   parts: Record<string, { contentType: string; size: number }>
 }
 
+interface ValidationError {
+  code: string
+  message: string
+  path: string
+  value?: string
+  line?: number
+  column?: number
+}
+
+interface PartValidationResult {
+  path: string
+  valid: boolean
+  error?: string  // For backward compatibility (XML parse errors)
+  errors?: ValidationError[]  // Schema validation errors
+}
+
+interface ValidationSummary {
+  totalParts: number
+  validParts: number
+  invalidParts: number
+  totalErrors: number
+}
+
 interface ValidationResult {
   valid: boolean
-  results: { path: string; valid: boolean; error?: string }[]
+  results: PartValidationResult[]
+  summary?: ValidationSummary
 }
 
 interface DocumentState {

@@ -8,6 +8,13 @@ import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
+import {
+  ValidationEngine,
+  loadSchemaRegistry,
+  type OoxmlDocumentType,
+  type ValidationError,
+  type SchemaRegistry,
+} from '@ooxml/core'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -237,34 +244,166 @@ function setupIpcHandlers(): void {
     }
   })
 
-  // Validate document
+  // Validate document with XSD schema validation
   ipcMain.handle('ooxml:validate', async (_, base64Data: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
       const doc = await OoxmlParser.fromBuffer(buffer)
 
-      // Basic validation - check all XML parts are parseable
-      const results: { path: string; valid: boolean; error?: string }[] = []
+      // Load schema registry based on document type
+      const documentType = doc.documentType as OoxmlDocumentType
+      let registry: SchemaRegistry
+      try {
+        registry = loadSchemaRegistry(documentType)
+      } catch (schemaError) {
+        // Fallback to basic validation if schema loading fails
+        console.warn('Schema loading failed, using basic validation:', schemaError)
+        return basicValidation(doc)
+      }
+
+      // Validate each XML part
+      const results: {
+        path: string
+        valid: boolean
+        errors?: Array<{
+          code: string
+          message: string
+          path: string
+          value?: string
+          line?: number
+          column?: number
+        }>
+      }[] = []
 
       for (const [path, part] of doc.parts) {
+        // Skip non-XML parts
         if (!part.contentType.includes('xml')) continue
+        // Skip relationship parts
         if (path.includes('_rels/')) continue
+        // Skip content types
+        if (path === '[Content_Types].xml') continue
 
         try {
           const xmlContent = part.content.toString('utf-8')
-          parseXmlToEventArray(xmlContent)
-          results.push({ path, valid: true })
+          const events = parseXmlToEventArray(xmlContent)
+
+          // Create validation engine for this part
+          const engine = new ValidationEngine(registry, {
+            maxErrors: 100,
+            allowWhitespace: true,
+          })
+
+          // Process validation events
+          for (const event of events) {
+            switch (event.type) {
+              case 'startDocument':
+                engine.startDocument()
+                break
+              case 'startElement':
+                engine.startElement(event.element)
+                break
+              case 'text':
+                engine.text(event.text)
+                break
+              case 'endElement':
+                engine.endElement(event.element)
+                break
+              case 'endDocument':
+                // Get validation result
+                const result = engine.endDocument()
+                if (result.valid) {
+                  results.push({ path, valid: true })
+                } else {
+                  results.push({
+                    path,
+                    valid: false,
+                    errors: result.errors.map((err) => ({
+                      code: err.code,
+                      message: err.message,
+                      path: err.path,
+                      value: err.value,
+                      line: err.line,
+                      column: err.column,
+                    })),
+                  })
+                }
+                break
+            }
+          }
         } catch (err) {
-          results.push({ path, valid: false, error: String(err) })
+          // XML parsing error
+          results.push({
+            path,
+            valid: false,
+            errors: [
+              {
+                code: 'XML_PARSE_ERROR',
+                message: String(err),
+                path: '/',
+              },
+            ],
+          })
         }
       }
 
       const valid = results.every((r) => r.valid)
-      return { success: true, data: { valid, results } }
+      const totalErrors = results.reduce(
+        (sum, r) => sum + (r.errors?.length || 0),
+        0
+      )
+
+      return {
+        success: true,
+        data: {
+          valid,
+          results,
+          summary: {
+            totalParts: results.length,
+            validParts: results.filter((r) => r.valid).length,
+            invalidParts: results.filter((r) => !r.valid).length,
+            totalErrors,
+          },
+        },
+      }
     } catch (error) {
       return { success: false, error: String(error) }
     }
   })
+}
+
+/**
+ * Basic validation fallback (XML parsing only)
+ */
+async function basicValidation(doc: Awaited<ReturnType<typeof OoxmlParser.fromBuffer>>) {
+  const results: { path: string; valid: boolean; error?: string }[] = []
+
+  for (const [path, part] of doc.parts) {
+    if (!part.contentType.includes('xml')) continue
+    if (path.includes('_rels/')) continue
+
+    try {
+      const xmlContent = part.content.toString('utf-8')
+      parseXmlToEventArray(xmlContent)
+      results.push({ path, valid: true })
+    } catch (err) {
+      results.push({ path, valid: false, error: String(err) })
+    }
+  }
+
+  const valid = results.every((r) => r.valid)
+  return {
+    success: true,
+    data: {
+      valid,
+      results,
+      summary: {
+        totalParts: results.length,
+        validParts: results.filter((r) => r.valid).length,
+        invalidParts: results.filter((r) => !r.valid).length,
+        totalErrors: results.filter((r) => !r.valid).length,
+      },
+    },
+  }
 }
 
 // App lifecycle
