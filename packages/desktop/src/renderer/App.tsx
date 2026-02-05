@@ -16,6 +16,17 @@ declare global {
       getPart: (base64Data: string, partPath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       updatePart: (base64Data: string, partPath: string, content: string) => Promise<{ success: boolean; data?: string; error?: string }>
       validate: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
+      getSchemaInfo: (elementName: string, namespaceUri?: string | null) =>
+        Promise<{ success: boolean; data?: {
+          elementName: string
+          namespaceUri: string
+          typeName?: string
+          typeNamespaceUri?: string
+          typeKind?: string
+          occurs?: { minOccurs: number; maxOccurs: number | 'unbounded' }
+          nillable?: boolean
+          abstract?: boolean
+        } | null; error?: string }>
       onFileOpened: (callback: (filePath: string) => void) => () => void
       onMenuSave: (callback: () => void) => () => void
       onMenuSaveAs: (callback: () => void) => () => void

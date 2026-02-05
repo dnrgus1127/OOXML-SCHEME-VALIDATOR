@@ -6,6 +6,24 @@ interface XmlEditorProps {
   onChange: (content: string) => void
 }
 
+interface CursorSchemaInfo {
+  elementName: string
+  namespaceUri: string
+  typeName?: string
+  typeNamespaceUri?: string
+  typeKind?: string
+  occurs?: { minOccurs: number; maxOccurs: number | 'unbounded' }
+  nillable?: boolean
+  abstract?: boolean
+}
+
+interface CursorElementInfo {
+  qualifiedName: string
+  localName: string
+  prefix?: string
+  namespaceUri?: string
+}
+
 // Simple XML syntax highlighter (placeholder 방식으로 순서 충돌 방지)
 function highlightXml(xml: string): string {
   let result = xml
@@ -74,18 +92,123 @@ function formatXml(xml: string): string {
   }
 }
 
+function parseTagName(tagText: string): { qualifiedName: string; localName: string; prefix?: string } | null {
+  const match = tagText.match(/^<\s*\/?\s*([^\s/>]+)/)
+  if (!match) return null
+  const qualifiedName = match[1]
+  const [prefix, localName] = qualifiedName.includes(':')
+    ? qualifiedName.split(':')
+    : [undefined, qualifiedName]
+  return { qualifiedName, localName, prefix }
+}
+
+function parseNamespaceDeclarations(tagText: string): Map<string, string> {
+  const namespaceMap = new Map<string, string>()
+  const attrRegex = /xmlns(?::([\w.-]+))?="([^"]*)"/g
+  let match: RegExpExecArray | null
+
+  while ((match = attrRegex.exec(tagText)) !== null) {
+    const prefix = match[1] ?? ''
+    namespaceMap.set(prefix, match[2])
+  }
+
+  return namespaceMap
+}
+
+function resolveNamespaceUri(map: Map<string, string>, prefix?: string): string | undefined {
+  if (!prefix) {
+    return map.get('')
+  }
+  return map.get(prefix)
+}
+
+function findCursorElementInfo(xml: string, cursor: number): CursorElementInfo | null {
+  const tagRegex = /<[^>]+>/g
+  const stack: Array<{ info: CursorElementInfo; namespaceMap: Map<string, string> }> = []
+  let match: RegExpExecArray | null
+
+  while ((match = tagRegex.exec(xml)) !== null) {
+    const tagText = match[0]
+    const start = match.index
+    const end = start + tagText.length
+    if (start > cursor) {
+      break
+    }
+
+    if (tagText.startsWith('<?') || tagText.startsWith('<!') || tagText.startsWith('<!--')) {
+      continue
+    }
+
+    const isClosing = tagText.startsWith('</')
+    const isSelfClosing = tagText.endsWith('/>')
+    const tagName = parseTagName(tagText)
+    if (!tagName) continue
+
+    const parentNamespaces = stack.length > 0 ? stack[stack.length - 1].namespaceMap : new Map<string, string>()
+    const currentNamespaces = new Map(parentNamespaces)
+    const declarations = parseNamespaceDeclarations(tagText)
+    for (const [prefix, uri] of declarations.entries()) {
+      currentNamespaces.set(prefix, uri)
+    }
+
+    const elementInfo: CursorElementInfo = {
+      qualifiedName: tagName.qualifiedName,
+      localName: tagName.localName,
+      prefix: tagName.prefix,
+      namespaceUri: resolveNamespaceUri(currentNamespaces, tagName.prefix),
+    }
+
+    const cursorInsideTag = cursor >= start && cursor <= end
+
+    if (isClosing) {
+      if (cursorInsideTag) {
+        const current = stack[stack.length - 1]
+        if (current) {
+          return {
+            ...current.info,
+            namespaceUri: resolveNamespaceUri(current.namespaceMap, current.info.prefix),
+          }
+        }
+        return elementInfo
+      }
+      stack.pop()
+      continue
+    }
+
+    if (cursorInsideTag) {
+      return elementInfo
+    }
+
+    if (!isSelfClosing) {
+      stack.push({ info: elementInfo, namespaceMap: currentNamespaces })
+    }
+  }
+
+  if (stack.length > 0) {
+    const current = stack[stack.length - 1]
+    return {
+      ...current.info,
+      namespaceUri: resolveNamespaceUri(current.namespaceMap, current.info.prefix),
+    }
+  }
+
+  return null
+}
+
 export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [localContent, setLocalContent] = useState(content)
   const [showHighlighted, setShowHighlighted] = useState(true)
+  const [schemaInfo, setSchemaInfo] = useState<CursorSchemaInfo | null>(null)
 
   useEffect(() => {
     // Part 변경 시 자동 포맷팅 적용
     const formatted = formatXml(content)
     setLocalContent(formatted)
     onChange(formatted)
+    setSchemaInfo(null)
   }, [content, partPath])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -123,6 +246,30 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
     if (lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textarea.scrollTop
     }
+  }
+
+  const updateSchemaInfo = async () => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const cursor = textarea.selectionStart
+    const elementInfo = findCursorElementInfo(localContent, cursor)
+    if (!elementInfo) {
+      setSchemaInfo(null)
+      return
+    }
+
+    const result = await window.electronAPI.getSchemaInfo(
+      elementInfo.localName,
+      elementInfo.namespaceUri ?? null,
+    )
+
+    if (!result.success) {
+      setSchemaInfo(null)
+      return
+    }
+
+    setSchemaInfo(result.data ?? null)
   }
 
   // Format XML (재포맷팅용)
@@ -172,12 +319,56 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
             value={localContent}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onKeyUp={updateSchemaInfo}
+            onClick={updateSchemaInfo}
+            onMouseUp={updateSchemaInfo}
             onScroll={handleScroll}
             className={showHighlighted ? 'transparent' : ''}
             spellCheck={false}
           />
         </div>
       </div>
+
+      {schemaInfo && (
+        <div className="schema-info">
+          <div className="schema-info__title">Schema Info</div>
+          <div className="schema-info__row">
+            <span className="schema-info__label">Element</span>
+            <span className="schema-info__value">{schemaInfo.elementName}</span>
+          </div>
+          <div className="schema-info__row">
+            <span className="schema-info__label">Namespace</span>
+            <span className="schema-info__value">{schemaInfo.namespaceUri}</span>
+          </div>
+          {schemaInfo.typeName && (
+            <div className="schema-info__row">
+              <span className="schema-info__label">Type</span>
+              <span className="schema-info__value">
+                {schemaInfo.typeName}
+                {schemaInfo.typeKind ? ` (${schemaInfo.typeKind})` : ''}
+              </span>
+            </div>
+          )}
+          {schemaInfo.occurs && (
+            <div className="schema-info__row">
+              <span className="schema-info__label">Occurs</span>
+              <span className="schema-info__value">
+                {schemaInfo.occurs.minOccurs}..{schemaInfo.occurs.maxOccurs}
+              </span>
+            </div>
+          )}
+          {(schemaInfo.nillable || schemaInfo.abstract) && (
+            <div className="schema-info__row">
+              <span className="schema-info__label">Flags</span>
+              <span className="schema-info__value">
+                {schemaInfo.nillable ? 'nillable' : ''}
+                {schemaInfo.nillable && schemaInfo.abstract ? ', ' : ''}
+                {schemaInfo.abstract ? 'abstract' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

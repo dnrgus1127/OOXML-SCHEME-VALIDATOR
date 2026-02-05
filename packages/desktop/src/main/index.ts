@@ -8,6 +8,7 @@ import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
+import { lookupSchemaElement } from './schema-registry'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -261,6 +262,32 @@ function setupIpcHandlers(): void {
 
       const valid = results.every((r) => r.valid)
       return { success: true, data: { valid, results } }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
+  })
+
+  // Get schema info for element
+  ipcMain.handle('ooxml:getSchemaInfo', async (_, elementName: string, namespaceUri?: string | null) => {
+    try {
+      const info = await lookupSchemaElement(elementName, namespaceUri ?? undefined)
+      if (!info) {
+        return { success: true, data: null }
+      }
+
+      return {
+        success: true,
+        data: {
+          elementName: info.elementName,
+          namespaceUri: info.namespaceUri,
+          typeName: info.typeName,
+          typeNamespaceUri: info.typeNamespaceUri,
+          typeKind: info.schemaType?.kind,
+          occurs: info.element.occurs,
+          nillable: info.element.nillable,
+          abstract: info.element.abstract,
+        },
+      }
     } catch (error) {
       return { success: false, error: String(error) }
     }

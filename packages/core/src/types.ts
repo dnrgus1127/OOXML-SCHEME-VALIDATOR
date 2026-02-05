@@ -524,6 +524,28 @@ export interface SchemaRegistry {
 }
 
 // ============================================================================
+// Schema 탐색 유틸리티
+// ============================================================================
+
+/** 특정 요소의 스키마 정보를 조회한 결과 */
+export interface SchemaElementInfo {
+  /** 요소 이름 */
+  elementName: string;
+  /** 요소 네임스페이스 */
+  namespaceUri: string;
+  /** 요소 정의 */
+  element: XsdElement;
+  /** 요소가 속한 스키마 */
+  schema: XsdSchema;
+  /** 요소의 타입 (가능한 경우) */
+  schemaType?: XsdComplexType | XsdSimpleType;
+  /** 타입 이름 (inline 타입은 undefined) */
+  typeName?: string;
+  /** 타입 네임스페이스 */
+  typeNamespaceUri?: string;
+}
+
+// ============================================================================
 // XML 검증용 컨텍스트 및 유틸리티 타입
 // ============================================================================
 

@@ -22,6 +22,8 @@ const api = {
   updatePart: (base64Data: string, partPath: string, content: string) =>
     ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content),
   validate: (base64Data: string) => ipcRenderer.invoke('ooxml:validate', base64Data),
+  getSchemaInfo: (elementName: string, namespaceUri?: string | null) =>
+    ipcRenderer.invoke('ooxml:getSchemaInfo', elementName, namespaceUri),
 
   // Menu events
   onFileOpened: (callback: (filePath: string) => void) => {

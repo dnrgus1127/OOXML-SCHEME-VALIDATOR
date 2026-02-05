@@ -261,6 +261,7 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .editor-header {
@@ -359,6 +360,48 @@ body {
   margin: 0;
   background: var(--bg-primary);
   overflow: hidden;
+}
+
+.schema-info {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.schema-info__title {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
+.schema-info__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schema-info__label {
+  color: var(--text-secondary);
+}
+
+.schema-info__value {
+  font-family: var(--font-mono);
+  text-align: right;
+  word-break: break-word;
 }
 
 /* Scrollbar styling */
