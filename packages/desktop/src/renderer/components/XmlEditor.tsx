@@ -204,10 +204,8 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const [schemaInfo, setSchemaInfo] = useState<CursorSchemaInfo | null>(null)
 
   useEffect(() => {
-    // Part 변경 시 자동 포맷팅 적용
-    const formatted = formatXml(content)
-    setLocalContent(formatted)
-    onChange(formatted)
+    setLocalContent(content)
+    onChange(content)
     setSchemaInfo(null)
   }, [content, partPath])
 
