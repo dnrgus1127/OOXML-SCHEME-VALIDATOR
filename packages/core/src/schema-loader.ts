@@ -33,6 +33,48 @@ import { sharedCustomXmlSchemaPropertiesSchema } from './schemas/shared-customXm
 export type OoxmlDocumentType = 'spreadsheet' | 'document' | 'presentation' | 'unknown';
 
 /**
+ * Namespace mapping: Transitional (used in most Office files) -> Strict (used in XSD schemas)
+ *
+ * Office files typically use Transitional namespaces (schemas.openxmlformats.org)
+ * but our XSD schemas use Strict namespaces (purl.oclc.org/ooxml)
+ */
+const TRANSITIONAL_TO_STRICT_NS: Record<string, string> = {
+  // SpreadsheetML
+  'http://schemas.openxmlformats.org/spreadsheetml/2006/main': 'http://purl.oclc.org/ooxml/spreadsheetml/main',
+  // WordprocessingML
+  'http://schemas.openxmlformats.org/wordprocessingml/2006/main': 'http://purl.oclc.org/ooxml/wordprocessingml/main',
+  // PresentationML
+  'http://schemas.openxmlformats.org/presentationml/2006/main': 'http://purl.oclc.org/ooxml/presentationml/main',
+  // DrawingML
+  'http://schemas.openxmlformats.org/drawingml/2006/main': 'http://purl.oclc.org/ooxml/drawingml/main',
+  'http://schemas.openxmlformats.org/drawingml/2006/chart': 'http://purl.oclc.org/ooxml/drawingml/chart',
+  'http://schemas.openxmlformats.org/drawingml/2006/chartDrawing': 'http://purl.oclc.org/ooxml/drawingml/chartDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/diagram': 'http://purl.oclc.org/ooxml/drawingml/diagram',
+  'http://schemas.openxmlformats.org/drawingml/2006/picture': 'http://purl.oclc.org/ooxml/drawingml/picture',
+  'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing': 'http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing': 'http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas': 'http://purl.oclc.org/ooxml/drawingml/lockedCanvas',
+  // Office Document
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships': 'http://purl.oclc.org/ooxml/officeDocument/relationships',
+  'http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes': 'http://purl.oclc.org/ooxml/officeDocument/sharedTypes',
+  'http://schemas.openxmlformats.org/officeDocument/2006/math': 'http://purl.oclc.org/ooxml/officeDocument/math',
+  'http://schemas.openxmlformats.org/officeDocument/2006/bibliography': 'http://purl.oclc.org/ooxml/officeDocument/bibliography',
+  'http://schemas.openxmlformats.org/officeDocument/2006/characteristics': 'http://purl.oclc.org/ooxml/officeDocument/characteristics',
+  'http://schemas.openxmlformats.org/officeDocument/2006/custom-properties': 'http://purl.oclc.org/ooxml/officeDocument/custom-properties',
+  'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties': 'http://purl.oclc.org/ooxml/officeDocument/extended-properties',
+  'http://schemas.openxmlformats.org/officeDocument/2006/customXml': 'http://purl.oclc.org/ooxml/officeDocument/customXml',
+  // Variant Types
+  'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes': 'http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes',
+};
+
+/**
+ * Normalize namespace URI: Convert Transitional to Strict if applicable
+ */
+export function normalizeNamespace(namespaceUri: string): string {
+  return TRANSITIONAL_TO_STRICT_NS[namespaceUri] || namespaceUri;
+}
+
+/**
  * All available schemas
  */
 const ALL_SCHEMAS: XsdSchema[] = [
