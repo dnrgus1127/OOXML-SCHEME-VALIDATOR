@@ -40,6 +40,7 @@ const XSD_BUILTIN_TYPES = new Set([
 
 interface ParsedSchema {
   targetNamespace: string
+  namespaces: { prefix: string; uri: string }[]
   imports: { namespace: string; schemaLocation: string }[]
   simpleTypes: ParsedSimpleType[]
   complexTypes: ParsedComplexType[]
@@ -195,8 +196,21 @@ export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
   const targetNamespace = attr(schemaNode, 'targetNamespace') || ''
   const schemaChildren = nodeChildren(schemaNode)
 
+  // Extract namespace declarations from schema attributes
+  const namespaces: { prefix: string; uri: string }[] = []
+  const schemaAttrs = schemaNode[':@'] || {}
+  for (const [key, value] of Object.entries(schemaAttrs)) {
+    if (key.startsWith('@_xmlns:')) {
+      const prefix = key.substring('@_xmlns:'.length)
+      if (prefix !== 'xsd' && prefix !== 'xs') {
+        namespaces.push({ prefix, uri: String(value) })
+      }
+    }
+  }
+
   const result: ParsedSchema = {
     targetNamespace,
+    namespaces,
     imports: [],
     simpleTypes: [],
     complexTypes: [],
@@ -749,9 +763,14 @@ function generateTypeScript(schema: ParsedSchema, filename: string): string {
     `["${ag.name}", ${generateAttributeGroup(ag)}]`
   ).join(',\n    ')
 
+  // Generate namespace declarations
+  const nsEntries = schema.namespaces.map(ns =>
+    `{ prefix: "${ns.prefix}", uri: "${ns.uri}" }`
+  ).join(', ')
+
   lines.push(`export const ${varName}Schema: XsdSchema = {`)
   lines.push(`  targetNamespace: "${schema.targetNamespace}",`)
-  lines.push(`  namespaces: [],`)
+  lines.push(`  namespaces: [${nsEntries}],`)
   lines.push(`  elementFormDefault: "qualified",`)
   lines.push(`  attributeFormDefault: "unqualified",`)
   lines.push(`  imports: [`)

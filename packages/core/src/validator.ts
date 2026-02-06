@@ -41,6 +41,25 @@ export class ValidationEngine {
     }
   }
 
+  /**
+   * Create a namespace resolver that combines XML context with schema prefix fallback.
+   * Schema prefixes (like "a", "s", "r") are resolved from the schema's namespace
+   * declarations when they're not found in the XML namespace context.
+   */
+  private createResolver(namespaceContext: Map<string, string>) {
+    return {
+      resolveNamespaceUri: (prefix?: string): string => {
+        const xmlResult = resolveNamespaceUri(namespaceContext, prefix);
+        if (xmlResult) return xmlResult;
+        // Fall back to schema namespace prefix map
+        if (prefix) {
+          return this.registry.resolveSchemaPrefix(prefix) ?? '';
+        }
+        return '';
+      },
+    };
+  }
+
   startDocument(): void {
     this.context.elementStack = [];
     this.context.namespaceStack = [new Map()];
@@ -59,15 +78,15 @@ export class ValidationEngine {
 
     let matchedParticle: FlattenedParticle | undefined;
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1];
+    const resolver = this.createResolver(namespaceContext);
+
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
         element.namespaceUri,
         element.localName,
         parentFrame.compositorState,
         this.registry,
-        {
-          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(namespaceContext, prefix),
-        },
+        resolver,
       );
 
       if (!result.success) {
@@ -92,9 +111,7 @@ export class ValidationEngine {
       namespaceUri: element.namespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
-        ? initCompositorState(schemaType, this.registry, {
-            resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(namespaceContext, prefix),
-          })
+        ? initCompositorState(schemaType, this.registry, resolver)
         : null,
       textContent: '',
       validatedAttributes,
@@ -119,12 +136,11 @@ export class ValidationEngine {
     }
 
     if (currentFrame.compositorState) {
+      const endNsContext = this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map();
       const missing = checkMissingRequiredElements(
         currentFrame.compositorState,
         this.registry,
-        {
-          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map(), prefix),
-        },
+        this.createResolver(endNsContext),
       );
 
       for (const missingElement of missing) {
@@ -205,7 +221,11 @@ export class ValidationEngine {
       } as XsdSimpleType;
     }
 
-    const namespaceUri = ref.namespacePrefix ? resolveNamespaceUri(namespaceContext, ref.namespacePrefix) : resolveNamespaceUri(namespaceContext);
+    let namespaceUri = ref.namespacePrefix ? resolveNamespaceUri(namespaceContext, ref.namespacePrefix) : resolveNamespaceUri(namespaceContext);
+    // Fall back to schema namespace prefix map if XML context doesn't have the prefix
+    if (!namespaceUri && ref.namespacePrefix) {
+      namespaceUri = this.registry.resolveSchemaPrefix(ref.namespacePrefix) ?? '';
+    }
     const type = this.registry.resolveType(namespaceUri, ref.name);
     if (!type) {
       this.pushError('UNKNOWN_TYPE', `타입을 찾을 수 없습니다: ${ref.name}`);
@@ -591,9 +611,12 @@ export class ValidationEngine {
     if (isElement(p)) {
       // If element uses ref, resolve it from registry
       if (p.ref && !p.typeRef && !p.inlineComplexType && !p.inlineSimpleType) {
-        const refNs = p.ref.namespacePrefix
+        let refNs = p.ref.namespacePrefix
           ? resolveNamespaceUri(namespaceContext, p.ref.namespacePrefix)
           : resolveNamespaceUri(namespaceContext);
+        if (!refNs && p.ref.namespacePrefix) {
+          refNs = this.registry.resolveSchemaPrefix(p.ref.namespacePrefix) ?? '';
+        }
         return this.registry.resolveElement(refNs, p.ref.name);
       }
 
