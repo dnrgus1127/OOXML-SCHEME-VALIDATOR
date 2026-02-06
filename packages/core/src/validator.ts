@@ -76,7 +76,8 @@ export class ValidationEngine {
     }
 
     const schemaElement = matchedParticle
-      ? this.extractElementFromParticle(matchedParticle, namespaceContext)
+      ? (this.extractElementFromParticle(matchedParticle, namespaceContext)
+        ?? this.registry.resolveElement(element.namespaceUri, element.localName))
       : this.registry.resolveElement(element.namespaceUri, element.localName);
     const schemaType = this.resolveSchemaElementType(schemaElement, namespaceContext, element);
 
@@ -152,7 +153,6 @@ export class ValidationEngine {
     const errors = this.context.errors.map((error) => ({
       ...error,
       code: error.code as ValidationErrorCode,
-      path: this.currentPath(),
     }));
 
     return {

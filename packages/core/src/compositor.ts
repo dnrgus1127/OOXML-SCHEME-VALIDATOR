@@ -1,4 +1,5 @@
 import type {
+  ComplexContent,
   ElementContent,
   Particle,
   SchemaRegistry,
@@ -11,6 +12,7 @@ import type {
   XsdSequence,
 } from './types';
 import {
+  hasComplexContent,
   hasElementContent,
   isAll,
   isAny,
@@ -34,17 +36,115 @@ export function initCompositorState(
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
 ): CompositorState | null {
-  if (!schemaType || !hasElementContent(schemaType.content)) {
+  if (!schemaType) {
     return null;
   }
 
-  const content = schemaType.content as ElementContent;
-  const compositor = content.compositor ?? resolveGroupCompositor(content.groupRef, registry, resolver);
-  if (!compositor) {
+  if (hasElementContent(schemaType.content)) {
+    const content = schemaType.content as ElementContent;
+    const compositor = content.compositor ?? resolveGroupCompositor(content.groupRef, registry, resolver);
+    if (!compositor) {
+      return null;
+    }
+    return createCompositorState(compositor, registry, resolver);
+  }
+
+  if (hasComplexContent(schemaType.content)) {
+    return initComplexContentCompositorState(schemaType.content, registry, resolver);
+  }
+
+  return null;
+}
+
+function initComplexContentCompositorState(
+  content: ComplexContent,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver,
+): CompositorState | null {
+  const derivation = content.content;
+  const extensionCompositor = derivation.compositor ?? resolveGroupCompositor(derivation.groupRef, registry, resolver);
+
+  // Resolve base type to get its content model
+  const baseNamespaceUri = derivation.base.namespacePrefix
+    ? resolver.resolveNamespaceUri(derivation.base.namespacePrefix)
+    : resolver.resolveNamespaceUri();
+  const baseType = registry.resolveType(baseNamespaceUri, derivation.base.name);
+
+  let baseCompositor: XsdSequence | XsdChoice | XsdAll | undefined;
+  if (baseType && baseType.kind === 'complexType') {
+    if (hasElementContent(baseType.content)) {
+      const baseContent = baseType.content as ElementContent;
+      baseCompositor = baseContent.compositor ?? resolveGroupCompositor(baseContent.groupRef, registry, resolver);
+    } else if (hasComplexContent(baseType.content)) {
+      // Recursively resolve base type's compositor
+      const baseState = initComplexContentCompositorState(baseType.content, registry, resolver);
+      if (baseState) {
+        if (!extensionCompositor) {
+          return baseState;
+        }
+        // Merge base state particles with extension compositor particles
+        const extensionParticles = flattenParticles(
+          extensionCompositor.kind === 'all' ? extensionCompositor.elements : extensionCompositor.particles,
+          registry,
+          resolver,
+          baseState.flattenedParticles.length,
+        );
+        return {
+          kind: 'sequence',
+          flattenedParticles: [...baseState.flattenedParticles, ...extensionParticles],
+          currentIndex: 0,
+          selectedBranch: null,
+          appearedElements: new Set(),
+          occurrenceCounts: new Map(),
+          nestedStates: new Map(),
+        };
+      }
+    }
+  }
+
+  if (derivation.derivation === 'restriction') {
+    // Restriction replaces the base type's content model
+    if (!extensionCompositor) {
+      return null;
+    }
+    return createCompositorState(extensionCompositor, registry, resolver);
+  }
+
+  // Extension: merge base compositor + extension compositor
+  if (!baseCompositor && !extensionCompositor) {
     return null;
   }
 
-  return createCompositorState(compositor, registry, resolver);
+  if (!baseCompositor && extensionCompositor) {
+    return createCompositorState(extensionCompositor, registry, resolver);
+  }
+
+  if (baseCompositor && !extensionCompositor) {
+    return createCompositorState(baseCompositor, registry, resolver);
+  }
+
+  // Both exist: merge base + extension into a single sequence
+  const baseParticles = flattenParticles(
+    baseCompositor!.kind === 'all' ? baseCompositor!.elements : baseCompositor!.particles,
+    registry,
+    resolver,
+  );
+  const extParticles = flattenParticles(
+    extensionCompositor!.kind === 'all' ? extensionCompositor!.elements : extensionCompositor!.particles,
+    registry,
+    resolver,
+    baseParticles.length,
+  );
+
+  return {
+    kind: 'sequence',
+    flattenedParticles: [...baseParticles, ...extParticles],
+    currentIndex: 0,
+    selectedBranch: null,
+    appearedElements: new Set(),
+    occurrenceCounts: new Map(),
+    nestedStates: new Map(),
+  };
 }
 
 export function createCompositorState(
@@ -145,6 +245,34 @@ function validateSequenceChild(
     const particle = state.flattenedParticles[i];
     if (!particle) continue;
 
+    // For nested compositors, delegate validation to nested state
+    if (isNestedCompositor(particle.particle)) {
+      const nested = getOrCreateNestedState(state, particle, registry, resolver);
+      const nestedResult = validateCompositorChild(childNamespaceUri, childLocalName, nested, registry, resolver);
+      if (nestedResult.success) {
+        if (!state.occurrenceCounts.has(i)) {
+          state.occurrenceCounts.set(i, 1);
+        }
+        state.currentIndex = i;
+        return { success: true, matchedParticle: nestedResult.matchedParticle };
+      }
+      // Nested compositor didn't match — try starting a new occurrence if allowed
+      const count = state.occurrenceCounts.get(i) ?? 0;
+      if (count > 0 && (particle.maxOccurs === 'unbounded' || count < particle.maxOccurs)) {
+        const freshNested = resetNestedState(state, particle, registry, resolver);
+        const retryResult = validateCompositorChild(childNamespaceUri, childLocalName, freshNested, registry, resolver);
+        if (retryResult.success) {
+          state.occurrenceCounts.set(i, count + 1);
+          state.currentIndex = i;
+          return { success: true, matchedParticle: retryResult.matchedParticle };
+        }
+      }
+      if (count < particle.minOccurs) {
+        return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' };
+      }
+      continue;
+    }
+
     const canMatch = particleAllows(qualifiedName, particle, state, registry, resolver);
 
     if (canMatch) {
@@ -183,35 +311,82 @@ function validateChoiceChild(
 
   if (state.selectedBranch !== null) {
     const particle = state.flattenedParticles[state.selectedBranch];
-    if (particle && particleAllows(qualifiedName, particle, state, registry, resolver)) {
-      const count = (state.occurrenceCounts.get(state.selectedBranch) ?? 0) + 1;
-      state.occurrenceCounts.set(state.selectedBranch, count);
-      if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
-        return { success: false, errorCode: 'TOO_MANY_ELEMENTS' };
-      }
-      return { success: true, matchedParticle: particle };
-    }
-
     if (particle) {
+      const matchResult = matchParticle(childNamespaceUri, childLocalName, qualifiedName, particle, state, registry, resolver);
+      if (matchResult) {
+        if (!isNestedCompositor(particle.particle)) {
+          const count = (state.occurrenceCounts.get(state.selectedBranch) ?? 0) + 1;
+          state.occurrenceCounts.set(state.selectedBranch, count);
+          if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
+            return { success: false, errorCode: 'TOO_MANY_ELEMENTS' };
+          }
+        }
+        return { success: true, matchedParticle: matchResult };
+      }
+
       const count = state.occurrenceCounts.get(particle.index) ?? 0;
       if (count < particle.minOccurs) {
         return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' };
       }
     }
 
-    state.selectedBranch = null;
+    // Branch is exhausted or doesn't match — return failure.
+    // The PARENT compositor handles re-occurrence via the reset mechanism
+    // (respecting its own maxOccurs), rather than re-selecting here.
+    return { success: false, errorCode: 'CHOICE_NOT_SATISFIED' };
   }
 
   for (let i = 0; i < state.flattenedParticles.length; i += 1) {
     const particle = state.flattenedParticles[i];
-    if (particle && particleAllows(qualifiedName, particle, state, registry, resolver)) {
+    if (!particle) continue;
+    const matchResult = matchParticle(childNamespaceUri, childLocalName, qualifiedName, particle, state, registry, resolver);
+    if (matchResult) {
       state.selectedBranch = i;
       state.occurrenceCounts.set(i, 1);
-      return { success: true, matchedParticle: particle };
+      return { success: true, matchedParticle: matchResult };
     }
   }
 
   return { success: false, errorCode: 'CHOICE_NOT_SATISFIED' };
+}
+
+/**
+ * Try to match a child element against a particle.
+ * For nested compositors, delegates to nested state and returns the actual element particle.
+ * Returns the matched FlattenedParticle or undefined if no match.
+ */
+function matchParticle(
+  childNamespaceUri: string,
+  childLocalName: string,
+  qualifiedName: string,
+  particle: FlattenedParticle,
+  state: CompositorState,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver,
+): FlattenedParticle | undefined {
+  if (isSequence(particle.particle) || isChoice(particle.particle) || isAll(particle.particle)) {
+    const nested = getOrCreateNestedState(state, particle, registry, resolver);
+    const nestedResult = validateCompositorChild(childNamespaceUri, childLocalName, nested, registry, resolver);
+    if (nestedResult.success) {
+      return nestedResult.matchedParticle;
+    }
+    // Try reset for a new occurrence if allowed
+    const count = state.occurrenceCounts.get(particle.index) ?? 0;
+    if (count > 0 && (particle.maxOccurs === 'unbounded' || count < particle.maxOccurs)) {
+      const freshNested = resetNestedState(state, particle, registry, resolver);
+      const retryResult = validateCompositorChild(childNamespaceUri, childLocalName, freshNested, registry, resolver);
+      if (retryResult.success) {
+        return retryResult.matchedParticle;
+      }
+    }
+    return undefined;
+  }
+
+  if (particleAllows(qualifiedName, particle, state, registry, resolver)) {
+    return particle;
+  }
+
+  return undefined;
 }
 
 function validateAllChild(
@@ -246,6 +421,10 @@ function validateAllChild(
   }
 
   return { success: true, matchedParticle: particle };
+}
+
+function isNestedCompositor(particle: Particle | XsdElement): boolean {
+  return isSequence(particle) || isChoice(particle) || isAll(particle);
 }
 
 function particleAllows(
@@ -286,6 +465,22 @@ function getOrCreateNestedState(
     const nested = createCompositorState(particle.particle, registry, resolver);
     parent.nestedStates.set(particle.index, nested);
     return nested;
+  }
+
+  throw new Error('Invalid nested compositor state');
+}
+
+/** Reset a nested compositor state for a new occurrence (e.g., maxOccurs > 1) */
+function resetNestedState(
+  parent: CompositorState,
+  particle: FlattenedParticle,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver,
+): CompositorState {
+  if (isSequence(particle.particle) || isChoice(particle.particle) || isAll(particle.particle)) {
+    const fresh = createCompositorState(particle.particle, registry, resolver);
+    parent.nestedStates.set(particle.index, fresh);
+    return fresh;
   }
 
   throw new Error('Invalid nested compositor state');
