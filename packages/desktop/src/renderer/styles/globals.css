@@ -501,3 +501,133 @@ body {
   font-size: 11px;
   color: var(--error);
 }
+
+/* Validation Panel - Updated */
+.validation-item-container {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.validation-item-container .validation-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: none;
+}
+
+.validation-item-container .validation-item:hover {
+  background: var(--bg-hover);
+}
+
+.validation-item-container.valid .item-icon { color: var(--success); }
+.validation-item-container.invalid .item-icon { color: var(--error); }
+
+.item-error-count {
+  font-size: 11px;
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-error-count .expand-icon {
+  font-size: 8px;
+  width: auto;
+}
+
+.navigate-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.navigate-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.revalidate-btn {
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  margin-right: auto;
+}
+
+.revalidate-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Validation Errors List */
+.validation-errors {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.validation-error {
+  padding: 8px 12px 8px 28px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+}
+
+.validation-error:last-child {
+  border-bottom: none;
+}
+
+.error-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.error-code {
+  background: var(--error);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.error-location {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.error-message {
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.error-path {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.error-value {
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.error-value code {
+  background: var(--bg-primary);
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  color: var(--warning);
+}
