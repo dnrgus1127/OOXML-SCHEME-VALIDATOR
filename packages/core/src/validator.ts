@@ -4,6 +4,7 @@ import type {
   ValidationOptions,
   ValidationErrorCode,
   XsdAttribute,
+  XsdAttributeGroup,
   XsdComplexType,
   XsdSimpleType,
   TypeReference,
@@ -13,6 +14,7 @@ import type {
   SimpleTypeList,
   XsdElement,
   XsdAny,
+  XsdAnyAttribute,
 } from './types';
 import { hasComplexContent, hasElementContent, hasSimpleContent, isSimpleType, isElement, isAny } from './types';
 import {
@@ -211,20 +213,75 @@ export class ValidationEngine {
     return type ?? null;
   }
 
+  /**
+   * Collect all attributes from a complexType, including those inherited
+   * through complexContent extension/restriction chains.
+   */
+  private collectAllAttributes(
+    schemaType: XsdComplexType,
+    namespaceContext: Map<string, string>,
+    visited?: Set<string>,
+  ): { attributes: XsdAttribute[]; attributeGroups: XsdAttributeGroup[]; anyAttribute?: XsdAnyAttribute } {
+    const attributes: XsdAttribute[] = [...schemaType.attributes];
+    const attributeGroups: XsdAttributeGroup[] = [...schemaType.attributeGroups];
+    let anyAttribute = schemaType.anyAttribute;
+
+    if (hasComplexContent(schemaType.content)) {
+      const derivation = schemaType.content.content;
+
+      // Add attributes from the extension/restriction itself
+      attributes.push(...derivation.attributes);
+      attributeGroups.push(...derivation.attributeGroups);
+      if (derivation.anyAttribute) {
+        anyAttribute = anyAttribute ?? derivation.anyAttribute;
+      }
+
+      // For extensions, also inherit base type attributes
+      if (derivation.derivation === 'extension') {
+        const seen = visited ?? new Set<string>();
+        const baseKey = `${derivation.base.namespacePrefix ?? ''}:${derivation.base.name}`;
+        if (!seen.has(baseKey)) {
+          seen.add(baseKey);
+          const baseNs = derivation.base.namespacePrefix
+            ? resolveNamespaceUri(namespaceContext, derivation.base.namespacePrefix)
+            : resolveNamespaceUri(namespaceContext);
+          const baseType = this.registry.resolveType(baseNs, derivation.base.name);
+          if (baseType && baseType.kind === 'complexType') {
+            const baseAttrs = this.collectAllAttributes(baseType, namespaceContext, seen);
+            // Base attributes come first, derived can override
+            const derivedNames = new Set(attributes.filter(a => a.name).map(a => a.name!));
+            for (const baseAttr of baseAttrs.attributes) {
+              if (baseAttr.name && !derivedNames.has(baseAttr.name)) {
+                attributes.push(baseAttr);
+              }
+            }
+            attributeGroups.push(...baseAttrs.attributeGroups);
+            if (baseAttrs.anyAttribute) {
+              anyAttribute = anyAttribute ?? baseAttrs.anyAttribute;
+            }
+          }
+        }
+      }
+    }
+
+    return { attributes, attributeGroups, anyAttribute };
+  }
+
   private validateAttributes(
     attributes: XmlAttribute[],
     schemaType: XsdComplexType,
     namespaceContext: Map<string, string>,
   ): Set<string> {
+    const collected = this.collectAllAttributes(schemaType, namespaceContext);
     const allowedAttributes = new Map<string, XsdAttribute>();
 
-    for (const attr of schemaType.attributes) {
+    for (const attr of collected.attributes) {
       if (attr.name) {
         allowedAttributes.set(attr.name, attr);
       }
     }
 
-    for (const group of schemaType.attributeGroups) {
+    for (const group of collected.attributeGroups) {
       if (group.ref) {
         const namespaceUri = group.ref.namespacePrefix
           ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
@@ -250,7 +307,7 @@ export class ValidationEngine {
       const attrName = xmlAttr.localName ?? xmlAttr.name;
       const schemaDef = allowedAttributes.get(attrName);
       if (!schemaDef) {
-        if (schemaType.anyAttribute) {
+        if (collected.anyAttribute) {
           continue;
         }
         this.pushError('INVALID_ATTRIBUTE', `허용되지 않는 속성: ${xmlAttr.name}`);
@@ -475,9 +532,28 @@ export class ValidationEngine {
   }
 
   private checkRequiredAttributes(schemaType: XsdComplexType, frame: ElementStackFrame): void {
-    for (const attr of schemaType.attributes) {
+    const namespaceContext = this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map();
+    const collected = this.collectAllAttributes(schemaType, namespaceContext);
+
+    for (const attr of collected.attributes) {
       if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
         this.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`);
+      }
+    }
+
+    for (const group of collected.attributeGroups) {
+      if (group.ref) {
+        const namespaceUri = group.ref.namespacePrefix
+          ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
+          : resolveNamespaceUri(namespaceContext);
+        const resolved = this.registry.resolveAttributeGroup(namespaceUri, group.ref.name);
+        if (resolved?.attributes) {
+          for (const attr of resolved.attributes) {
+            if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
+              this.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`);
+            }
+          }
+        }
       }
     }
   }
