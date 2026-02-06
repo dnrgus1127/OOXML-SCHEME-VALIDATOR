@@ -5,7 +5,7 @@
   "description": "OOXML Validator desktop application with XML editor",
   "main": "./dist/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev -- --inspect-brk=5858",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-builder --config electron-builder.yml",
