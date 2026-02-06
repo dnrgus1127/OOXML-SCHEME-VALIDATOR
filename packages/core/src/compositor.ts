@@ -75,7 +75,7 @@ export function validateCompositorChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-): { success: boolean; errorCode?: string } {
+): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
   switch (state.kind) {
     case 'sequence':
       return validateSequenceChild(childNamespaceUri, childLocalName, state, registry, resolver);
@@ -138,7 +138,7 @@ function validateSequenceChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-): { success: boolean; errorCode?: string } {
+): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName);
 
   for (let i = state.currentIndex; i < state.flattenedParticles.length; i += 1) {
@@ -160,7 +160,7 @@ function validateSequenceChild(
         state.currentIndex = i;
       }
 
-      return { success: true };
+      return { success: true, matchedParticle: particle };
     }
 
     const count = state.occurrenceCounts.get(i) ?? 0;
@@ -178,7 +178,7 @@ function validateChoiceChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-): { success: boolean; errorCode?: string } {
+): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName);
 
   if (state.selectedBranch !== null) {
@@ -189,7 +189,7 @@ function validateChoiceChild(
       if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
         return { success: false, errorCode: 'TOO_MANY_ELEMENTS' };
       }
-      return { success: true };
+      return { success: true, matchedParticle: particle };
     }
 
     if (particle) {
@@ -207,7 +207,7 @@ function validateChoiceChild(
     if (particle && particleAllows(qualifiedName, particle, state, registry, resolver)) {
       state.selectedBranch = i;
       state.occurrenceCounts.set(i, 1);
-      return { success: true };
+      return { success: true, matchedParticle: particle };
     }
   }
 
@@ -220,7 +220,7 @@ function validateAllChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-): { success: boolean; errorCode?: string } {
+): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName);
 
   const particle = state.flattenedParticles.find((entry) => entry.allowedNames?.has(qualifiedName));
@@ -245,7 +245,7 @@ function validateAllChild(
     return validateCompositorChild(childNamespaceUri, childLocalName, nestedState, registry, resolver);
   }
 
-  return { success: true };
+  return { success: true, matchedParticle: particle };
 }
 
 function particleAllows(

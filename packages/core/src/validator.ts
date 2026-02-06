@@ -11,8 +11,10 @@ import type {
   SimpleTypeRestriction,
   SimpleTypeUnion,
   SimpleTypeList,
+  XsdElement,
+  XsdAny,
 } from './types';
-import { hasComplexContent, hasElementContent, hasSimpleContent, isSimpleType } from './types';
+import { hasComplexContent, hasElementContent, hasSimpleContent, isSimpleType, isElement, isAny } from './types';
 import {
   CompositorState,
   ElementStackFrame,
@@ -23,6 +25,7 @@ import {
   resolveNamespaceUri,
   withNamespaceContext,
   isComplexSchemaType,
+  FlattenedParticle,
 } from './runtime';
 import { checkMissingRequiredElements, initCompositorState, validateCompositorChild } from './compositor';
 
@@ -52,6 +55,7 @@ export class ValidationEngine {
     );
     this.context.namespaceStack.push(namespaceContext);
 
+    let matchedParticle: FlattenedParticle | undefined;
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1];
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
@@ -67,9 +71,13 @@ export class ValidationEngine {
       if (!result.success) {
         this.pushError(result.errorCode ?? 'INVALID_CONTENT', `허용되지 않는 요소: ${element.name}`);
       }
+
+      matchedParticle = result.matchedParticle;
     }
 
-    const schemaElement = this.registry.resolveElement(element.namespaceUri, element.localName);
+    const schemaElement = matchedParticle
+      ? this.extractElementFromParticle(matchedParticle, namespaceContext)
+      : this.registry.resolveElement(element.namespaceUri, element.localName);
     const schemaType = this.resolveSchemaElementType(schemaElement, namespaceContext, element);
 
     const validatedAttributes = isComplexSchemaType(schemaType)
@@ -495,6 +503,38 @@ export class ValidationEngine {
   private currentPath(): string {
     const parts = this.context.elementStack.map((frame) => frame.elementName);
     return `/${parts.join('/')}`;
+  }
+
+  private extractElementFromParticle(
+    particle: FlattenedParticle,
+    namespaceContext: Map<string, string>,
+  ): { typeRef?: TypeReference; inlineComplexType?: XsdComplexType; inlineSimpleType?: XsdSimpleType } | undefined {
+    const p = particle.particle;
+
+    // Handle element particles - extract type information
+    if (isElement(p)) {
+      // If element uses ref, resolve it from registry
+      if (p.ref && !p.typeRef && !p.inlineComplexType && !p.inlineSimpleType) {
+        const refNs = p.ref.namespacePrefix
+          ? resolveNamespaceUri(namespaceContext, p.ref.namespacePrefix)
+          : resolveNamespaceUri(namespaceContext);
+        return this.registry.resolveElement(refNs, p.ref.name);
+      }
+
+      return {
+        typeRef: p.typeRef,
+        inlineComplexType: p.inlineComplexType,
+        inlineSimpleType: p.inlineSimpleType,
+      };
+    }
+
+    // Handle any particles - allow any content without validation
+    if (isAny(p)) {
+      return undefined;
+    }
+
+    // Handle nested compositors - rely on compositor state machine
+    return undefined;
   }
 }
 
