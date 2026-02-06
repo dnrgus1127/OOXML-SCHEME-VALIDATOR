@@ -282,6 +282,10 @@ function setupIpcHandlers(): void {
         if (path.includes('_rels/')) continue
         // Skip content types
         if (path === '[Content_Types].xml') continue
+        // Skip docProps - uses Dublin Core and extended properties namespaces not in our schema set
+        if (path.startsWith('docProps/')) continue
+        // Skip customXml root - custom XML data isn't validated against OOXML schemas
+        if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
 
         try {
           const xmlContent = part.content.toString('utf-8')
@@ -380,6 +384,9 @@ async function basicValidation(doc: Awaited<ReturnType<typeof OoxmlParser.fromBu
   for (const [path, part] of doc.parts) {
     if (!part.contentType.includes('xml')) continue
     if (path.includes('_rels/')) continue
+    if (path === '[Content_Types].xml') continue
+    if (path.startsWith('docProps/')) continue
+    if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
 
     try {
       const xmlContent = part.content.toString('utf-8')
