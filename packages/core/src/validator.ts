@@ -153,7 +153,6 @@ export class ValidationEngine {
     const errors = this.context.errors.map((error) => ({
       ...error,
       code: error.code as ValidationErrorCode,
-      path: this.currentPath(),
     }));
 
     return {

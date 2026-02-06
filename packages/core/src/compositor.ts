@@ -250,16 +250,23 @@ function validateSequenceChild(
       const nested = getOrCreateNestedState(state, particle, registry, resolver);
       const nestedResult = validateCompositorChild(childNamespaceUri, childLocalName, nested, registry, resolver);
       if (nestedResult.success) {
-        // Only count the first match as 1 occurrence; subsequent elements
-        // within the same nested compositor are part of the same occurrence.
         if (!state.occurrenceCounts.has(i)) {
           state.occurrenceCounts.set(i, 1);
         }
         state.currentIndex = i;
         return { success: true, matchedParticle: nestedResult.matchedParticle };
       }
-      // Nested compositor didn't match — check if it had enough occurrences
+      // Nested compositor didn't match — try starting a new occurrence if allowed
       const count = state.occurrenceCounts.get(i) ?? 0;
+      if (count > 0 && (particle.maxOccurs === 'unbounded' || count < particle.maxOccurs)) {
+        const freshNested = resetNestedState(state, particle, registry, resolver);
+        const retryResult = validateCompositorChild(childNamespaceUri, childLocalName, freshNested, registry, resolver);
+        if (retryResult.success) {
+          state.occurrenceCounts.set(i, count + 1);
+          state.currentIndex = i;
+          return { success: true, matchedParticle: retryResult.matchedParticle };
+        }
+      }
       if (count < particle.minOccurs) {
         return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' };
       }
@@ -307,8 +314,6 @@ function validateChoiceChild(
     if (particle) {
       const matchResult = matchParticle(childNamespaceUri, childLocalName, qualifiedName, particle, state, registry, resolver);
       if (matchResult) {
-        // For nested compositors, don't increment count for each element within;
-        // the count was already set to 1 on first selection.
         if (!isNestedCompositor(particle.particle)) {
           const count = (state.occurrenceCounts.get(state.selectedBranch) ?? 0) + 1;
           state.occurrenceCounts.set(state.selectedBranch, count);
@@ -325,7 +330,10 @@ function validateChoiceChild(
       }
     }
 
-    state.selectedBranch = null;
+    // Branch is exhausted or doesn't match — return failure.
+    // The PARENT compositor handles re-occurrence via the reset mechanism
+    // (respecting its own maxOccurs), rather than re-selecting here.
+    return { success: false, errorCode: 'CHOICE_NOT_SATISFIED' };
   }
 
   for (let i = 0; i < state.flattenedParticles.length; i += 1) {
@@ -359,7 +367,19 @@ function matchParticle(
   if (isSequence(particle.particle) || isChoice(particle.particle) || isAll(particle.particle)) {
     const nested = getOrCreateNestedState(state, particle, registry, resolver);
     const nestedResult = validateCompositorChild(childNamespaceUri, childLocalName, nested, registry, resolver);
-    return nestedResult.success ? nestedResult.matchedParticle : undefined;
+    if (nestedResult.success) {
+      return nestedResult.matchedParticle;
+    }
+    // Try reset for a new occurrence if allowed
+    const count = state.occurrenceCounts.get(particle.index) ?? 0;
+    if (count > 0 && (particle.maxOccurs === 'unbounded' || count < particle.maxOccurs)) {
+      const freshNested = resetNestedState(state, particle, registry, resolver);
+      const retryResult = validateCompositorChild(childNamespaceUri, childLocalName, freshNested, registry, resolver);
+      if (retryResult.success) {
+        return retryResult.matchedParticle;
+      }
+    }
+    return undefined;
   }
 
   if (particleAllows(qualifiedName, particle, state, registry, resolver)) {
@@ -445,6 +465,22 @@ function getOrCreateNestedState(
     const nested = createCompositorState(particle.particle, registry, resolver);
     parent.nestedStates.set(particle.index, nested);
     return nested;
+  }
+
+  throw new Error('Invalid nested compositor state');
+}
+
+/** Reset a nested compositor state for a new occurrence (e.g., maxOccurs > 1) */
+function resetNestedState(
+  parent: CompositorState,
+  particle: FlattenedParticle,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver,
+): CompositorState {
+  if (isSequence(particle.particle) || isChoice(particle.particle) || isAll(particle.particle)) {
+    const fresh = createCompositorState(particle.particle, registry, resolver);
+    parent.nestedStates.set(particle.index, fresh);
+    return fresh;
   }
 
   throw new Error('Invalid nested compositor state');

@@ -3,6 +3,8 @@
  *
  * Converts OOXML XSD schema files to TypeScript runtime type definitions
  * for use with @ooxml/core validation engine.
+ *
+ * Uses preserveOrder mode to maintain correct particle ordering in compositors.
  */
 
 import { XMLParser } from 'fast-xml-parser'
@@ -14,13 +16,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const SCHEMAS_DIR = join(__dirname, '../../../schemas')
 const OUTPUT_DIR = join(__dirname, '../../../packages/core/src/schemas')
 
-// XML Parser configuration
+// XML Parser configuration — preserveOrder mode to maintain child ordering
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   textNodeName: '#text',
   parseAttributeValue: false,
   trimValues: true,
+  preserveOrder: true,
 })
 
 // XSD built-in types
@@ -128,20 +131,70 @@ interface ParsedComplexContent {
   attributeGroups: string[]
 }
 
-function ensureArray<T>(value: T | T[] | undefined): T[] {
-  if (!value) return []
-  return Array.isArray(value) ? value : [value]
+// ============================================================================
+// preserveOrder helper functions
+// ============================================================================
+
+/** Get an attribute value from a preserveOrder node */
+function attr(node: any, name: string): string | undefined {
+  return node?.[':@']?.['@_' + name]
 }
+
+/** Get the tag name of a preserveOrder node (first key that isn't ':@') */
+function nodeTag(node: any): string {
+  if (!node) return ''
+  for (const key of Object.keys(node)) {
+    if (key !== ':@') return key
+  }
+  return ''
+}
+
+/** Get the ordered children array of a preserveOrder node */
+function nodeChildren(node: any): any[] {
+  const tag = nodeTag(node)
+  return tag ? (node[tag] || []) : []
+}
+
+/** Find all child nodes matching a tag (supports xsd: and xs: prefixes) */
+function findByTag(children: any[], baseName: string): any[] {
+  return children.filter(child => {
+    const tag = nodeTag(child)
+    return tag === `xsd:${baseName}` || tag === `xs:${baseName}`
+  })
+}
+
+/** Find the first child node matching a tag */
+function findFirstByTag(children: any[], baseName: string): any | undefined {
+  return children.find(child => {
+    const tag = nodeTag(child)
+    return tag === `xsd:${baseName}` || tag === `xs:${baseName}`
+  })
+}
+
+/** Check if a tag name matches an XSD tag (with xsd: or xs: prefix) */
+function isXsdTag(tag: string, baseName: string): boolean {
+  return tag === `xsd:${baseName}` || tag === `xs:${baseName}`
+}
+
+// ============================================================================
+// Parsing functions (preserveOrder format)
+// ============================================================================
 
 export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
   const parsed = parser.parse(xsdContent)
-  const schema = parsed['xsd:schema'] || parsed['xs:schema'] || parsed.schema
+  // preserveOrder returns an array; find the schema element
+  const schemaNode = parsed.find((node: any) => {
+    const tag = nodeTag(node)
+    return tag === 'xsd:schema' || tag === 'xs:schema' || tag === 'schema'
+  })
 
-  if (!schema) {
+  if (!schemaNode) {
     throw new Error(`No schema element found in ${filename}`)
   }
 
-  const targetNamespace = schema['@_targetNamespace'] || ''
+  const targetNamespace = attr(schemaNode, 'targetNamespace') || ''
+  const schemaChildren = nodeChildren(schemaNode)
+
   const result: ParsedSchema = {
     targetNamespace,
     imports: [],
@@ -153,76 +206,72 @@ export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
   }
 
   // Process imports
-  const imports = ensureArray(schema['xsd:import'] || schema['xs:import'] || [])
-  for (const imp of imports) {
+  for (const imp of findByTag(schemaChildren, 'import')) {
     result.imports.push({
-      namespace: imp['@_namespace'] || '',
-      schemaLocation: imp['@_schemaLocation'] || '',
+      namespace: attr(imp, 'namespace') || '',
+      schemaLocation: attr(imp, 'schemaLocation') || '',
     })
   }
 
   // Process simple types
-  const simpleTypes = ensureArray(schema['xsd:simpleType'] || schema['xs:simpleType'] || [])
-  for (const st of simpleTypes) {
+  for (const st of findByTag(schemaChildren, 'simpleType')) {
     result.simpleTypes.push(parseSimpleType(st))
   }
 
   // Process complex types
-  const complexTypes = ensureArray(schema['xsd:complexType'] || schema['xs:complexType'] || [])
-  for (const ct of complexTypes) {
+  for (const ct of findByTag(schemaChildren, 'complexType')) {
     result.complexTypes.push(parseComplexType(ct))
   }
 
   // Process elements
-  const elements = ensureArray(schema['xsd:element'] || schema['xs:element'] || [])
-  for (const el of elements) {
+  for (const el of findByTag(schemaChildren, 'element')) {
     result.elements.push(parseElement(el))
   }
 
   // Process groups
-  const groups = ensureArray(schema['xsd:group'] || schema['xs:group'] || [])
-  for (const gr of groups) {
+  for (const gr of findByTag(schemaChildren, 'group')) {
     result.groups.push(parseGroup(gr))
   }
 
   // Process attribute groups
-  const attrGroups = ensureArray(schema['xsd:attributeGroup'] || schema['xs:attributeGroup'] || [])
-  for (const ag of attrGroups) {
+  for (const ag of findByTag(schemaChildren, 'attributeGroup')) {
     result.attributeGroups.push(parseAttributeGroup(ag))
   }
 
   return result
 }
 
-function parseSimpleType(st: any): ParsedSimpleType {
-  const name = st['@_name'] || ''
-  const restriction = st['xsd:restriction'] || st['xs:restriction']
-  const union = st['xsd:union'] || st['xs:union']
-  const list = st['xsd:list'] || st['xs:list']
+function parseSimpleType(stNode: any): ParsedSimpleType {
+  const name = attr(stNode, 'name') || ''
+  const children = nodeChildren(stNode)
+  const restriction = findFirstByTag(children, 'restriction')
+  const union = findFirstByTag(children, 'union')
+  const list = findFirstByTag(children, 'list')
 
   const result: ParsedSimpleType = { name }
 
   if (restriction) {
     result.restriction = {
-      base: restriction['@_base'] || 'xsd:string',
+      base: attr(restriction, 'base') || 'xsd:string',
       facets: extractFacets(restriction),
     }
   } else if (union) {
-    const memberTypes = union['@_memberTypes']
+    const memberTypes = attr(union, 'memberTypes')
     result.union = {
       memberTypes: memberTypes ? memberTypes.split(/\s+/) : [],
     }
   } else if (list) {
     result.list = {
-      itemType: list['@_itemType'] || '',
+      itemType: attr(list, 'itemType') || '',
     }
   }
 
   return result
 }
 
-function extractFacets(restriction: any): ParsedFacet[] {
+function extractFacets(restrictionNode: any): ParsedFacet[] {
   const facets: ParsedFacet[] = []
+  const children = nodeChildren(restrictionNode)
   const facetTypes = [
     'enumeration', 'pattern', 'minLength', 'maxLength', 'length',
     'minInclusive', 'maxInclusive', 'minExclusive', 'maxExclusive',
@@ -230,26 +279,23 @@ function extractFacets(restriction: any): ParsedFacet[] {
   ]
 
   for (const facetType of facetTypes) {
-    const xsdFacet = restriction[`xsd:${facetType}`] || restriction[`xs:${facetType}`]
-    if (xsdFacet) {
-      const values = ensureArray(xsdFacet)
-      for (const v of values) {
-        facets.push({
-          type: facetType,
-          value: v['@_value'] || '',
-          fixed: v['@_fixed'] === 'true',
-        })
-      }
+    for (const facetNode of findByTag(children, facetType)) {
+      facets.push({
+        type: facetType,
+        value: attr(facetNode, 'value') || '',
+        fixed: attr(facetNode, 'fixed') === 'true',
+      })
     }
   }
 
   return facets
 }
 
-function parseComplexType(ct: any): ParsedComplexType {
-  const name = ct['@_name'] || ''
-  const mixed = ct['@_mixed'] === 'true'
-  const abstract = ct['@_abstract'] === 'true'
+function parseComplexType(ctNode: any): ParsedComplexType {
+  const name = attr(ctNode, 'name') || ''
+  const mixed = attr(ctNode, 'mixed') === 'true'
+  const abstract = attr(ctNode, 'abstract') === 'true'
+  const children = nodeChildren(ctNode)
 
   const result: ParsedComplexType = {
     name,
@@ -260,11 +306,11 @@ function parseComplexType(ct: any): ParsedComplexType {
   }
 
   // Extract content model
-  const sequence = ct['xsd:sequence'] || ct['xs:sequence']
-  const choice = ct['xsd:choice'] || ct['xs:choice']
-  const all = ct['xsd:all'] || ct['xs:all']
-  const simpleContent = ct['xsd:simpleContent'] || ct['xs:simpleContent']
-  const complexContent = ct['xsd:complexContent'] || ct['xs:complexContent']
+  const sequence = findFirstByTag(children, 'sequence')
+  const choice = findFirstByTag(children, 'choice')
+  const all = findFirstByTag(children, 'all')
+  const simpleContent = findFirstByTag(children, 'simpleContent')
+  const complexContent = findFirstByTag(children, 'complexContent')
 
   if (sequence) {
     result.content = { type: 'sequence', particles: parseParticles(sequence) }
@@ -279,125 +325,117 @@ function parseComplexType(ct: any): ParsedComplexType {
   }
 
   // Extract attributes
-  const attrs = ensureArray(ct['xsd:attribute'] || ct['xs:attribute'] || [])
-  for (const attr of attrs) {
-    result.attributes.push(parseAttribute(attr))
+  for (const attrNode of findByTag(children, 'attribute')) {
+    result.attributes.push(parseAttribute(attrNode))
   }
 
   // Extract attribute groups
-  const attrGroups = ensureArray(ct['xsd:attributeGroup'] || ct['xs:attributeGroup'] || [])
-  for (const ag of attrGroups) {
-    if (ag['@_ref']) {
-      result.attributeGroups.push(ag['@_ref'])
+  for (const ag of findByTag(children, 'attributeGroup')) {
+    const ref = attr(ag, 'ref')
+    if (ref) {
+      result.attributeGroups.push(ref)
     }
   }
 
   // Extract anyAttribute
-  const anyAttr = ct['xsd:anyAttribute'] || ct['xs:anyAttribute']
+  const anyAttr = findFirstByTag(children, 'anyAttribute')
   if (anyAttr) {
     result.anyAttribute = {
-      namespace: anyAttr['@_namespace'] || '##any',
-      processContents: anyAttr['@_processContents'] || 'strict',
+      namespace: attr(anyAttr, 'namespace') || '##any',
+      processContents: attr(anyAttr, 'processContents') || 'strict',
     }
   }
 
   return result
 }
 
-function parseParticles(container: any): ParsedParticle[] {
+/**
+ * Parse particles from a compositor node (sequence/choice/all).
+ * Iterates children in document order to preserve correct ordering.
+ */
+function parseParticles(compositorNode: any): ParsedParticle[] {
   const particles: ParsedParticle[] = []
+  const children = nodeChildren(compositorNode)
 
-  // Elements
-  const elements = ensureArray(container['xsd:element'] || container['xs:element'] || [])
-  for (const el of elements) {
-    particles.push({
-      type: 'element',
-      name: el['@_name'] || undefined,
-      ref: el['@_ref'] || undefined,
-      elementType: el['@_type'] || undefined,
-      minOccurs: parseInt(el['@_minOccurs'] || '1', 10),
-      maxOccurs: el['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(el['@_maxOccurs'] || '1', 10),
-    })
-  }
+  for (const child of children) {
+    const tag = nodeTag(child)
 
-  // Nested sequences
-  const sequences = ensureArray(container['xsd:sequence'] || container['xs:sequence'] || [])
-  for (const seq of sequences) {
-    particles.push({
-      type: 'sequence',
-      particles: parseParticles(seq),
-      minOccurs: parseInt(seq['@_minOccurs'] || '1', 10),
-      maxOccurs: seq['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(seq['@_maxOccurs'] || '1', 10),
-    })
-  }
-
-  // Nested choices
-  const choices = ensureArray(container['xsd:choice'] || container['xs:choice'] || [])
-  for (const ch of choices) {
-    particles.push({
-      type: 'choice',
-      particles: parseParticles(ch),
-      minOccurs: parseInt(ch['@_minOccurs'] || '1', 10),
-      maxOccurs: ch['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(ch['@_maxOccurs'] || '1', 10),
-    })
-  }
-
-  // Group references
-  const groups = ensureArray(container['xsd:group'] || container['xs:group'] || [])
-  for (const gr of groups) {
-    if (gr['@_ref']) {
+    if (isXsdTag(tag, 'element')) {
       particles.push({
-        type: 'group',
-        ref: gr['@_ref'],
-        minOccurs: parseInt(gr['@_minOccurs'] || '1', 10),
-        maxOccurs: gr['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(gr['@_maxOccurs'] || '1', 10),
+        type: 'element',
+        name: attr(child, 'name') || undefined,
+        ref: attr(child, 'ref') || undefined,
+        elementType: attr(child, 'type') || undefined,
+        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
+        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+      })
+    } else if (isXsdTag(tag, 'sequence')) {
+      particles.push({
+        type: 'sequence',
+        particles: parseParticles(child),
+        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
+        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+      })
+    } else if (isXsdTag(tag, 'choice')) {
+      particles.push({
+        type: 'choice',
+        particles: parseParticles(child),
+        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
+        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+      })
+    } else if (isXsdTag(tag, 'group')) {
+      const ref = attr(child, 'ref')
+      if (ref) {
+        particles.push({
+          type: 'group',
+          ref,
+          minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
+          maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+        })
+      }
+    } else if (isXsdTag(tag, 'any')) {
+      particles.push({
+        type: 'any',
+        namespace: attr(child, 'namespace') || '##any',
+        processContents: attr(child, 'processContents') || 'strict',
+        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
+        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
       })
     }
-  }
-
-  // Any elements
-  const anys = ensureArray(container['xsd:any'] || container['xs:any'] || [])
-  for (const any of anys) {
-    particles.push({
-      type: 'any',
-      namespace: any['@_namespace'] || '##any',
-      processContents: any['@_processContents'] || 'strict',
-      minOccurs: parseInt(any['@_minOccurs'] || '1', 10),
-      maxOccurs: any['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(any['@_maxOccurs'] || '1', 10),
-    })
   }
 
   return particles
 }
 
-function parseElement(el: any): ParsedElement {
+function parseElement(elNode: any): ParsedElement {
   return {
-    name: el['@_name'] || '',
-    ref: el['@_ref'] || undefined,
-    type: el['@_type'] || undefined,
-    minOccurs: parseInt(el['@_minOccurs'] || '1', 10),
-    maxOccurs: el['@_maxOccurs'] === 'unbounded' ? 'unbounded' : parseInt(el['@_maxOccurs'] || '1', 10),
-    default: el['@_default'],
-    fixed: el['@_fixed'],
-    nillable: el['@_nillable'] === 'true',
+    name: attr(elNode, 'name') || '',
+    ref: attr(elNode, 'ref') || undefined,
+    type: attr(elNode, 'type') || undefined,
+    minOccurs: parseInt(attr(elNode, 'minOccurs') || '1', 10),
+    maxOccurs: attr(elNode, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(elNode, 'maxOccurs') || '1', 10),
+    default: attr(elNode, 'default'),
+    fixed: attr(elNode, 'fixed'),
+    nillable: attr(elNode, 'nillable') === 'true',
   }
 }
 
-function parseAttribute(attr: any): ParsedAttribute {
+function parseAttribute(attrNode: any): ParsedAttribute {
   return {
-    name: attr['@_name'] || '',
-    ref: attr['@_ref'] || undefined,
-    type: attr['@_type'] || 'xsd:string',
-    use: (attr['@_use'] as 'required' | 'optional' | 'prohibited') || 'optional',
-    default: attr['@_default'],
-    fixed: attr['@_fixed'],
+    name: attr(attrNode, 'name') || '',
+    ref: attr(attrNode, 'ref') || undefined,
+    type: attr(attrNode, 'type') || 'xsd:string',
+    use: (attr(attrNode, 'use') as 'required' | 'optional' | 'prohibited') || 'optional',
+    default: attr(attrNode, 'default'),
+    fixed: attr(attrNode, 'fixed'),
   }
 }
 
-function parseGroup(gr: any): ParsedGroup {
-  const name = gr['@_name'] || ''
-  const sequence = gr['xsd:sequence'] || gr['xs:sequence']
-  const choice = gr['xsd:choice'] || gr['xs:choice']
+function parseGroup(grNode: any): ParsedGroup {
+  const name = attr(grNode, 'name') || ''
+  const children = nodeChildren(grNode)
+  const sequence = findFirstByTag(children, 'sequence')
+  const choice = findFirstByTag(children, 'choice')
 
   const result: ParsedGroup = { name }
 
@@ -410,47 +448,50 @@ function parseGroup(gr: any): ParsedGroup {
   return result
 }
 
-function parseAttributeGroup(ag: any): ParsedAttributeGroup {
-  const name = ag['@_name'] || ''
+function parseAttributeGroup(agNode: any): ParsedAttributeGroup {
+  const name = attr(agNode, 'name') || ''
+  const children = nodeChildren(agNode)
   const result: ParsedAttributeGroup = {
     name,
     attributes: [],
     attributeGroups: [],
   }
 
-  const attrs = ensureArray(ag['xsd:attribute'] || ag['xs:attribute'] || [])
-  for (const attr of attrs) {
-    result.attributes.push(parseAttribute(attr))
+  for (const attrNode of findByTag(children, 'attribute')) {
+    result.attributes.push(parseAttribute(attrNode))
   }
 
-  const attrGroups = ensureArray(ag['xsd:attributeGroup'] || ag['xs:attributeGroup'] || [])
-  for (const ref of attrGroups) {
-    if (ref['@_ref']) {
-      result.attributeGroups.push(ref['@_ref'])
+  for (const ref of findByTag(children, 'attributeGroup')) {
+    const refName = attr(ref, 'ref')
+    if (refName) {
+      result.attributeGroups.push(refName)
     }
   }
 
   return result
 }
 
-function parseSimpleContent(sc: any): ParsedSimpleContent {
-  const extension = sc['xsd:extension'] || sc['xs:extension']
-  const restriction = sc['xsd:restriction'] || sc['xs:restriction']
+function parseSimpleContent(scNode: any): ParsedSimpleContent {
+  const children = nodeChildren(scNode)
+  const extension = findFirstByTag(children, 'extension')
+  const restriction = findFirstByTag(children, 'restriction')
 
   if (extension) {
-    const attrs = ensureArray(extension['xsd:attribute'] || extension['xs:attribute'] || [])
+    const extChildren = nodeChildren(extension)
+    const attrs = findByTag(extChildren, 'attribute')
     return {
       type: 'extension',
-      base: extension['@_base'] || '',
+      base: attr(extension, 'base') || '',
       attributes: attrs.map(parseAttribute),
     }
   }
 
   if (restriction) {
-    const attrs = ensureArray(restriction['xsd:attribute'] || restriction['xs:attribute'] || [])
+    const restChildren = nodeChildren(restriction)
+    const attrs = findByTag(restChildren, 'attribute')
     return {
       type: 'restriction',
-      base: restriction['@_base'] || '',
+      base: attr(restriction, 'base') || '',
       attributes: attrs.map(parseAttribute),
       facets: extractFacets(restriction),
     }
@@ -459,35 +500,37 @@ function parseSimpleContent(sc: any): ParsedSimpleContent {
   return { type: 'extension', base: '', attributes: [] }
 }
 
-function parseComplexContent(cc: any): ParsedComplexContent {
-  const extension = cc['xsd:extension'] || cc['xs:extension']
-  const restriction = cc['xsd:restriction'] || cc['xs:restriction']
+function parseComplexContent(ccNode: any): ParsedComplexContent {
+  const children = nodeChildren(ccNode)
+  const extension = findFirstByTag(children, 'extension')
+  const restriction = findFirstByTag(children, 'restriction')
   const source = extension || restriction
 
   if (!source) {
     return { type: 'extension', base: '', attributes: [], attributeGroups: [] }
   }
 
-  const sequence = source['xsd:sequence'] || source['xs:sequence']
-  const choice = source['xsd:choice'] || source['xs:choice']
-  const attrs = ensureArray(source['xsd:attribute'] || source['xs:attribute'] || [])
-  const attrGroups = ensureArray(source['xsd:attributeGroup'] || source['xs:attributeGroup'] || [])
+  const sourceChildren = nodeChildren(source)
+  const sequence = findFirstByTag(sourceChildren, 'sequence')
+  const choice = findFirstByTag(sourceChildren, 'choice')
+  const attrs = findByTag(sourceChildren, 'attribute')
+  const attrGroups = findByTag(sourceChildren, 'attributeGroup')
 
   return {
     type: extension ? 'extension' : 'restriction',
-    base: source['@_base'] || '',
+    base: attr(source, 'base') || '',
     content: sequence
       ? { type: 'sequence', particles: parseParticles(sequence) }
       : choice
         ? { type: 'choice', particles: parseParticles(choice) }
         : undefined,
     attributes: attrs.map(parseAttribute),
-    attributeGroups: attrGroups.filter((ref: any) => ref['@_ref']).map((ref: any) => ref['@_ref']),
+    attributeGroups: attrGroups.filter((ref: any) => attr(ref, 'ref')).map((ref: any) => attr(ref, 'ref')!),
   }
 }
 
 // ============================================================================
-// TypeScript Code Generation
+// TypeScript Code Generation (unchanged from original)
 // ============================================================================
 
 function makeTypeRef(typeStr: string): string {

@@ -789,4 +789,261 @@ describe('deep nested child validation (cascading)', () => {
     expect(result.errors).toHaveLength(0)
     expect(result.valid).toBe(true)
   })
+
+  it('should handle nested compositor with maxOccurs > 1 (choice repeating in sequence)', () => {
+    // Root type has sequence with a choice(maxOccurs=2), then a required element
+    // <root>
+    //   <sequence>
+    //     <choice maxOccurs="2">
+    //       <element name="optA" type="string"/>
+    //       <element name="optB" type="string"/>
+    //     </choice>
+    //     <element name="required" type="string"/>
+    //   </sequence>
+    // </root>
+    const rootType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Root',
+      content: {
+        kind: 'elementOnly',
+        compositor: {
+          kind: 'sequence',
+          particles: [
+            {
+              kind: 'choice',
+              particles: [
+                {
+                  kind: 'element',
+                  name: 'optA',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+                {
+                  kind: 'element',
+                  name: 'optB',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+              ],
+              occurs: { minOccurs: 1, maxOccurs: 2 },
+            },
+            {
+              kind: 'element',
+              name: 'required',
+              typeRef: { name: 'string', isBuiltin: true },
+              occurs: { minOccurs: 1, maxOccurs: 1 },
+            },
+          ],
+          occurs: { minOccurs: 1, maxOccurs: 1 },
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Root', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([['CT_Root', rootType]]),
+      new Map([['root', rootElement]]),
+    )
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+
+    // First choice occurrence: select optA
+    engine.startElement(makeElement('optA', TEST_NS))
+    engine.text('value1')
+    engine.endElement(makeElement('optA', TEST_NS))
+
+    // Second choice occurrence: select optB (should work since maxOccurs=2)
+    engine.startElement(makeElement('optB', TEST_NS))
+    engine.text('value2')
+    engine.endElement(makeElement('optB', TEST_NS))
+
+    // Required element after the choice
+    engine.startElement(makeElement('required', TEST_NS))
+    engine.text('value3')
+    engine.endElement(makeElement('required', TEST_NS))
+
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should handle nested sequence with maxOccurs > 1', () => {
+    // Root type has a parent sequence containing a nested sequence(maxOccurs=unbounded)
+    // <root>
+    //   <sequence>
+    //     <sequence maxOccurs="unbounded">
+    //       <element name="a" type="string"/>
+    //       <element name="b" type="string"/>
+    //     </sequence>
+    //   </sequence>
+    // </root>
+    const rootType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Root',
+      content: {
+        kind: 'elementOnly',
+        compositor: {
+          kind: 'sequence',
+          particles: [
+            {
+              kind: 'sequence',
+              particles: [
+                {
+                  kind: 'element',
+                  name: 'a',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+                {
+                  kind: 'element',
+                  name: 'b',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+              ],
+              occurs: { minOccurs: 1, maxOccurs: 'unbounded' },
+            },
+          ],
+          occurs: { minOccurs: 1, maxOccurs: 1 },
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Root', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([['CT_Root', rootType]]),
+      new Map([['root', rootElement]]),
+    )
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+
+    // First sequence occurrence: a, b
+    engine.startElement(makeElement('a', TEST_NS))
+    engine.text('1')
+    engine.endElement(makeElement('a', TEST_NS))
+    engine.startElement(makeElement('b', TEST_NS))
+    engine.text('2')
+    engine.endElement(makeElement('b', TEST_NS))
+
+    // Second sequence occurrence: a, b
+    engine.startElement(makeElement('a', TEST_NS))
+    engine.text('3')
+    engine.endElement(makeElement('a', TEST_NS))
+    engine.startElement(makeElement('b', TEST_NS))
+    engine.text('4')
+    engine.endElement(makeElement('b', TEST_NS))
+
+    // Third sequence occurrence: a, b
+    engine.startElement(makeElement('a', TEST_NS))
+    engine.text('5')
+    engine.endElement(makeElement('a', TEST_NS))
+    engine.startElement(makeElement('b', TEST_NS))
+    engine.text('6')
+    engine.endElement(makeElement('b', TEST_NS))
+
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should reject nested compositor exceeding maxOccurs', () => {
+    // choice with maxOccurs=1 — only one branch selection allowed
+    const rootType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Root',
+      content: {
+        kind: 'elementOnly',
+        compositor: {
+          kind: 'sequence',
+          particles: [
+            {
+              kind: 'choice',
+              particles: [
+                {
+                  kind: 'element',
+                  name: 'optA',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+                {
+                  kind: 'element',
+                  name: 'optB',
+                  typeRef: { name: 'string', isBuiltin: true },
+                  occurs: { minOccurs: 1, maxOccurs: 1 },
+                },
+              ],
+              occurs: { minOccurs: 1, maxOccurs: 1 },
+            },
+          ],
+          occurs: { minOccurs: 1, maxOccurs: 1 },
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Root', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([['CT_Root', rootType]]),
+      new Map([['root', rootElement]]),
+    )
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+
+    // First occurrence: select optA — OK
+    engine.startElement(makeElement('optA', TEST_NS))
+    engine.text('value1')
+    engine.endElement(makeElement('optA', TEST_NS))
+
+    // Second occurrence: select optB — should FAIL (maxOccurs=1)
+    engine.startElement(makeElement('optB', TEST_NS))
+    engine.text('value2')
+    engine.endElement(makeElement('optB', TEST_NS))
+
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    // Should have an error for the second choice occurrence
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
 })
