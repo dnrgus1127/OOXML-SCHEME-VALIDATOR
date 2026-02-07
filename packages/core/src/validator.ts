@@ -262,9 +262,12 @@ export class ValidationEngine {
         const baseKey = `${derivation.base.namespacePrefix ?? ''}:${derivation.base.name}`;
         if (!seen.has(baseKey)) {
           seen.add(baseKey);
-          const baseNs = derivation.base.namespacePrefix
+          let baseNs = derivation.base.namespacePrefix
             ? resolveNamespaceUri(namespaceContext, derivation.base.namespacePrefix)
             : resolveNamespaceUri(namespaceContext);
+          if (!baseNs && derivation.base.namespacePrefix) {
+            baseNs = this.registry.resolveSchemaPrefix(derivation.base.namespacePrefix) ?? '';
+          }
           const baseType = this.registry.resolveType(baseNs, derivation.base.name);
           if (baseType && baseType.kind === 'complexType') {
             const baseAttrs = this.collectAllAttributes(baseType, namespaceContext, seen);

@@ -1371,3 +1371,128 @@ describe('deep nested child validation (cascading)', () => {
     expect(result.errors.length).toBeGreaterThan(0)
   })
 })
+
+describe('cross-namespace complexContent attribute inheritance', () => {
+  const OTHER_NS = 'http://other.example.com/schema'
+
+  it('should inherit attributes from a base type in a different namespace via schema prefix', () => {
+    // Base type in OTHER_NS with a required attribute
+    const baseType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_BaseOther',
+      content: { kind: 'empty' },
+      attributes: [
+        {
+          kind: 'attribute',
+          name: 'baseAttr',
+          typeRef: { name: 'string', isBuiltin: true },
+          use: 'required',
+        },
+      ],
+      attributeGroups: [],
+    }
+
+    const otherSchema: XsdSchema = {
+      targetNamespace: OTHER_NS,
+      namespaces: [],
+      elementFormDefault: 'qualified',
+      attributeFormDefault: 'unqualified',
+      imports: [],
+      includes: [],
+      redefines: [],
+      simpleTypes: new Map(),
+      complexTypes: new Map([['CT_BaseOther', baseType]]),
+      elements: new Map(),
+      attributes: new Map(),
+      groups: new Map(),
+      attributeGroups: new Map(),
+    }
+
+    // Derived type in TEST_NS extends base from OTHER_NS using prefix "o"
+    const derivedType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Derived',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_BaseOther', isBuiltin: false, namespacePrefix: 'o' },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'extAttr',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'required',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Derived', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    // Schema for TEST_NS declares prefix "o" → OTHER_NS
+    const testSchema: XsdSchema = {
+      targetNamespace: TEST_NS,
+      namespaces: [{ prefix: 'o', uri: OTHER_NS }],
+      elementFormDefault: 'qualified',
+      attributeFormDefault: 'unqualified',
+      imports: [],
+      includes: [],
+      redefines: [],
+      simpleTypes: new Map(),
+      complexTypes: new Map([['CT_Derived', derivedType]]),
+      elements: new Map([['root', rootElement]]),
+      attributes: new Map(),
+      groups: new Map(),
+      attributeGroups: new Map(),
+    }
+
+    const registry = createTestRegistry(
+      new Map([
+        [TEST_NS, testSchema],
+        [OTHER_NS, otherSchema],
+      ]),
+    )
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test 1: provide both base and extension attributes → should pass
+    engine.startDocument()
+    engine.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'baseAttr', value: 'base' },
+        { name: 'extAttr', value: 'ext' },
+      ], nsDecl),
+    )
+    engine.endElement(makeElement('root', TEST_NS))
+    const result1 = engine.endDocument()
+
+    expect(result1.errors).toHaveLength(0)
+    expect(result1.valid).toBe(true)
+
+    // Test 2: omit the base attribute → should report MISSING_REQUIRED_ATTR
+    const engine2 = new ValidationEngine(registry)
+    engine2.startDocument()
+    engine2.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'extAttr', value: 'ext' },
+      ], nsDecl),
+    )
+    engine2.endElement(makeElement('root', TEST_NS))
+    const result2 = engine2.endDocument()
+
+    const missingAttrErrors = result2.errors.filter((e) => e.code === 'MISSING_REQUIRED_ATTR')
+    expect(missingAttrErrors).toHaveLength(1)
+    expect(missingAttrErrors[0]!.message).toContain('baseAttr')
+  })
+})
