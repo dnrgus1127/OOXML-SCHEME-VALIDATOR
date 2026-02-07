@@ -103,8 +103,39 @@ export function resolveNamespaceUri(context: Map<string, string>, prefix?: strin
   return context.get(prefix) ?? '';
 }
 
+/**
+ * Namespace mapping: Transitional (used in most Office files) -> Strict (used in XSD schemas)
+ */
+const TRANSITIONAL_TO_STRICT_NS: Record<string, string> = {
+  'http://schemas.openxmlformats.org/spreadsheetml/2006/main': 'http://purl.oclc.org/ooxml/spreadsheetml/main',
+  'http://schemas.openxmlformats.org/wordprocessingml/2006/main': 'http://purl.oclc.org/ooxml/wordprocessingml/main',
+  'http://schemas.openxmlformats.org/presentationml/2006/main': 'http://purl.oclc.org/ooxml/presentationml/main',
+  'http://schemas.openxmlformats.org/drawingml/2006/main': 'http://purl.oclc.org/ooxml/drawingml/main',
+  'http://schemas.openxmlformats.org/drawingml/2006/chart': 'http://purl.oclc.org/ooxml/drawingml/chart',
+  'http://schemas.openxmlformats.org/drawingml/2006/chartDrawing': 'http://purl.oclc.org/ooxml/drawingml/chartDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/diagram': 'http://purl.oclc.org/ooxml/drawingml/diagram',
+  'http://schemas.openxmlformats.org/drawingml/2006/picture': 'http://purl.oclc.org/ooxml/drawingml/picture',
+  'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing': 'http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing': 'http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing',
+  'http://schemas.openxmlformats.org/drawingml/2006/lockedCanvas': 'http://purl.oclc.org/ooxml/drawingml/lockedCanvas',
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships': 'http://purl.oclc.org/ooxml/officeDocument/relationships',
+  'http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes': 'http://purl.oclc.org/ooxml/officeDocument/sharedTypes',
+  'http://schemas.openxmlformats.org/officeDocument/2006/math': 'http://purl.oclc.org/ooxml/officeDocument/math',
+  'http://schemas.openxmlformats.org/officeDocument/2006/bibliography': 'http://purl.oclc.org/ooxml/officeDocument/bibliography',
+  'http://schemas.openxmlformats.org/officeDocument/2006/characteristics': 'http://purl.oclc.org/ooxml/officeDocument/characteristics',
+  'http://schemas.openxmlformats.org/officeDocument/2006/custom-properties': 'http://purl.oclc.org/ooxml/officeDocument/custom-properties',
+  'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties': 'http://purl.oclc.org/ooxml/officeDocument/extended-properties',
+  'http://schemas.openxmlformats.org/officeDocument/2006/customXml': 'http://purl.oclc.org/ooxml/officeDocument/customXml',
+  'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes': 'http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes',
+};
+
+/** Normalize namespace URI: Convert Transitional to Strict if applicable */
+export function normalizeNamespace(namespaceUri: string): string {
+  return TRANSITIONAL_TO_STRICT_NS[namespaceUri] || namespaceUri;
+}
+
 export function makeQualifiedName(namespaceUri: string, localName: string): string {
-  return `${namespaceUri}:${localName}`;
+  return `${normalizeNamespace(namespaceUri)}:${localName}`;
 }
 
 export function isComplexSchemaType(

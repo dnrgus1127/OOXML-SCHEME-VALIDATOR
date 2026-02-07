@@ -521,6 +521,9 @@ export interface SchemaRegistry {
 
   /** 속성 그룹 조회 */
   resolveAttributeGroup(namespaceUri: string, groupName: string): XsdAttributeGroup | undefined;
+
+  /** 스키마 네임스페이스 프리픽스 해석 */
+  resolveSchemaPrefix(prefix: string): string | undefined;
 }
 
 // ============================================================================

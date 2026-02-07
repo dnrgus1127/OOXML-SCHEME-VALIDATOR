@@ -4,6 +4,7 @@ import type {
   ValidationOptions,
   ValidationErrorCode,
   XsdAttribute,
+  XsdAttributeGroup,
   XsdComplexType,
   XsdSimpleType,
   TypeReference,
@@ -13,6 +14,7 @@ import type {
   SimpleTypeList,
   XsdElement,
   XsdAny,
+  XsdAnyAttribute,
 } from './types';
 import { hasComplexContent, hasElementContent, hasSimpleContent, isSimpleType, isElement, isAny } from './types';
 import {
@@ -39,6 +41,25 @@ export class ValidationEngine {
     }
   }
 
+  /**
+   * Create a namespace resolver that combines XML context with schema prefix fallback.
+   * Schema prefixes (like "a", "s", "r") are resolved from the schema's namespace
+   * declarations when they're not found in the XML namespace context.
+   */
+  private createResolver(namespaceContext: Map<string, string>) {
+    return {
+      resolveNamespaceUri: (prefix?: string): string => {
+        const xmlResult = resolveNamespaceUri(namespaceContext, prefix);
+        if (xmlResult) return xmlResult;
+        // Fall back to schema namespace prefix map
+        if (prefix) {
+          return this.registry.resolveSchemaPrefix(prefix) ?? '';
+        }
+        return '';
+      },
+    };
+  }
+
   startDocument(): void {
     this.context.elementStack = [];
     this.context.namespaceStack = [new Map()];
@@ -57,15 +78,15 @@ export class ValidationEngine {
 
     let matchedParticle: FlattenedParticle | undefined;
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1];
+    const resolver = this.createResolver(namespaceContext);
+
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
         element.namespaceUri,
         element.localName,
         parentFrame.compositorState,
         this.registry,
-        {
-          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(namespaceContext, prefix),
-        },
+        resolver,
       );
 
       if (!result.success) {
@@ -90,9 +111,7 @@ export class ValidationEngine {
       namespaceUri: element.namespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
-        ? initCompositorState(schemaType, this.registry, {
-            resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(namespaceContext, prefix),
-          })
+        ? initCompositorState(schemaType, this.registry, resolver)
         : null,
       textContent: '',
       validatedAttributes,
@@ -117,12 +136,11 @@ export class ValidationEngine {
     }
 
     if (currentFrame.compositorState) {
+      const endNsContext = this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map();
       const missing = checkMissingRequiredElements(
         currentFrame.compositorState,
         this.registry,
-        {
-          resolveNamespaceUri: (prefix?: string) => resolveNamespaceUri(this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map(), prefix),
-        },
+        this.createResolver(endNsContext),
       );
 
       for (const missingElement of missing) {
@@ -203,7 +221,11 @@ export class ValidationEngine {
       } as XsdSimpleType;
     }
 
-    const namespaceUri = ref.namespacePrefix ? resolveNamespaceUri(namespaceContext, ref.namespacePrefix) : resolveNamespaceUri(namespaceContext);
+    let namespaceUri = ref.namespacePrefix ? resolveNamespaceUri(namespaceContext, ref.namespacePrefix) : resolveNamespaceUri(namespaceContext);
+    // Fall back to schema namespace prefix map if XML context doesn't have the prefix
+    if (!namespaceUri && ref.namespacePrefix) {
+      namespaceUri = this.registry.resolveSchemaPrefix(ref.namespacePrefix) ?? '';
+    }
     const type = this.registry.resolveType(namespaceUri, ref.name);
     if (!type) {
       this.pushError('UNKNOWN_TYPE', `타입을 찾을 수 없습니다: ${ref.name}`);
@@ -211,20 +233,78 @@ export class ValidationEngine {
     return type ?? null;
   }
 
+  /**
+   * Collect all attributes from a complexType, including those inherited
+   * through complexContent extension/restriction chains.
+   */
+  private collectAllAttributes(
+    schemaType: XsdComplexType,
+    namespaceContext: Map<string, string>,
+    visited?: Set<string>,
+  ): { attributes: XsdAttribute[]; attributeGroups: XsdAttributeGroup[]; anyAttribute?: XsdAnyAttribute } {
+    const attributes: XsdAttribute[] = [...schemaType.attributes];
+    const attributeGroups: XsdAttributeGroup[] = [...schemaType.attributeGroups];
+    let anyAttribute = schemaType.anyAttribute;
+
+    if (hasComplexContent(schemaType.content)) {
+      const derivation = schemaType.content.content;
+
+      // Add attributes from the extension/restriction itself
+      attributes.push(...derivation.attributes);
+      attributeGroups.push(...derivation.attributeGroups);
+      if (derivation.anyAttribute) {
+        anyAttribute = anyAttribute ?? derivation.anyAttribute;
+      }
+
+      // For extensions, also inherit base type attributes
+      if (derivation.derivation === 'extension') {
+        const seen = visited ?? new Set<string>();
+        const baseKey = `${derivation.base.namespacePrefix ?? ''}:${derivation.base.name}`;
+        if (!seen.has(baseKey)) {
+          seen.add(baseKey);
+          let baseNs = derivation.base.namespacePrefix
+            ? resolveNamespaceUri(namespaceContext, derivation.base.namespacePrefix)
+            : resolveNamespaceUri(namespaceContext);
+          if (!baseNs && derivation.base.namespacePrefix) {
+            baseNs = this.registry.resolveSchemaPrefix(derivation.base.namespacePrefix) ?? '';
+          }
+          const baseType = this.registry.resolveType(baseNs, derivation.base.name);
+          if (baseType && baseType.kind === 'complexType') {
+            const baseAttrs = this.collectAllAttributes(baseType, namespaceContext, seen);
+            // Base attributes come first, derived can override
+            const derivedNames = new Set(attributes.filter(a => a.name).map(a => a.name!));
+            for (const baseAttr of baseAttrs.attributes) {
+              if (baseAttr.name && !derivedNames.has(baseAttr.name)) {
+                attributes.push(baseAttr);
+              }
+            }
+            attributeGroups.push(...baseAttrs.attributeGroups);
+            if (baseAttrs.anyAttribute) {
+              anyAttribute = anyAttribute ?? baseAttrs.anyAttribute;
+            }
+          }
+        }
+      }
+    }
+
+    return { attributes, attributeGroups, anyAttribute };
+  }
+
   private validateAttributes(
     attributes: XmlAttribute[],
     schemaType: XsdComplexType,
     namespaceContext: Map<string, string>,
   ): Set<string> {
+    const collected = this.collectAllAttributes(schemaType, namespaceContext);
     const allowedAttributes = new Map<string, XsdAttribute>();
 
-    for (const attr of schemaType.attributes) {
+    for (const attr of collected.attributes) {
       if (attr.name) {
         allowedAttributes.set(attr.name, attr);
       }
     }
 
-    for (const group of schemaType.attributeGroups) {
+    for (const group of collected.attributeGroups) {
       if (group.ref) {
         const namespaceUri = group.ref.namespacePrefix
           ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
@@ -250,7 +330,7 @@ export class ValidationEngine {
       const attrName = xmlAttr.localName ?? xmlAttr.name;
       const schemaDef = allowedAttributes.get(attrName);
       if (!schemaDef) {
-        if (schemaType.anyAttribute) {
+        if (collected.anyAttribute) {
           continue;
         }
         this.pushError('INVALID_ATTRIBUTE', `허용되지 않는 속성: ${xmlAttr.name}`);
@@ -475,9 +555,28 @@ export class ValidationEngine {
   }
 
   private checkRequiredAttributes(schemaType: XsdComplexType, frame: ElementStackFrame): void {
-    for (const attr of schemaType.attributes) {
+    const namespaceContext = this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map();
+    const collected = this.collectAllAttributes(schemaType, namespaceContext);
+
+    for (const attr of collected.attributes) {
       if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
         this.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`);
+      }
+    }
+
+    for (const group of collected.attributeGroups) {
+      if (group.ref) {
+        const namespaceUri = group.ref.namespacePrefix
+          ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
+          : resolveNamespaceUri(namespaceContext);
+        const resolved = this.registry.resolveAttributeGroup(namespaceUri, group.ref.name);
+        if (resolved?.attributes) {
+          for (const attr of resolved.attributes) {
+            if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
+              this.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`);
+            }
+          }
+        }
       }
     }
   }
@@ -515,9 +614,12 @@ export class ValidationEngine {
     if (isElement(p)) {
       // If element uses ref, resolve it from registry
       if (p.ref && !p.typeRef && !p.inlineComplexType && !p.inlineSimpleType) {
-        const refNs = p.ref.namespacePrefix
+        let refNs = p.ref.namespacePrefix
           ? resolveNamespaceUri(namespaceContext, p.ref.namespacePrefix)
           : resolveNamespaceUri(namespaceContext);
+        if (!refNs && p.ref.namespacePrefix) {
+          refNs = this.registry.resolveSchemaPrefix(p.ref.namespacePrefix) ?? '';
+        }
         return this.registry.resolveElement(refNs, p.ref.name);
       }
 

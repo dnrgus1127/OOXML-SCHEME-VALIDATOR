@@ -685,6 +685,330 @@ describe('nested compositor validation', () => {
   })
 })
 
+describe('complexContent attribute inheritance', () => {
+  it('should validate attributes defined in complexContent extension', () => {
+    const baseType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Base',
+      content: { kind: 'empty' },
+      attributes: [
+        {
+          kind: 'attribute',
+          name: 'baseAttr',
+          typeRef: { name: 'string', isBuiltin: true },
+          use: 'required',
+        },
+      ],
+      attributeGroups: [],
+    }
+
+    // Derived type extends base, adds its own attribute in the extension content
+    const derivedType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Derived',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_Base', isBuiltin: false },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'extAttr',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'required',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Derived', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([
+        ['CT_Base', baseType],
+        ['CT_Derived', derivedType],
+      ]),
+      new Map([['root', rootElement]]),
+    )
+
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test: provide both base and extension attributes
+    engine.startDocument()
+    engine.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'baseAttr', value: 'base' },
+        { name: 'extAttr', value: 'ext' },
+      ], nsDecl),
+    )
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should report missing required attributes from base type', () => {
+    const baseType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Base',
+      content: { kind: 'empty' },
+      attributes: [
+        {
+          kind: 'attribute',
+          name: 'baseAttr',
+          typeRef: { name: 'string', isBuiltin: true },
+          use: 'required',
+        },
+      ],
+      attributeGroups: [],
+    }
+
+    const derivedType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Derived',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_Base', isBuiltin: false },
+          attributes: [],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Derived', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([
+        ['CT_Base', baseType],
+        ['CT_Derived', derivedType],
+      ]),
+      new Map([['root', rootElement]]),
+    )
+
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test: omit the required base attribute
+    engine.startDocument()
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    const missingAttrErrors = result.errors.filter((e) => e.code === 'MISSING_REQUIRED_ATTR')
+    expect(missingAttrErrors).toHaveLength(1)
+    expect(missingAttrErrors[0]!.message).toContain('baseAttr')
+  })
+
+  it('should validate attributes from multi-level complexContent extension chain', () => {
+    const grandparentType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_GrandParent',
+      content: { kind: 'empty' },
+      attributes: [
+        {
+          kind: 'attribute',
+          name: 'gpAttr',
+          typeRef: { name: 'string', isBuiltin: true },
+          use: 'required',
+        },
+      ],
+      attributeGroups: [],
+    }
+
+    const parentType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Parent',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_GrandParent', isBuiltin: false },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'parentAttr',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'required',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const childType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Child',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_Parent', isBuiltin: false },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'childAttr',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'optional',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Child', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([
+        ['CT_GrandParent', grandparentType],
+        ['CT_Parent', parentType],
+        ['CT_Child', childType],
+      ]),
+      new Map([['root', rootElement]]),
+    )
+
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test: provide all required attributes from the chain
+    engine.startDocument()
+    engine.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'gpAttr', value: 'gp' },
+        { name: 'parentAttr', value: 'p' },
+        { name: 'childAttr', value: 'c' },
+      ], nsDecl),
+    )
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should report missing required attributes from extension content (not top-level)', () => {
+    // This tests the case where attributes are in content.content.attributes
+    // but schemaType.attributes is empty (as generated by XSD converter)
+    const baseType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Base',
+      content: { kind: 'empty' },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const derivedType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Derived',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_Base', isBuiltin: false },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'author',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'required',
+            },
+            {
+              kind: 'attribute',
+              name: 'date',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'optional',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [], // empty top-level, just like generated schemas
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Derived', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([
+        ['CT_Base', baseType],
+        ['CT_Derived', derivedType],
+      ]),
+      new Map([['root', rootElement]]),
+    )
+
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test 1: provide required attribute, should pass
+    engine.startDocument()
+    engine.startElement(
+      makeElement('root', TEST_NS, [{ name: 'author', value: 'John' }], nsDecl),
+    )
+    engine.endElement(makeElement('root', TEST_NS))
+    const result1 = engine.endDocument()
+
+    expect(result1.errors).toHaveLength(0)
+    expect(result1.valid).toBe(true)
+
+    // Test 2: omit required attribute, should fail
+    const engine2 = new ValidationEngine(registry)
+    engine2.startDocument()
+    engine2.startElement(
+      makeElement('root', TEST_NS, [{ name: 'date', value: '2024-01-01' }], nsDecl),
+    )
+    engine2.endElement(makeElement('root', TEST_NS))
+    const result2 = engine2.endDocument()
+
+    const missingAttrErrors = result2.errors.filter((e) => e.code === 'MISSING_REQUIRED_ATTR')
+    expect(missingAttrErrors).toHaveLength(1)
+    expect(missingAttrErrors[0]!.message).toContain('author')
+  })
+})
+
 describe('deep nested child validation (cascading)', () => {
   it('should not cascade failures - children of resolved elements should also validate', () => {
     const leafType: XsdComplexType = {
@@ -1045,5 +1369,130 @@ describe('deep nested child validation (cascading)', () => {
 
     // Should have an error for the second choice occurrence
     expect(result.errors.length).toBeGreaterThan(0)
+  })
+})
+
+describe('cross-namespace complexContent attribute inheritance', () => {
+  const OTHER_NS = 'http://other.example.com/schema'
+
+  it('should inherit attributes from a base type in a different namespace via schema prefix', () => {
+    // Base type in OTHER_NS with a required attribute
+    const baseType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_BaseOther',
+      content: { kind: 'empty' },
+      attributes: [
+        {
+          kind: 'attribute',
+          name: 'baseAttr',
+          typeRef: { name: 'string', isBuiltin: true },
+          use: 'required',
+        },
+      ],
+      attributeGroups: [],
+    }
+
+    const otherSchema: XsdSchema = {
+      targetNamespace: OTHER_NS,
+      namespaces: [],
+      elementFormDefault: 'qualified',
+      attributeFormDefault: 'unqualified',
+      imports: [],
+      includes: [],
+      redefines: [],
+      simpleTypes: new Map(),
+      complexTypes: new Map([['CT_BaseOther', baseType]]),
+      elements: new Map(),
+      attributes: new Map(),
+      groups: new Map(),
+      attributeGroups: new Map(),
+    }
+
+    // Derived type in TEST_NS extends base from OTHER_NS using prefix "o"
+    const derivedType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_Derived',
+      content: {
+        kind: 'complexContent',
+        content: {
+          derivation: 'extension',
+          base: { name: 'CT_BaseOther', isBuiltin: false, namespacePrefix: 'o' },
+          attributes: [
+            {
+              kind: 'attribute',
+              name: 'extAttr',
+              typeRef: { name: 'string', isBuiltin: true },
+              use: 'required',
+            },
+          ],
+          attributeGroups: [],
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_Derived', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    // Schema for TEST_NS declares prefix "o" → OTHER_NS
+    const testSchema: XsdSchema = {
+      targetNamespace: TEST_NS,
+      namespaces: [{ prefix: 'o', uri: OTHER_NS }],
+      elementFormDefault: 'qualified',
+      attributeFormDefault: 'unqualified',
+      imports: [],
+      includes: [],
+      redefines: [],
+      simpleTypes: new Map(),
+      complexTypes: new Map([['CT_Derived', derivedType]]),
+      elements: new Map([['root', rootElement]]),
+      attributes: new Map(),
+      groups: new Map(),
+      attributeGroups: new Map(),
+    }
+
+    const registry = createTestRegistry(
+      new Map([
+        [TEST_NS, testSchema],
+        [OTHER_NS, otherSchema],
+      ]),
+    )
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+
+    // Test 1: provide both base and extension attributes → should pass
+    engine.startDocument()
+    engine.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'baseAttr', value: 'base' },
+        { name: 'extAttr', value: 'ext' },
+      ], nsDecl),
+    )
+    engine.endElement(makeElement('root', TEST_NS))
+    const result1 = engine.endDocument()
+
+    expect(result1.errors).toHaveLength(0)
+    expect(result1.valid).toBe(true)
+
+    // Test 2: omit the base attribute → should report MISSING_REQUIRED_ATTR
+    const engine2 = new ValidationEngine(registry)
+    engine2.startDocument()
+    engine2.startElement(
+      makeElement('root', TEST_NS, [
+        { name: 'extAttr', value: 'ext' },
+      ], nsDecl),
+    )
+    engine2.endElement(makeElement('root', TEST_NS))
+    const result2 = engine2.endDocument()
+
+    const missingAttrErrors = result2.errors.filter((e) => e.code === 'MISSING_REQUIRED_ATTR')
+    expect(missingAttrErrors).toHaveLength(1)
+    expect(missingAttrErrors[0]!.message).toContain('baseAttr')
   })
 })

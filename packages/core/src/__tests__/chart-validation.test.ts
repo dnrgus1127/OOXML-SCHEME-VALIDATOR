@@ -6,6 +6,8 @@ import { initCompositorState } from '../compositor'
 import { resolveNamespaceUri } from '../runtime'
 
 const CHART_NS = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+const DML_MAIN_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+const SHARED_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes'
 
 function makeEl(localName: string, ns = CHART_NS, attrs: any[] = []) {
   return {
@@ -236,5 +238,96 @@ describe('real chart schema validation', () => {
         }
       }
     }
+  })
+})
+
+describe('cross-namespace type resolution', () => {
+  it('should resolve types from other namespaces via schema prefix (e.g., a:CT_ShapeProperties)', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    // Verify that the registry can resolve schema prefixes
+    const dmlMainUri = registry.resolveSchemaPrefix('a')
+    expect(dmlMainUri).toBe('http://purl.oclc.org/ooxml/drawingml/main')
+
+    const sharedUri = registry.resolveSchemaPrefix('s')
+    expect(sharedUri).toBe('http://purl.oclc.org/ooxml/officeDocument/sharedTypes')
+
+    // Verify that cross-namespace types can be resolved
+    const shapePropsType = registry.resolveType(dmlMainUri!, 'CT_ShapeProperties')
+    expect(shapePropsType).toBeDefined()
+    expect(shapePropsType?.kind).toBe('complexType')
+  })
+
+  it('should validate chart elements that reference cross-namespace types (spPr, txPr)', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 200,
+      allowWhitespace: true,
+    })
+
+    const nsDecl = new Map([['', CHART_NS]])
+
+    engine.startDocument()
+    engine.startElement({
+      ...makeEl('chartSpace'),
+      namespaceDeclarations: nsDecl,
+    })
+
+    engine.startElement(makeEl('chart'))
+    engine.startElement(makeEl('plotArea'))
+
+    // areaChart is inside a choice in plotArea's sequence
+    engine.startElement(makeEl('areaChart'))
+
+    // grouping (from EG_AreaChartShared)
+    engine.startElement(makeEl('grouping'))
+    engine.endElement(makeEl('grouping'))
+
+    // ser (from EG_AreaChartShared)
+    engine.startElement(makeEl('ser'))
+
+    // idx (required by EG_SerShared)
+    engine.startElement(makeEl('idx'))
+    engine.endElement(makeEl('idx'))
+
+    // order (required by EG_SerShared)
+    engine.startElement(makeEl('order'))
+    engine.endElement(makeEl('order'))
+
+    // spPr — this has typeRef: { namespacePrefix: "a", name: "CT_ShapeProperties" }
+    // Previously this would fail because "a" prefix couldn't be resolved
+    engine.startElement(makeEl('spPr'))
+
+    // CT_ShapeProperties has a sequence with optional elements from drawingml main
+    // Just open and close to verify the type was resolved (compositor initialized)
+    engine.endElement(makeEl('spPr'))
+
+    engine.endElement(makeEl('ser'))
+
+    // axId (x2 required)
+    engine.startElement(makeEl('axId'))
+    engine.endElement(makeEl('axId'))
+    engine.startElement(makeEl('axId'))
+    engine.endElement(makeEl('axId'))
+
+    engine.endElement(makeEl('areaChart'))
+    engine.endElement(makeEl('plotArea'))
+    engine.endElement(makeEl('chart'))
+    engine.endElement(makeEl('chartSpace'))
+
+    const result = engine.endDocument()
+
+    // No "schema not found" errors - cross-namespace types should be resolved
+    const schemaNotFoundErrors = result.errors.filter((e) =>
+      e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+    )
+    expect(schemaNotFoundErrors).toHaveLength(0)
+
+    // No "unknown type" errors - cross-namespace type refs should resolve
+    const unknownTypeErrors = result.errors.filter((e) =>
+      e.code === 'UNKNOWN_TYPE',
+    )
+    expect(unknownTypeErrors).toHaveLength(0)
   })
 })
