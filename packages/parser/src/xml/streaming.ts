@@ -148,9 +148,7 @@ export function parseXmlToEventArray(xml: string): XmlValidationEvent[] {
 /**
  * Async version that yields events for large documents
  */
-export async function* parseXmlToEventsAsync(
-  xml: string
-): AsyncGenerator<XmlValidationEvent> {
+export async function* parseXmlToEventsAsync(xml: string): AsyncGenerator<XmlValidationEvent> {
   for (const event of parseXmlToEvents(xml)) {
     yield event
   }

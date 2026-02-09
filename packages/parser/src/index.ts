@@ -41,11 +41,7 @@ export {
 } from './content-types'
 
 // Relationships
-export {
-  parseRelationships,
-  getRelsPath,
-  RelationshipTypes,
-} from './relationships'
+export { parseRelationships, getRelsPath, RelationshipTypes } from './relationships'
 
 // Types
 export type {

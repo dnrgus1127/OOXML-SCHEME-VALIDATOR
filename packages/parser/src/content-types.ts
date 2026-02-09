@@ -69,10 +69,7 @@ export function parseContentTypes(xml: string): ContentTypesResult {
 /**
  * Get content type for a part path
  */
-export function getContentType(
-  result: ContentTypesResult,
-  partPath: string
-): string {
+export function getContentType(result: ContentTypesResult, partPath: string): string {
   // Check override first (exact match)
   if (result.overrides.has(partPath)) {
     return result.overrides.get(partPath)!

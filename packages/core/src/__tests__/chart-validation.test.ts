@@ -58,7 +58,7 @@ describe('real chart schema validation', () => {
     }
 
     const schemaNotFoundErrors = result.errors.filter((e) =>
-      e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(schemaNotFoundErrors).toHaveLength(0)
   })
@@ -147,7 +147,7 @@ describe('real chart schema validation', () => {
 
     // The main assertion: no "schema not found" errors
     const schemaNotFoundErrors = result.errors.filter((e) =>
-      e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(schemaNotFoundErrors).toHaveLength(0)
   })
@@ -168,7 +168,11 @@ describe('real chart schema validation', () => {
         if (comp?.kind === 'sequence') {
           console.log('Particles count:', comp.particles.length)
           for (const p of comp.particles) {
-            console.log('  particle:', (p as any).kind, (p as any).name || (p as any).ref?.name || '')
+            console.log(
+              '  particle:',
+              (p as any).kind,
+              (p as any).name || (p as any).ref?.name || ''
+            )
           }
         }
       }
@@ -183,7 +187,9 @@ describe('real chart schema validation', () => {
       if (state) {
         for (const fp of state.flattenedParticles) {
           const p = fp.particle as any
-          console.log(`  [${fp.index}] ${p.kind} name=${p.name || ''} ref=${p.ref?.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`)
+          console.log(
+            `  [${fp.index}] ${p.kind} name=${p.name || ''} ref=${p.ref?.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`
+          )
           if (fp.allowedNames) {
             console.log(`       allowedNames: ${[...fp.allowedNames].join(', ')}`)
           }
@@ -207,7 +213,9 @@ describe('real chart schema validation', () => {
       if (state) {
         for (const fp of state.flattenedParticles) {
           const p = fp.particle as any
-          console.log(`  [${fp.index}] ${p.kind} name=${p.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`)
+          console.log(
+            `  [${fp.index}] ${p.kind} name=${p.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`
+          )
           if (fp.allowedNames) {
             console.log(`       allowedNames: ${[...fp.allowedNames].join(', ')}`)
           }
@@ -231,7 +239,9 @@ describe('real chart schema validation', () => {
       if (state) {
         for (const fp of state.flattenedParticles) {
           const p = fp.particle as any
-          console.log(`  [${fp.index}] ${p.kind} name=${p.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`)
+          console.log(
+            `  [${fp.index}] ${p.kind} name=${p.name || ''} min=${fp.minOccurs} max=${fp.maxOccurs}`
+          )
           if (fp.allowedNames) {
             console.log(`       allowedNames: ${[...fp.allowedNames].join(', ')}`)
           }
@@ -320,14 +330,12 @@ describe('cross-namespace type resolution', () => {
 
     // No "schema not found" errors - cross-namespace types should be resolved
     const schemaNotFoundErrors = result.errors.filter((e) =>
-      e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(schemaNotFoundErrors).toHaveLength(0)
 
     // No "unknown type" errors - cross-namespace type refs should resolve
-    const unknownTypeErrors = result.errors.filter((e) =>
-      e.code === 'UNKNOWN_TYPE',
-    )
+    const unknownTypeErrors = result.errors.filter((e) => e.code === 'UNKNOWN_TYPE')
     expect(unknownTypeErrors).toHaveLength(0)
   })
 })

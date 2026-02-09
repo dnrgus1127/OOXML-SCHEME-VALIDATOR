@@ -3,6 +3,7 @@
 ## 1. 개요
 
 ### 1.1 목적
+
 XSD 스키마를 JSON으로 변환하여 런타임에 메모리에 적재하고, XML 문서를 순차적으로 순회하며 OOXML 스펙 준수 여부를 검증하는 엔진 설계
 
 ### 1.2 아키텍처 개요
@@ -57,7 +58,7 @@ SchemaRegistry
 <xsd:attribute name="val" type="s:ST_OnOff"/>
                                ↑
                                prefix "s"
-                               
+
 해결 과정:
 1. 현재 스키마의 namespace 매핑에서 "s" 조회
    → "http://purl.oclc.org/ooxml/officeDocument/sharedTypes"
@@ -92,24 +93,24 @@ XSD 로딩 원칙:
 ```typescript
 interface ValidationContext {
   // 스키마 레지스트리
-  registry: SchemaRegistry;
-  
+  registry: SchemaRegistry
+
   // 현재 순회 상태
-  elementStack: ElementStackFrame[];
-  
+  elementStack: ElementStackFrame[]
+
   // 네임스페이스 컨텍스트 (스택 구조 - 요소별 상속)
-  namespaceStack: Map<string, string>[];
-  
+  namespaceStack: Map<string, string>[]
+
   // 결과 수집
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-  
+  errors: ValidationError[]
+  warnings: ValidationWarning[]
+
   // ID/IDREF 추적 (문서 전체 유효성)
-  idValues: Set<string>;
-  idrefValues: Set<string>;
-  
+  idValues: Set<string>
+  idrefValues: Set<string>
+
   // 옵션
-  options: ValidationOptions;
+  options: ValidationOptions
 }
 ```
 
@@ -118,18 +119,18 @@ interface ValidationContext {
 ```typescript
 interface ElementStackFrame {
   // 기본 정보
-  elementName: string;
-  namespaceUri: string;
-  schemaType: XsdComplexType | null;
-  
+  elementName: string
+  namespaceUri: string
+  schemaType: XsdComplexType | null
+
   // Compositor 상태 (순서 검증의 핵심)
-  compositorState: CompositorState | null;
-  
+  compositorState: CompositorState | null
+
   // 텍스트 컨텐츠 누적 (mixed/simpleContent용)
-  textContent: string;
-  
+  textContent: string
+
   // 검증된 속성 목록 (required 체크용)
-  validatedAttributes: Set<string>;
+  validatedAttributes: Set<string>
 }
 ```
 
@@ -137,39 +138,39 @@ interface ElementStackFrame {
 
 ```typescript
 interface CompositorState {
-  kind: 'sequence' | 'choice' | 'all';
-  
+  kind: 'sequence' | 'choice' | 'all'
+
   // 펼쳐진 particles (group 참조 해결 후)
-  flattenedParticles: FlattenedParticle[];
-  
+  flattenedParticles: FlattenedParticle[]
+
   // === Sequence 전용 ===
   // 현재 위치 포인터 (앞으로만 이동 가능)
-  currentIndex: number;
-  
+  currentIndex: number
+
   // === Choice 전용 ===
   // 선택된 branch
-  selectedBranch: number | null;
-  
+  selectedBranch: number | null
+
   // === All 전용 ===
   // 이미 나타난 요소들
-  appearedElements: Set<string>;
-  
+  appearedElements: Set<string>
+
   // === 공통 ===
   // 각 particle의 출현 횟수
-  occurrenceCounts: Map<number, number>;
-  
+  occurrenceCounts: Map<number, number>
+
   // 중첩 compositor 스택 (sequence 안의 choice 등)
-  nestedStack: CompositorState[];
+  nestedStack: CompositorState[]
 }
 
 interface FlattenedParticle {
-  index: number;
-  particle: XsdElement | XsdAny | XsdSequence | XsdChoice | XsdAll;
-  minOccurs: number;
-  maxOccurs: number | 'unbounded';
-  
+  index: number
+  particle: XsdElement | XsdAny | XsdSequence | XsdChoice | XsdAll
+  minOccurs: number
+  maxOccurs: number | 'unbounded'
+
   // 빠른 매칭을 위한 캐시
-  allowedNames?: Set<string>;  // 이 particle이 허용하는 요소명들
+  allowedNames?: Set<string> // 이 particle이 허용하는 요소명들
 }
 ```
 
@@ -182,40 +183,40 @@ interface FlattenedParticle {
 ```
 알고리즘: validateSequenceChild(childElement, state)
 
-입력: 
+입력:
   - childElement: 새로 진입한 자식 요소
   - state: 현재 CompositorState (kind='sequence')
 
 처리:
   1. startIndex = state.currentIndex
-  
+
   2. FOR i = startIndex TO particles.length - 1:
        particle = particles[i]
-       
+
        IF particle이 childElement를 허용하는가?
          // 매칭 성공
          state.occurrenceCounts[i]++
-         
+
          IF occurrenceCounts[i] > particle.maxOccurs:
            RETURN Error(TOO_MANY_ELEMENTS)
-         
+
          // 포인터는 현재 위치 유지 (같은 요소 반복 가능)
          // maxOccurs 도달 시에만 다음으로 이동
          IF occurrenceCounts[i] == particle.maxOccurs:
            state.currentIndex = i + 1
          ELSE:
            state.currentIndex = i
-         
+
          RETURN Success
-       
+
        ELSE:
          // 이 particle 스킵 가능한지 확인
          IF occurrenceCounts[i] < particle.minOccurs:
            RETURN Error(MISSING_REQUIRED_ELEMENT, particle)
-         
+
          // 스킵하고 다음으로
          CONTINUE
-  
+
   3. // 모든 particle 소진 - 허용되지 않는 요소
      RETURN Error(INVALID_ELEMENT)
 ```
@@ -234,14 +235,14 @@ Sequence 정의: [date1904?, roundedCorners?, chart]
 <date1904> 진입:
              [date1904?, roundedCorners?, chart]
                  ↑ 매칭! count=1, maxOccurs=1 도달
-             
+
              [date1904?, roundedCorners?, chart]
                           ↑ currentIndex=1로 이동
 
 <chart> 진입 (roundedCorners 스킵):
              [date1904?, roundedCorners?, chart]
                           ↑ 스킵 가능? minOccurs=0 ✓
-             
+
              [date1904?, roundedCorners?, chart]
                                           ↑ 매칭!
 ```
@@ -252,14 +253,14 @@ Sequence 정의: [date1904?, roundedCorners?, chart]
 알고리즘: validateChoiceChild(childElement, state)
 
 입력:
-  - childElement: 새로 진입한 자식 요소  
+  - childElement: 새로 진입한 자식 요소
   - state: 현재 CompositorState (kind='choice')
 
 처리:
   1. IF state.selectedBranch != null:
        // 이미 선택된 branch가 있음
        particle = particles[state.selectedBranch]
-       
+
        IF particle이 childElement를 허용하는가?
          state.occurrenceCounts[selectedBranch]++
          // maxOccurs 체크
@@ -271,14 +272,14 @@ Sequence 정의: [date1904?, roundedCorners?, chart]
            GOTO step 2
          ELSE:
            RETURN Error(INVALID_ELEMENT)
-  
+
   2. // 새 branch 선택 시도
      FOR i = 0 TO particles.length - 1:
        IF particles[i]가 childElement를 허용하는가?
          state.selectedBranch = i
          state.occurrenceCounts[i] = 1
          RETURN Success
-     
+
   3. RETURN Error(CHOICE_NOT_SATISFIED)
 ```
 
@@ -310,16 +311,16 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
 
 처리:
   1. elementName = childElement.name
-  
+
   2. particle = particles에서 elementName 찾기
-     
+
      IF particle == null:
        RETURN Error(INVALID_ELEMENT)
-  
+
   3. IF state.appearedElements.has(elementName):
        // all 내에서는 각 요소 최대 1회
        RETURN Error(TOO_MANY_ELEMENTS)
-  
+
   4. state.appearedElements.add(elementName)
      RETURN Success
 
@@ -386,17 +387,17 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
 2. ═══ 부모 Compositor 검증 (순서 체크) ═══
    IF elementStack이 비어있지 않음:
      parentFrame = elementStack.top()
-     
+
      IF parentFrame.compositorState != null:
        result = validateCompositorChild(element, parentFrame.compositorState)
-       
+
        IF result.isError:
          errors.push(result.error)
          IF options.failFast: THROW
 
 3. ═══ 스키마 타입 조회 ═══
    schemaElement = registry.resolveElement(namespaceUri, localName)
-   
+
    IF schemaElement == null:
      // 부모가 any를 허용하는지 확인
      IF parentAllowsAny(processContents):
@@ -437,7 +438,7 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
 2. ═══ 필수 자식 요소 누락 체크 ═══
    IF currentFrame.compositorState != null:
      missingElements = checkMissingRequiredElements(currentFrame.compositorState)
-     
+
      FOR each missing in missingElements:
        errors.push({
          code: 'MISSING_REQUIRED_ELEMENT',
@@ -476,11 +477,11 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
 
 1. ═══ 허용된 속성 목록 구축 ═══
    allowedAttrs = new Map()
-   
+
    // 직접 정의된 속성
    FOR each attr in schemaType.attributes:
      allowedAttrs.set(attr.name, attr)
-   
+
    // attributeGroup 참조 해결 (재귀)
    FOR each groupRef in schemaType.attributeGroups:
      group = registry.resolveAttributeGroup(groupRef)
@@ -491,11 +492,11 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
      // 네임스페이스 속성은 스킵
      IF xmlAttr.name.startsWith('xmlns'):
        CONTINUE
-    
+
     // qualified 속성은 (namespaceUri, localName) 기준으로 조회
     // unqualified 속성은 localName 기준으로 조회
     schemaDef = resolveAttributeByQName(allowedAttrs, xmlAttr)
-     
+
      IF schemaDef == null:
        // anyAttribute 허용 여부 확인
        IF schemaType.anyAttribute != null:
@@ -503,7 +504,7 @@ Choice 정의: (pieChart | barChart | lineChart | areaChart)
        ELSE:
          errors.push(INVALID_ATTRIBUTE)
        CONTINUE
-     
+
      // 값 검증
      validateAttributeValue(xmlAttr.value, schemaDef)
      validatedAttributes.add(xmlAttr.localName)
@@ -558,12 +559,12 @@ SWITCH simpleType.content.kind:
       baseType = registry.resolveType(content.base)
       result = validateSimpleTypeValue(value, baseType)
       IF result.isError: RETURN result
-    
+
     // 2. Facet 검증
     FOR each facet in content.facets:
       IF NOT validateFacet(value, facet):
         RETURN facetError(facet)
-    
+
     RETURN Success
 
   CASE 'union':
@@ -573,19 +574,19 @@ SWITCH simpleType.content.kind:
       result = validateSimpleTypeValue(value, memberType)
       IF result.isSuccess:
         RETURN Success
-    
+
     RETURN Error(INVALID_VALUE, "No union member matched")
 
   CASE 'list':
     // 공백으로 분리하여 각 아이템 검증
     items = value.split(/\s+/)
     itemType = registry.resolveType(content.itemType)
-    
+
     FOR each item in items:
       result = validateSimpleTypeValue(item, itemType)
       IF result.isError:
         RETURN result
-    
+
     RETURN Success
 ```
 
@@ -749,16 +750,16 @@ OOXML 확장 (c14, a14, w14 등):
 
 3. IF schema == null:
      // 알 수 없는 확장 네임스페이스
-     
+
      SWITCH determineProcessContents():
        CASE 'lax':
          // 스키마 없으면 통과, 있으면 검증
          RETURN Success
-         
+
        CASE 'strict':
          // 반드시 스키마 필요
          RETURN Error(UNKNOWN_TYPE)
-         
+
        CASE 'skip':
          // 완전 무시
          RETURN Success
@@ -785,22 +786,22 @@ any 처리 예시:
      CASE '##any':
        // 모든 네임스페이스 허용
        PASS
-       
+
      CASE '##other':
        // 현재 스키마의 targetNamespace 외의 것만 허용
        IF element.namespace == currentSchema.targetNamespace:
          RETURN Error(INVALID_NAMESPACE)
-       
+
      CASE '##targetNamespace':
        // 현재 스키마의 targetNamespace만 허용
        IF element.namespace != currentSchema.targetNamespace:
          RETURN Error(INVALID_NAMESPACE)
-       
+
      CASE '##local':
        // 네임스페이스 없는 요소만
        IF element.namespace != null:
          RETURN Error(INVALID_NAMESPACE)
-       
+
      DEFAULT:
        // 특정 네임스페이스 목록
        IF element.namespace NOT IN anyDef.namespace.split(' '):
@@ -814,14 +815,14 @@ any 처리 예시:
          RETURN Error(UNKNOWN_TYPE)
        // 전체 검증 수행
        RETURN validateElement(element, schema)
-       
+
      CASE 'lax':
        schema = registry.getSchema(element.namespace)
        IF schema != null:
          RETURN validateElement(element, schema)
        // 스키마 없으면 통과
        RETURN Success
-       
+
      CASE 'skip':
        // 검증 완전 스킵
        RETURN Success
@@ -881,11 +882,11 @@ CompositorState에 nestedStack 사용:
 2. <c/> 진입
    → particles[1]이 choice
    → choice 진입, nestedStack에 choiceState 푸시
-   
+
    choiceState = { kind: 'choice', selectedBranch: null }
    → particles[1] (sequence containing c,d) 선택
    → nestedStack에 innerSeqState 푸시
-   
+
    innerSeqState = { kind: 'sequence', currentIndex: 0 }
    → 'c' 매칭 ✓
 
@@ -927,10 +928,10 @@ Compositor 초기화 시:
 
 결과 FlattenedParticles:
   [
-    { 
+    {
       particle: choice(scrgbClr | srgbClr | hslClr),
       minOccurs: 1,
-      maxOccurs: 1 
+      maxOccurs: 1
     }
   ]
 ```
@@ -944,22 +945,22 @@ Compositor 초기화 시:
 ```typescript
 interface ValidationError {
   // 에러 식별
-  code: ValidationErrorCode;
-  severity: 'error' | 'warning';
-  
+  code: ValidationErrorCode
+  severity: 'error' | 'warning'
+
   // 위치 정보
-  path: string;           // XPath: /c:chartSpace/c:chart/c:plotArea
-  line?: number;          // 소스 라인
-  column?: number;        // 소스 컬럼
-  
+  path: string // XPath: /c:chartSpace/c:chart/c:plotArea
+  line?: number // 소스 라인
+  column?: number // 소스 컬럼
+
   // 상세 정보
-  message: string;        // 사람이 읽을 수 있는 메시지
-  value?: string;         // 문제가 된 실제 값
-  expected?: string;      // 기대되는 값/타입 설명
-  
+  message: string // 사람이 읽을 수 있는 메시지
+  value?: string // 문제가 된 실제 값
+  expected?: string // 기대되는 값/타입 설명
+
   // 스키마 참조
-  schemaFile?: string;    // 관련 XSD 파일
-  schemaType?: string;    // 관련 타입 이름
+  schemaFile?: string // 관련 XSD 파일
+  schemaType?: string // 관련 타입 이름
 }
 ```
 
@@ -1061,14 +1062,14 @@ Choice 최적화:
 
 예시:
   sequence: [date1904?, roundedCorners?, AlternateContent*, chart]
-  
+
   precomputed = {
     'date1904': [0],
     'roundedCorners': [1],
     'AlternateContent': [2],
     'chart': [3]
   }
-  
+
   <chart> 요소 진입 시:
     → precomputed['chart'] = [3]
     → currentIndex(0)부터 index(3)까지 스킵 가능 여부만 확인
@@ -1095,28 +1096,28 @@ ValidationOptions:
 ```typescript
 interface ValidationResult {
   // 전체 유효성
-  valid: boolean;
-  
+  valid: boolean
+
   // 에러 목록
-  errors: ValidationError[];
-  
+  errors: ValidationError[]
+
   // 경고 목록 (선택적)
-  warnings?: ValidationWarning[];
-  
+  warnings?: ValidationWarning[]
+
   // 통계
   statistics: {
-    elementsValidated: number;
-    attributesValidated: number;
-    errorsFound: number;
-    warningsFound: number;
-    validationTimeMs: number;
-  };
-  
+    elementsValidated: number
+    attributesValidated: number
+    errorsFound: number
+    warningsFound: number
+    validationTimeMs: number
+  }
+
   // 검증 완료 여부 (early exit 시 false)
-  complete: boolean;
-  
+  complete: boolean
+
   // 검증 범위 (complete=false 시)
-  lastValidatedPath?: string;
+  lastValidatedPath?: string
 }
 ```
 
@@ -1210,6 +1211,7 @@ FINAL: 검증 완료
 ## 15. 향후 확장 고려사항
 
 ### 14.1 Identity Constraints (unique, key, keyref)
+
 ```
 현재 설계에서 ID/IDREF만 지원
 향후 xsd:unique, xsd:key, xsd:keyref 지원 필요:
@@ -1219,6 +1221,7 @@ FINAL: 검증 완료
 ```
 
 ### 14.2 Assert (XSD 1.1)
+
 ```
 XSD 1.1의 xsd:assert 지원:
   - XPath 2.0 표현식 평가
@@ -1226,6 +1229,7 @@ XSD 1.1의 xsd:assert 지원:
 ```
 
 ### 14.3 Type Alternatives (XSD 1.1)
+
 ```
 조건부 타입 할당:
   - 속성 값에 따른 다른 타입 적용

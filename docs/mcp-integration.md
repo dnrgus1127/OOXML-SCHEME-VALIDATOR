@@ -15,16 +15,19 @@
 ## 역할 분담 옵션
 
 ### 1) 에이전트에서 압축 해제
+
 - 장점: 현재 프로젝트는 검증 엔진에 집중 → 별도 의존성 불필요
 - 흐름
   - 에이전트: Zip 해제 → XML 파트별로 검증 요청
   - 검증 엔진: XML 스트림 이벤트 처리 및 결과 반환
 
 ### 2) 프로젝트(서버)에서 압축 해제
+
 - 장점: MCP 도구가 “xlsx → report” 단일 기능으로 동작
 - 고려사항: zip 해제 라이브러리/파일 I/O 필요
 
 #### zip 해제 + 파일 I/O 작업 체크리스트
+
 - **의존성 선정**
   - Node.js 환경이라면 `adm-zip`, `yauzl`, `unzipper` 같은 zip 라이브러리 선정
   - 스트리밍 처리 필요 시 `yauzl` 같은 lazy/stream 지원 라이브러리 고려
@@ -47,21 +50,21 @@
 ## MCP 서버/도구 설계 제안
 
 ### MCP 도구 이름 예시
+
 - `validate_ooxml_xlsx`
 
 ### 입력(예시)
+
 ```json
 {
   "filePath": "/path/to/file.xlsx",
-  "parts": [
-    "xl/workbook.xml",
-    "xl/worksheets/sheet1.xml"
-  ],
+  "parts": ["xl/workbook.xml", "xl/worksheets/sheet1.xml"],
   "failFast": false
 }
 ```
 
 ### 출력(예시)
+
 ```json
 {
   "valid": false,
@@ -92,33 +95,34 @@
 ## 검증 이벤트 연동 예시(개념)
 
 ```ts
-import { SchemaRegistryImpl, ValidationEngine } from '../dist';
+import { SchemaRegistryImpl, ValidationEngine } from '../dist'
 
-const registry = new SchemaRegistryImpl(new Map());
-const validator = new ValidationEngine(registry, { failFast: false });
+const registry = new SchemaRegistryImpl(new Map())
+const validator = new ValidationEngine(registry, { failFast: false })
 
-validator.startDocument();
+validator.startDocument()
 validator.startElement({
   name: 'c:chart',
   localName: 'chart',
   namespaceUri: 'http://schemas.openxmlformats.org/drawingml/2006/chart',
   attributes: [],
-});
+})
 validator.endElement({
   name: 'c:chart',
   localName: 'chart',
   namespaceUri: 'http://schemas.openxmlformats.org/drawingml/2006/chart',
   attributes: [],
-});
-const result = validator.endDocument();
+})
+const result = validator.endDocument()
 ```
 
 > 실제 구현에서는 SAX 파서 이벤트(`startElement`, `endElement`, `text`)를
 > 그대로 연결하면 됩니다.
 
 ### 이벤트 배열 유틸리티 사용 예시
+
 ```ts
-import { validateXmlEvents } from '../dist';
+import { validateXmlEvents } from '../dist'
 
 const result = validateXmlEvents(registry, [
   { type: 'startDocument' },
@@ -141,7 +145,7 @@ const result = validateXmlEvents(registry, [
     },
   },
   { type: 'endDocument' },
-]);
+])
 ```
 
 ## 리포트 구성 팁
@@ -151,6 +155,7 @@ const result = validateXmlEvents(registry, [
 - **요약 정보**: `valid` 여부와 오류 개수
 
 ### 리포트 포맷 예시
+
 ```json
 {
   "valid": false,

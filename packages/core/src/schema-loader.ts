@@ -4,36 +4,44 @@
  * Loads and combines OOXML schemas based on document type
  */
 
-import type { XsdSchema, SchemaRegistry, XsdSimpleType, XsdComplexType, XsdElement, XsdGroup, XsdAttributeGroup } from './types';
-import { SchemaRegistryImpl } from './registry';
-import { normalizeNamespace } from './runtime';
+import type {
+  XsdSchema,
+  SchemaRegistry,
+  XsdSimpleType,
+  XsdComplexType,
+  XsdElement,
+  XsdGroup,
+  XsdAttributeGroup,
+} from './types'
+import { SchemaRegistryImpl } from './registry'
+import { normalizeNamespace } from './runtime'
 
 // Import all schemas
-import { smlSchema } from './schemas/sml';
-import { wmlSchema } from './schemas/wml';
-import { pmlSchema } from './schemas/pml';
-import { dmlMainSchema } from './schemas/dml-main';
-import { dmlChartSchema } from './schemas/dml-chart';
-import { dmlChartDrawingSchema } from './schemas/dml-chartDrawing';
-import { dmlDiagramSchema } from './schemas/dml-diagram';
-import { dmlPictureSchema } from './schemas/dml-picture';
-import { dmlSpreadsheetDrawingSchema } from './schemas/dml-spreadsheetDrawing';
-import { dmlWordprocessingDrawingSchema } from './schemas/dml-wordprocessingDrawing';
-import { dmlLockedCanvasSchema } from './schemas/dml-lockedCanvas';
-import { sharedCommonSimpleTypesSchema } from './schemas/shared-commonSimpleTypes';
-import { sharedRelationshipReferenceSchema } from './schemas/shared-relationshipReference';
-import { sharedMathSchema } from './schemas/shared-math';
-import { sharedBibliographySchema } from './schemas/shared-bibliography';
-import { sharedDocumentPropertiesExtendedSchema } from './schemas/shared-documentPropertiesExtended';
-import { sharedDocumentPropertiesCustomSchema } from './schemas/shared-documentPropertiesCustom';
-import { sharedDocumentPropertiesVariantTypesSchema } from './schemas/shared-documentPropertiesVariantTypes';
-import { sharedAdditionalCharacteristicsSchema } from './schemas/shared-additionalCharacteristics';
-import { sharedCustomXmlDataPropertiesSchema } from './schemas/shared-customXmlDataProperties';
-import { sharedCustomXmlSchemaPropertiesSchema } from './schemas/shared-customXmlSchemaProperties';
+import { smlSchema } from './schemas/sml'
+import { wmlSchema } from './schemas/wml'
+import { pmlSchema } from './schemas/pml'
+import { dmlMainSchema } from './schemas/dml-main'
+import { dmlChartSchema } from './schemas/dml-chart'
+import { dmlChartDrawingSchema } from './schemas/dml-chartDrawing'
+import { dmlDiagramSchema } from './schemas/dml-diagram'
+import { dmlPictureSchema } from './schemas/dml-picture'
+import { dmlSpreadsheetDrawingSchema } from './schemas/dml-spreadsheetDrawing'
+import { dmlWordprocessingDrawingSchema } from './schemas/dml-wordprocessingDrawing'
+import { dmlLockedCanvasSchema } from './schemas/dml-lockedCanvas'
+import { sharedCommonSimpleTypesSchema } from './schemas/shared-commonSimpleTypes'
+import { sharedRelationshipReferenceSchema } from './schemas/shared-relationshipReference'
+import { sharedMathSchema } from './schemas/shared-math'
+import { sharedBibliographySchema } from './schemas/shared-bibliography'
+import { sharedDocumentPropertiesExtendedSchema } from './schemas/shared-documentPropertiesExtended'
+import { sharedDocumentPropertiesCustomSchema } from './schemas/shared-documentPropertiesCustom'
+import { sharedDocumentPropertiesVariantTypesSchema } from './schemas/shared-documentPropertiesVariantTypes'
+import { sharedAdditionalCharacteristicsSchema } from './schemas/shared-additionalCharacteristics'
+import { sharedCustomXmlDataPropertiesSchema } from './schemas/shared-customXmlDataProperties'
+import { sharedCustomXmlSchemaPropertiesSchema } from './schemas/shared-customXmlSchemaProperties'
 
-export type OoxmlDocumentType = 'spreadsheet' | 'document' | 'presentation' | 'unknown';
+export type OoxmlDocumentType = 'spreadsheet' | 'document' | 'presentation' | 'unknown'
 
-export { normalizeNamespace };
+export { normalizeNamespace }
 
 /**
  * All available schemas
@@ -63,7 +71,7 @@ const ALL_SCHEMAS: XsdSchema[] = [
   sharedAdditionalCharacteristicsSchema,
   sharedCustomXmlDataPropertiesSchema,
   sharedCustomXmlSchemaPropertiesSchema,
-];
+]
 
 /**
  * Shared schemas that are common to all document types
@@ -79,7 +87,7 @@ const SHARED_SCHEMAS: XsdSchema[] = [
   sharedAdditionalCharacteristicsSchema,
   sharedCustomXmlDataPropertiesSchema,
   sharedCustomXmlSchemaPropertiesSchema,
-];
+]
 
 /**
  * DrawingML schemas (shared across document types)
@@ -91,25 +99,25 @@ const DRAWINGML_SCHEMAS: XsdSchema[] = [
   dmlDiagramSchema,
   dmlPictureSchema,
   dmlLockedCanvasSchema,
-];
+]
 
 /**
  * Load schemas for a specific document type
  */
 export function loadSchemaRegistry(documentType: OoxmlDocumentType): SchemaRegistry {
-  const schemas = new Map<string, XsdSchema>();
+  const schemas = new Map<string, XsdSchema>()
 
   // Add shared schemas
   for (const schema of SHARED_SCHEMAS) {
     if (schema.targetNamespace) {
-      schemas.set(schema.targetNamespace, schema);
+      schemas.set(schema.targetNamespace, schema)
     }
   }
 
   // Add DrawingML schemas
   for (const schema of DRAWINGML_SCHEMAS) {
     if (schema.targetNamespace) {
-      schemas.set(schema.targetNamespace, schema);
+      schemas.set(schema.targetNamespace, schema)
     }
   }
 
@@ -117,54 +125,54 @@ export function loadSchemaRegistry(documentType: OoxmlDocumentType): SchemaRegis
   switch (documentType) {
     case 'spreadsheet':
       if (smlSchema.targetNamespace) {
-        schemas.set(smlSchema.targetNamespace, smlSchema);
+        schemas.set(smlSchema.targetNamespace, smlSchema)
       }
       if (dmlSpreadsheetDrawingSchema.targetNamespace) {
-        schemas.set(dmlSpreadsheetDrawingSchema.targetNamespace, dmlSpreadsheetDrawingSchema);
+        schemas.set(dmlSpreadsheetDrawingSchema.targetNamespace, dmlSpreadsheetDrawingSchema)
       }
-      break;
+      break
 
     case 'document':
       if (wmlSchema.targetNamespace) {
-        schemas.set(wmlSchema.targetNamespace, wmlSchema);
+        schemas.set(wmlSchema.targetNamespace, wmlSchema)
       }
       if (dmlWordprocessingDrawingSchema.targetNamespace) {
-        schemas.set(dmlWordprocessingDrawingSchema.targetNamespace, dmlWordprocessingDrawingSchema);
+        schemas.set(dmlWordprocessingDrawingSchema.targetNamespace, dmlWordprocessingDrawingSchema)
       }
-      break;
+      break
 
     case 'presentation':
       if (pmlSchema.targetNamespace) {
-        schemas.set(pmlSchema.targetNamespace, pmlSchema);
+        schemas.set(pmlSchema.targetNamespace, pmlSchema)
       }
-      break;
+      break
 
     default:
       // Load all schemas for unknown document types
       for (const schema of ALL_SCHEMAS) {
         if (schema.targetNamespace) {
-          schemas.set(schema.targetNamespace, schema);
+          schemas.set(schema.targetNamespace, schema)
         }
       }
-      break;
+      break
   }
 
-  return new SchemaRegistryImpl(schemas);
+  return new SchemaRegistryImpl(schemas)
 }
 
 /**
  * Load all available schemas
  */
 export function loadAllSchemas(): SchemaRegistry {
-  const schemas = new Map<string, XsdSchema>();
+  const schemas = new Map<string, XsdSchema>()
 
   for (const schema of ALL_SCHEMAS) {
     if (schema.targetNamespace) {
-      schemas.set(schema.targetNamespace, schema);
+      schemas.set(schema.targetNamespace, schema)
     }
   }
 
-  return new SchemaRegistryImpl(schemas);
+  return new SchemaRegistryImpl(schemas)
 }
 
 /**
@@ -173,13 +181,13 @@ export function loadAllSchemas(): SchemaRegistry {
 export function getMainNamespace(documentType: OoxmlDocumentType): string {
   switch (documentType) {
     case 'spreadsheet':
-      return 'http://purl.oclc.org/ooxml/spreadsheetml/main';
+      return 'http://purl.oclc.org/ooxml/spreadsheetml/main'
     case 'document':
-      return 'http://purl.oclc.org/ooxml/wordprocessingml/main';
+      return 'http://purl.oclc.org/ooxml/wordprocessingml/main'
     case 'presentation':
-      return 'http://purl.oclc.org/ooxml/presentationml/main';
+      return 'http://purl.oclc.org/ooxml/presentationml/main'
     default:
-      return '';
+      return ''
   }
 }
 
@@ -188,40 +196,40 @@ export function getMainNamespace(documentType: OoxmlDocumentType): string {
  */
 export function detectDocumentTypeFromNamespace(namespaceUri: string): OoxmlDocumentType {
   if (namespaceUri.includes('spreadsheetml')) {
-    return 'spreadsheet';
+    return 'spreadsheet'
   }
   if (namespaceUri.includes('wordprocessingml')) {
-    return 'document';
+    return 'document'
   }
   if (namespaceUri.includes('presentationml')) {
-    return 'presentation';
+    return 'presentation'
   }
-  return 'unknown';
+  return 'unknown'
 }
 
 /**
  * Get schema statistics
  */
 export function getSchemaStats(registry: SchemaRegistry): {
-  namespaces: number;
-  simpleTypes: number;
-  complexTypes: number;
-  elements: number;
-  groups: number;
-  attributeGroups: number;
+  namespaces: number
+  simpleTypes: number
+  complexTypes: number
+  elements: number
+  groups: number
+  attributeGroups: number
 } {
-  let simpleTypes = 0;
-  let complexTypes = 0;
-  let elements = 0;
-  let groups = 0;
-  let attributeGroups = 0;
+  let simpleTypes = 0
+  let complexTypes = 0
+  let elements = 0
+  let groups = 0
+  let attributeGroups = 0
 
   for (const schema of registry.schemas.values()) {
-    simpleTypes += schema.simpleTypes.size;
-    complexTypes += schema.complexTypes.size;
-    elements += schema.elements.size;
-    groups += schema.groups.size;
-    attributeGroups += schema.attributeGroups.size;
+    simpleTypes += schema.simpleTypes.size
+    complexTypes += schema.complexTypes.size
+    elements += schema.elements.size
+    groups += schema.groups.size
+    attributeGroups += schema.attributeGroups.size
   }
 
   return {
@@ -231,5 +239,5 @@ export function getSchemaStats(registry: SchemaRegistry): {
     elements,
     groups,
     attributeGroups,
-  };
+  }
 }

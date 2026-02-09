@@ -207,7 +207,8 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
  */
 export const validateOoxmlTool = {
   name: 'validate_ooxml',
-  description: 'Validates OOXML documents (xlsx, docx, pptx) for schema compliance and structural integrity',
+  description:
+    'Validates OOXML documents (xlsx, docx, pptx) for schema compliance and structural integrity',
   inputSchema: {
     type: 'object' as const,
     properties: {

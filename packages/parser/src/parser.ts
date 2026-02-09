@@ -25,10 +25,7 @@ export class OoxmlParser {
   /**
    * Parse an OOXML document from file path
    */
-  static async fromFile(
-    filePath: string,
-    options?: ParserOptions
-  ): Promise<OoxmlDocument> {
+  static async fromFile(filePath: string, options?: ParserOptions): Promise<OoxmlDocument> {
     const buffer = readFileSync(filePath)
     return OoxmlParser.fromBuffer(buffer, options)
   }
@@ -36,10 +33,7 @@ export class OoxmlParser {
   /**
    * Parse an OOXML document from file path (sync)
    */
-  static fromFileSync(
-    filePath: string,
-    options?: ParserOptions
-  ): OoxmlDocument {
+  static fromFileSync(filePath: string, options?: ParserOptions): OoxmlDocument {
     const buffer = readFileSync(filePath)
     return OoxmlParser.fromBufferSync(buffer, options)
   }
@@ -47,20 +41,14 @@ export class OoxmlParser {
   /**
    * Parse an OOXML document from Buffer
    */
-  static async fromBuffer(
-    buffer: Buffer,
-    options?: ParserOptions
-  ): Promise<OoxmlDocument> {
+  static async fromBuffer(buffer: Buffer, options?: ParserOptions): Promise<OoxmlDocument> {
     return OoxmlParser.fromBufferSync(buffer, options)
   }
 
   /**
    * Parse an OOXML document from Buffer (sync)
    */
-  static fromBufferSync(
-    buffer: Buffer,
-    options?: ParserOptions
-  ): OoxmlDocument {
+  static fromBufferSync(buffer: Buffer, options?: ParserOptions): OoxmlDocument {
     const opts = { ...DEFAULT_OPTIONS, ...options }
 
     // Check file size
@@ -105,20 +93,13 @@ export class OoxmlParser {
       }
     }
 
-    return new OoxmlDocumentImpl(
-      documentType,
-      contentTypesResult.entries,
-      parts
-    )
+    return new OoxmlDocumentImpl(documentType, contentTypesResult.entries, parts)
   }
 
   /**
    * Parse an OOXML document from base64 string
    */
-  static async fromBase64(
-    base64: string,
-    options?: ParserOptions
-  ): Promise<OoxmlDocument> {
+  static async fromBase64(base64: string, options?: ParserOptions): Promise<OoxmlDocument> {
     const buffer = Buffer.from(base64, 'base64')
     return OoxmlParser.fromBuffer(buffer, options)
   }
@@ -142,9 +123,7 @@ export class OoxmlParser {
   /**
    * Detect document type from file extension or content
    */
-  static detectType(
-    filenameOrBuffer: string | Buffer
-  ): 'xlsx' | 'docx' | 'pptx' | 'unknown' {
+  static detectType(filenameOrBuffer: string | Buffer): 'xlsx' | 'docx' | 'pptx' | 'unknown' {
     if (typeof filenameOrBuffer === 'string') {
       const ext = filenameOrBuffer.split('.').pop()?.toLowerCase()
       if (ext === 'xlsx') return 'xlsx'

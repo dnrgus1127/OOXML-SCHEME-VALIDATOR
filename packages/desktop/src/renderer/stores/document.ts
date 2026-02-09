@@ -18,8 +18,8 @@ interface ValidationError {
 interface PartValidationResult {
   path: string
   valid: boolean
-  error?: string  // For backward compatibility (XML parse errors)
-  errors?: ValidationError[]  // Schema validation errors
+  error?: string // For backward compatibility (XML parse errors)
+  errors?: ValidationError[] // Schema validation errors
 }
 
 interface ValidationSummary {
@@ -114,7 +114,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     // Save modified content before switching
     if (modifiedContent !== null && selectedPart) {
-      const updateResult = await window.electronAPI.updatePart(fileData, selectedPart, modifiedContent)
+      const updateResult = await window.electronAPI.updatePart(
+        fileData,
+        selectedPart,
+        modifiedContent
+      )
       if (updateResult.success) {
         set({ fileData: updateResult.data! })
       }
@@ -159,7 +163,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       // Apply pending modifications
       if (modifiedContent !== null && selectedPart) {
-        const updateResult = await window.electronAPI.updatePart(currentFileData, selectedPart, modifiedContent)
+        const updateResult = await window.electronAPI.updatePart(
+          currentFileData,
+          selectedPart,
+          modifiedContent
+        )
         if (updateResult.success) {
           currentFileData = updateResult.data!
         }
@@ -192,7 +200,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       let currentFileData = fileData
 
       if (modifiedContent !== null && selectedPart) {
-        const updateResult = await window.electronAPI.updatePart(currentFileData, selectedPart, modifiedContent)
+        const updateResult = await window.electronAPI.updatePart(
+          currentFileData,
+          selectedPart,
+          modifiedContent
+        )
         if (updateResult.success) {
           currentFileData = updateResult.data!
         }
@@ -226,7 +238,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       // Apply pending modifications before validation
       if (modifiedContent !== null && selectedPart) {
-        const updateResult = await window.electronAPI.updatePart(currentFileData, selectedPart, modifiedContent)
+        const updateResult = await window.electronAPI.updatePart(
+          currentFileData,
+          selectedPart,
+          modifiedContent
+        )
         if (updateResult.success) {
           currentFileData = updateResult.data!
         }
@@ -249,15 +265,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  reset: () => set({
-    filePath: null,
-    fileData: null,
-    documentData: null,
-    selectedPart: null,
-    partContent: null,
-    modifiedContent: null,
-    validationResults: null,
-    isLoading: false,
-    error: null,
-  }),
+  reset: () =>
+    set({
+      filePath: null,
+      fileData: null,
+      documentData: null,
+      selectedPart: null,
+      partContent: null,
+      modifiedContent: null,
+      validationResults: null,
+      isLoading: false,
+      error: null,
+    }),
 }))

@@ -12,9 +12,18 @@ declare global {
       saveFile: (defaultPath?: string) => Promise<string | null>
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       writeFile: (filePath: string, data: string) => Promise<{ success: boolean; error?: string }>
-      parseDocument: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
-      getPart: (base64Data: string, partPath: string) => Promise<{ success: boolean; data?: string; error?: string }>
-      updatePart: (base64Data: string, partPath: string, content: string) => Promise<{ success: boolean; data?: string; error?: string }>
+      parseDocument: (
+        base64Data: string
+      ) => Promise<{ success: boolean; data?: any; error?: string }>
+      getPart: (
+        base64Data: string,
+        partPath: string
+      ) => Promise<{ success: boolean; data?: string; error?: string }>
+      updatePart: (
+        base64Data: string,
+        partPath: string,
+        content: string
+      ) => Promise<{ success: boolean; data?: string; error?: string }>
       validate: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
       onFileOpened: (callback: (filePath: string) => void) => () => void
       onMenuSave: (callback: () => void) => () => void
@@ -175,9 +184,7 @@ export default function App() {
               ) : isLoading ? (
                 <div className="loading">Loading...</div>
               ) : (
-                <div className="placeholder">
-                  Select a part from the tree to view its content
-                </div>
+                <div className="placeholder">Select a part from the tree to view its content</div>
               )}
             </main>
 
