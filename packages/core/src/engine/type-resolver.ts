@@ -1,5 +1,5 @@
-import type { SchemaRegistry, XsdComplexType, XsdSimpleType, TypeReference } from './types'
-import type { XmlElementInfo } from './runtime'
+import type { SchemaRegistry, XsdComplexType, XsdSimpleType, TypeReference } from '../types'
+import type { XmlElementInfo } from '../runtime'
 import type { ErrorCallback } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
 

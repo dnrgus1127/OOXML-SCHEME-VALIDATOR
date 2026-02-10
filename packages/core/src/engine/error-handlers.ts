@@ -1,5 +1,5 @@
-import type { Facet } from './types'
-import type { RuntimeValidationContext } from './runtime'
+import type { Facet } from '../types'
+import type { RuntimeValidationContext } from '../runtime'
 
 export type ErrorCallback = (code: string, message: string, value?: string) => void
 

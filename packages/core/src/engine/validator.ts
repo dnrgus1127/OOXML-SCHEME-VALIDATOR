@@ -6,8 +6,8 @@ import type {
   XsdComplexType,
   XsdSimpleType,
   TypeReference,
-} from './types'
-import { hasComplexContent, hasElementContent, hasSimpleContent, isElement, isAny } from './types'
+} from '../types'
+import { hasComplexContent, hasElementContent, hasSimpleContent, isElement, isAny } from '../types'
 import {
   ElementStackFrame,
   XmlElementInfo,
@@ -16,7 +16,7 @@ import {
   withNamespaceContext,
   isComplexSchemaType,
   FlattenedParticle,
-} from './runtime'
+} from '../runtime'
 import {
   checkMissingRequiredElements,
   initCompositorState,

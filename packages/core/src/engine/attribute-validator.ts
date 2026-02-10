@@ -4,10 +4,10 @@ import type {
   XsdAttributeGroup,
   XsdAnyAttribute,
   XsdComplexType,
-} from './types'
-import { hasComplexContent, isSimpleType } from './types'
-import type { XmlAttribute, ElementStackFrame } from './runtime'
-import { resolveNamespaceUri } from './runtime'
+} from '../types'
+import { hasComplexContent, isSimpleType } from '../types'
+import type { XmlAttribute, ElementStackFrame } from '../runtime'
+import { resolveNamespaceUri } from '../runtime'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
 import { resolveTypeReference } from './type-resolver'

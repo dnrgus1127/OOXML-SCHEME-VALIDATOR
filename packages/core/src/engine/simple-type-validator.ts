@@ -6,8 +6,8 @@ import type {
   SimpleTypeRestriction,
   SimpleTypeUnion,
   SimpleTypeList,
-} from './types'
-import { isSimpleType } from './types'
+} from '../types'
+import { isSimpleType } from '../types'
 import type { ErrorCallback } from './error-handlers'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveTypeReference } from './type-resolver'

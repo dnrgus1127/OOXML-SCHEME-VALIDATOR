@@ -8,8 +8,8 @@ import type {
   XsdElement,
   XsdGroup,
   XsdAttributeGroup,
-} from './types'
-import { normalizeNamespace } from './runtime'
+} from '../types'
+import { normalizeNamespace } from '../runtime'
 
 export class SchemaRegistryImpl implements SchemaRegistry {
   private _schemaPrefixMap?: Map<string, string>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { ValidationEngine } from '../validator'
-import { SchemaRegistryImpl } from '../registry'
+import { ValidationEngine } from '../engine/validator'
+import { SchemaRegistryImpl } from '../schema/registry'
 import type { XsdSchema, XsdComplexType, XsdElement } from '../types'
 
 const TEST_NS = 'http://test.example.com/schema'
