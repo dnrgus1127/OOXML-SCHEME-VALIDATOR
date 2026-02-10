@@ -82,9 +82,8 @@ export class OoxmlDocumentImpl implements OoxmlDocument {
     const relsXml = relsPart.content.toString('utf-8')
 
     // Determine base path for resolving relative targets
-    const basePath = normalizedPath === '/'
-      ? '/'
-      : normalizedPath.slice(0, normalizedPath.lastIndexOf('/') + 1)
+    const basePath =
+      normalizedPath === '/' ? '/' : normalizedPath.slice(0, normalizedPath.lastIndexOf('/') + 1)
 
     const rels = parseRelationships(relsXml, basePath)
     this.relsCache.set(normalizedPath, rels)
@@ -122,9 +121,7 @@ export class OoxmlDocumentImpl implements OoxmlDocument {
     const rootRels = this.getRelationships('/')
 
     // Find office document relationship
-    const officeDocRel = rootRels.find(
-      (r) => r.type.includes('officeDocument')
-    )
+    const officeDocRel = rootRels.find((r) => r.type.includes('officeDocument'))
 
     if (officeDocRel) {
       return this.getPart(officeDocRel.target)

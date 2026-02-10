@@ -76,7 +76,8 @@ export async function analyzeOoxmlStructure(input: AnalyzeOoxmlInput): Promise<A
     const size = part.content.length
     totalSize += size
 
-    const isXml = part.contentType.includes('xml') ||
+    const isXml =
+      part.contentType.includes('xml') ||
       part.content.toString('utf-8', 0, 10).trimStart().startsWith('<')
 
     const partInfo: PartInfo = {
@@ -88,9 +89,8 @@ export async function analyzeOoxmlStructure(input: AnalyzeOoxmlInput): Promise<A
 
     if (input.include_content_preview && isXml) {
       const content = part.content.toString('utf-8')
-      partInfo.preview = content.length > previewLength
-        ? content.slice(0, previewLength) + '...'
-        : content
+      partInfo.preview =
+        content.length > previewLength ? content.slice(0, previewLength) + '...' : content
     }
 
     parts.push(partInfo)
@@ -147,7 +147,9 @@ export async function analyzeOoxmlStructure(input: AnalyzeOoxmlInput): Promise<A
     'Main Parts:',
     ...parts.slice(0, 10).map((p) => `  ${p.path} (${formatSize(p.size)})`),
     parts.length > 10 ? `  ... and ${parts.length - 10} more` : '',
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return {
     documentType: doc.documentType,
@@ -170,7 +172,8 @@ function formatSize(bytes: number): string {
  */
 export const analyzeOoxmlStructureTool = {
   name: 'analyze_ooxml_structure',
-  description: 'Analyzes the internal structure of OOXML documents, listing all parts and their relationships',
+  description:
+    'Analyzes the internal structure of OOXML documents, listing all parts and their relationships',
   inputSchema: {
     type: 'object' as const,
     properties: {

@@ -28,6 +28,7 @@ pnpm run clean        # Remove dist/ and node_modules/
 Per-package commands work from within each package directory (`build`, `dev`, `test`, `test:watch`, `typecheck`, `clean`).
 
 Schema generation runs automatically as a prebuild step in `packages/core`:
+
 ```bash
 pnpm run generate:schemas   # Convert XSD → JSON schemas
 ```

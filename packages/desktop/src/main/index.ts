@@ -108,11 +108,7 @@ function createMenu(): void {
     },
     {
       label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { role: 'close' },
-      ],
+      submenu: [{ role: 'minimize' }, { role: 'zoom' }, { role: 'close' }],
     },
   ]
 
@@ -231,18 +227,21 @@ function setupIpcHandlers(): void {
   })
 
   // Update part content
-  ipcMain.handle('ooxml:updatePart', async (_, base64Data: string, partPath: string, content: string) => {
-    try {
-      const buffer = Buffer.from(base64Data, 'base64')
-      const builder = OoxmlBuilder.fromBuffer(buffer)
-      builder.setPart(partPath, content)
-      const newBuffer = builder.toBuffer()
+  ipcMain.handle(
+    'ooxml:updatePart',
+    async (_, base64Data: string, partPath: string, content: string) => {
+      try {
+        const buffer = Buffer.from(base64Data, 'base64')
+        const builder = OoxmlBuilder.fromBuffer(buffer)
+        builder.setPart(partPath, content)
+        const newBuffer = builder.toBuffer()
 
-      return { success: true, data: newBuffer.toString('base64') }
-    } catch (error) {
-      return { success: false, error: String(error) }
+        return { success: true, data: newBuffer.toString('base64') }
+      } catch (error) {
+        return { success: false, error: String(error) }
+      }
     }
-  })
+  )
 
   // Validate document with XSD schema validation
   ipcMain.handle('ooxml:validate', async (_, base64Data: string) => {
@@ -351,10 +350,7 @@ function setupIpcHandlers(): void {
       }
 
       const valid = results.every((r) => r.valid)
-      const totalErrors = results.reduce(
-        (sum, r) => sum + (r.errors?.length || 0),
-        0
-      )
+      const totalErrors = results.reduce((sum, r) => sum + (r.errors?.length || 0), 0)
 
       return {
         success: true,

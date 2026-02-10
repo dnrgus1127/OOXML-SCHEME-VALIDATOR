@@ -13,7 +13,7 @@ function makeElement(
   localName: string,
   namespaceUri: string = TEST_NS,
   attrs: Array<{ name: string; value: string }> = [],
-  nsDeclarations?: Map<string, string>,
+  nsDeclarations?: Map<string, string>
 ) {
   return {
     name: localName,
@@ -26,7 +26,7 @@ function makeElement(
 
 function createSchemaWithTypes(
   complexTypes: Map<string, XsdComplexType>,
-  elements: Map<string, XsdElement>,
+  elements: Map<string, XsdElement>
 ): XsdSchema {
   return {
     targetNamespace: TEST_NS,
@@ -111,7 +111,7 @@ describe('complexContent validation', () => {
         ['CT_Base', baseType],
         ['CT_Derived', derivedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -131,7 +131,8 @@ describe('complexContent validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -208,7 +209,7 @@ describe('complexContent validation', () => {
         ['CT_Base', baseType],
         ['CT_Restricted', restrictedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -225,7 +226,8 @@ describe('complexContent validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -323,7 +325,7 @@ describe('complexContent validation', () => {
         ['CT_Parent', parentType],
         ['CT_Child', childType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -347,7 +349,8 @@ describe('complexContent validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -405,7 +408,7 @@ describe('complexContent validation', () => {
         ['CT_Base', baseType],
         ['CT_Derived', derivedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -422,7 +425,8 @@ describe('complexContent validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -486,7 +490,7 @@ describe('nested compositor validation', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Container', containerType]]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -509,7 +513,8 @@ describe('nested compositor validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -565,7 +570,7 @@ describe('nested compositor validation', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Container', containerType]]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -586,7 +591,8 @@ describe('nested compositor validation', () => {
     const result = engine.endDocument()
 
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -656,7 +662,7 @@ describe('nested compositor validation', () => {
         ['CT_Inner', innerType],
         ['CT_Container', containerType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -678,7 +684,8 @@ describe('nested compositor validation', () => {
 
     // No "스키마에서 요소를 찾을 수 없습니다" errors at any level
     const elementErrors = result.errors.filter(
-      (e) => e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다'),
+      (e) =>
+        e.code === 'INVALID_ELEMENT' || e.message.includes('스키마에서 요소를 찾을 수 없습니다')
     )
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
@@ -738,7 +745,7 @@ describe('complexContent attribute inheritance', () => {
         ['CT_Base', baseType],
         ['CT_Derived', derivedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -749,10 +756,15 @@ describe('complexContent attribute inheritance', () => {
     // Test: provide both base and extension attributes
     engine.startDocument()
     engine.startElement(
-      makeElement('root', TEST_NS, [
-        { name: 'baseAttr', value: 'base' },
-        { name: 'extAttr', value: 'ext' },
-      ], nsDecl),
+      makeElement(
+        'root',
+        TEST_NS,
+        [
+          { name: 'baseAttr', value: 'base' },
+          { name: 'extAttr', value: 'ext' },
+        ],
+        nsDecl
+      )
     )
     engine.endElement(makeElement('root', TEST_NS))
     const result = engine.endDocument()
@@ -805,7 +817,7 @@ describe('complexContent attribute inheritance', () => {
         ['CT_Base', baseType],
         ['CT_Derived', derivedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -899,7 +911,7 @@ describe('complexContent attribute inheritance', () => {
         ['CT_Parent', parentType],
         ['CT_Child', childType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -910,11 +922,16 @@ describe('complexContent attribute inheritance', () => {
     // Test: provide all required attributes from the chain
     engine.startDocument()
     engine.startElement(
-      makeElement('root', TEST_NS, [
-        { name: 'gpAttr', value: 'gp' },
-        { name: 'parentAttr', value: 'p' },
-        { name: 'childAttr', value: 'c' },
-      ], nsDecl),
+      makeElement(
+        'root',
+        TEST_NS,
+        [
+          { name: 'gpAttr', value: 'gp' },
+          { name: 'parentAttr', value: 'p' },
+          { name: 'childAttr', value: 'c' },
+        ],
+        nsDecl
+      )
     )
     engine.endElement(makeElement('root', TEST_NS))
     const result = engine.endDocument()
@@ -975,7 +992,7 @@ describe('complexContent attribute inheritance', () => {
         ['CT_Base', baseType],
         ['CT_Derived', derivedType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -985,9 +1002,7 @@ describe('complexContent attribute inheritance', () => {
 
     // Test 1: provide required attribute, should pass
     engine.startDocument()
-    engine.startElement(
-      makeElement('root', TEST_NS, [{ name: 'author', value: 'John' }], nsDecl),
-    )
+    engine.startElement(makeElement('root', TEST_NS, [{ name: 'author', value: 'John' }], nsDecl))
     engine.endElement(makeElement('root', TEST_NS))
     const result1 = engine.endDocument()
 
@@ -998,7 +1013,7 @@ describe('complexContent attribute inheritance', () => {
     const engine2 = new ValidationEngine(registry)
     engine2.startDocument()
     engine2.startElement(
-      makeElement('root', TEST_NS, [{ name: 'date', value: '2024-01-01' }], nsDecl),
+      makeElement('root', TEST_NS, [{ name: 'date', value: '2024-01-01' }], nsDecl)
     )
     engine2.endElement(makeElement('root', TEST_NS))
     const result2 = engine2.endDocument()
@@ -1090,7 +1105,7 @@ describe('deep nested child validation (cascading)', () => {
         ['CT_Middle', middleType],
         ['CT_Leaf', leafType],
       ]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
 
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
@@ -1174,7 +1189,7 @@ describe('deep nested child validation (cascading)', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
     const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
@@ -1259,7 +1274,7 @@ describe('deep nested child validation (cascading)', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
     const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
@@ -1345,7 +1360,7 @@ describe('deep nested child validation (cascading)', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', rootElement]]),
+      new Map([['root', rootElement]])
     )
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
     const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
@@ -1460,7 +1475,7 @@ describe('cross-namespace complexContent attribute inheritance', () => {
       new Map([
         [TEST_NS, testSchema],
         [OTHER_NS, otherSchema],
-      ]),
+      ])
     )
     const engine = new ValidationEngine(registry)
 
@@ -1469,10 +1484,15 @@ describe('cross-namespace complexContent attribute inheritance', () => {
     // Test 1: provide both base and extension attributes → should pass
     engine.startDocument()
     engine.startElement(
-      makeElement('root', TEST_NS, [
-        { name: 'baseAttr', value: 'base' },
-        { name: 'extAttr', value: 'ext' },
-      ], nsDecl),
+      makeElement(
+        'root',
+        TEST_NS,
+        [
+          { name: 'baseAttr', value: 'base' },
+          { name: 'extAttr', value: 'ext' },
+        ],
+        nsDecl
+      )
     )
     engine.endElement(makeElement('root', TEST_NS))
     const result1 = engine.endDocument()
@@ -1483,11 +1503,7 @@ describe('cross-namespace complexContent attribute inheritance', () => {
     // Test 2: omit the base attribute → should report MISSING_REQUIRED_ATTR
     const engine2 = new ValidationEngine(registry)
     engine2.startDocument()
-    engine2.startElement(
-      makeElement('root', TEST_NS, [
-        { name: 'extAttr', value: 'ext' },
-      ], nsDecl),
-    )
+    engine2.startElement(makeElement('root', TEST_NS, [{ name: 'extAttr', value: 'ext' }], nsDecl))
     engine2.endElement(makeElement('root', TEST_NS))
     const result2 = engine2.endDocument()
 

@@ -8,7 +8,15 @@ interface ToolbarProps {
   isDirty: boolean
 }
 
-export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument, filePath, isDirty }: ToolbarProps) {
+export function Toolbar({
+  onOpenFile,
+  onSave,
+  onSaveAs,
+  onValidate,
+  hasDocument,
+  filePath,
+  isDirty,
+}: ToolbarProps) {
   const fileName = filePath ? filePath.split('/').pop() : null
 
   return (
@@ -17,7 +25,11 @@ export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument,
         <button onClick={onOpenFile} className="toolbar-btn">
           📂 Open
         </button>
-        <button onClick={onSave} className={`toolbar-btn${isDirty ? ' toolbar-btn--dirty' : ''}`} disabled={!hasDocument}>
+        <button
+          onClick={onSave}
+          className={`toolbar-btn${isDirty ? ' toolbar-btn--dirty' : ''}`}
+          disabled={!hasDocument}
+        >
           💾 Save
         </button>
         <button onClick={onSaveAs} className="toolbar-btn" disabled={!hasDocument}>
@@ -31,7 +43,8 @@ export function Toolbar({ onOpenFile, onSave, onSaveAs, onValidate, hasDocument,
       <div className="toolbar-center">
         {fileName && (
           <span className={`file-name${isDirty ? ' file-name--dirty' : ''}`}>
-            {isDirty && '● '}{fileName}
+            {isDirty && '● '}
+            {fileName}
           </span>
         )}
       </div>

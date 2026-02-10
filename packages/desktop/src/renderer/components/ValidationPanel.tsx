@@ -12,8 +12,8 @@ interface ValidationError {
 interface PartValidationResult {
   path: string
   valid: boolean
-  error?: string  // For backward compatibility (XML parse errors)
-  errors?: ValidationError[]  // Schema validation errors
+  error?: string // For backward compatibility (XML parse errors)
+  errors?: ValidationError[] // Schema validation errors
 }
 
 interface ValidationSummary {
@@ -36,7 +36,12 @@ interface ValidationPanelProps {
   onRevalidate: () => void
 }
 
-export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: ValidationPanelProps) {
+export function ValidationPanel({
+  results,
+  onClose,
+  onNavigate,
+  onRevalidate,
+}: ValidationPanelProps) {
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set())
 
   const toggleExpanded = (path: string) => {
@@ -56,8 +61,12 @@ export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: 
       <div className="validation-results">
         <div className="validation-header">
           <h3>Validation Results</h3>
-          <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
-          <button onClick={onClose} className="close-btn">×</button>
+          <button onClick={onRevalidate} className="revalidate-btn">
+            Re-validate
+          </button>
+          <button onClick={onClose} className="close-btn">
+            ×
+          </button>
         </div>
         <div className="validation-empty">
           No validation results. Click "Validate" to check the document.
@@ -67,18 +76,22 @@ export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: 
   }
 
   const validCount = results.summary?.validParts ?? results.results.filter((r) => r.valid).length
-  const invalidCount = results.summary?.invalidParts ?? results.results.filter((r) => !r.valid).length
-  const totalErrors = results.summary?.totalErrors ?? results.results.reduce(
-    (sum, r) => sum + (r.errors?.length || (r.error ? 1 : 0)),
-    0
-  )
+  const invalidCount =
+    results.summary?.invalidParts ?? results.results.filter((r) => !r.valid).length
+  const totalErrors =
+    results.summary?.totalErrors ??
+    results.results.reduce((sum, r) => sum + (r.errors?.length || (r.error ? 1 : 0)), 0)
 
   return (
     <div className="validation-results">
       <div className="validation-header">
         <h3>Validation Results</h3>
-        <button onClick={onRevalidate} className="revalidate-btn">Re-validate</button>
-        <button onClick={onClose} className="close-btn">×</button>
+        <button onClick={onRevalidate} className="revalidate-btn">
+          Re-validate
+        </button>
+        <button onClick={onClose} className="close-btn">
+          ×
+        </button>
       </div>
 
       <div className={`validation-summary ${results.valid ? 'valid' : 'invalid'}`}>
@@ -99,7 +112,10 @@ export function ValidationPanel({ results, onClose, onNavigate, onRevalidate }: 
           const errorCount = result.errors?.length || (result.error ? 1 : 0)
 
           return (
-            <div key={result.path} className={`validation-item-container ${result.valid ? 'valid' : 'invalid'}`}>
+            <div
+              key={result.path}
+              className={`validation-item-container ${result.valid ? 'valid' : 'invalid'}`}
+            >
               <div
                 className="validation-item"
                 onClick={() => {

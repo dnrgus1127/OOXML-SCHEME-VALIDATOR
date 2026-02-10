@@ -30,10 +30,7 @@ export function getRelsPath(partPath: string): string {
 /**
  * Parse a .rels file content
  */
-export function parseRelationships(
-  xml: string,
-  basePath: string = '/'
-): Relationship[] {
+export function parseRelationships(xml: string, basePath: string = '/'): Relationship[] {
   const parsed = parser.parse(xml)
   const rels = parsed.Relationships || {}
   const relationships: Relationship[] = []
@@ -100,68 +97,48 @@ export const RelationshipTypes = {
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties',
   CUSTOM_PROPERTIES:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties',
-  THUMBNAIL:
-    'http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail',
+  THUMBNAIL: 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail',
 
   // Office document relationships
   OFFICE_DOCUMENT:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument',
 
   // SpreadsheetML relationships
-  WORKSHEET:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
+  WORKSHEET: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
   SHARED_STRINGS:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings',
-  STYLES:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
-  THEME:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme',
+  STYLES: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
+  THEME: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme',
 
   // WordprocessingML relationships
-  STYLES_WML:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
-  NUMBERING:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering',
-  FOOTNOTES:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes',
-  ENDNOTES:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes',
-  COMMENTS:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments',
-  HEADER:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/header',
-  FOOTER:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer',
+  STYLES_WML: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles',
+  NUMBERING: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering',
+  FOOTNOTES: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes',
+  ENDNOTES: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes',
+  COMMENTS: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments',
+  HEADER: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/header',
+  FOOTER: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer',
 
   // PresentationML relationships
-  SLIDE:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide',
-  SLIDE_LAYOUT:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout',
-  SLIDE_MASTER:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster',
-  NOTES_SLIDE:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide',
+  SLIDE: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide',
+  SLIDE_LAYOUT: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout',
+  SLIDE_MASTER: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster',
+  NOTES_SLIDE: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide',
 
   // DrawingML relationships
-  IMAGE:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
-  CHART:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart',
-  DRAWING:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing',
+  IMAGE: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+  CHART: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart',
+  DRAWING: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing',
   DIAGRAM_COLORS:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors',
-  DIAGRAM_DATA:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData',
+  DIAGRAM_DATA: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData',
   DIAGRAM_LAYOUT:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout',
   DIAGRAM_QUICK_STYLE:
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle',
 
   // Hyperlinks
-  HYPERLINK:
-    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+  HYPERLINK: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
 } as const
 
 function ensureArray<T>(value: T | T[] | undefined): T[] {

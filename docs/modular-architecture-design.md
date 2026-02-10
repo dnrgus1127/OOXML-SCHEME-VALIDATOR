@@ -35,6 +35,7 @@ OOXML 문서 검증 시스템을 4개의 독립적인 모듈로 분리하여 관
 **역할:** OOXML XSD 스키마를 기반으로 XML 문서를 검증하는 핵심 엔진
 
 **책임:**
+
 - XSD 스키마를 JSON 런타임 타입으로 관리
 - 이벤트 기반 XML 검증 (SAX 스타일)
 - 타입 검증 (SimpleType, ComplexType, Facet)
@@ -42,6 +43,7 @@ OOXML 문서 검증 시스템을 4개의 독립적인 모듈로 분리하여 관
 - 검증 오류 리포팅
 
 **주요 API:**
+
 ```typescript
 // 스키마 레지스트리
 interface SchemaRegistry {
@@ -72,6 +74,7 @@ function validateParts(registry, inputs, options): ValidationReport
 **역할:** OOXML 문서(xlsx, docx, pptx) 파일의 압축 해제, XML 파싱, JSON 변환, 재압축 처리
 
 **책임:**
+
 - ZIP 아카이브 해제/압축
 - XML → JSON 파싱
 - JSON → XML 직렬화
@@ -79,6 +82,7 @@ function validateParts(registry, inputs, options): ValidationReport
 - Part 구조 탐색
 
 **주요 API:**
+
 ```typescript
 // 문서 로더
 interface OoxmlDocument {
@@ -121,6 +125,7 @@ interface StreamingXmlParser {
 ```
 
 **의존성:**
+
 - `adm-zip` 또는 `yauzl` - ZIP 처리
 - `fast-xml-parser` 또는 `sax` - XML 파싱
 - `@ooxml/core` - XmlValidationEvent 타입 참조
@@ -132,12 +137,14 @@ interface StreamingXmlParser {
 **역할:** AI 에이전트에게 OOXML 문서 검증 도구를 제공하는 MCP(Model Context Protocol) 서버
 
 **책임:**
+
 - MCP 프로토콜 구현
 - 도구(Tool) 정의 및 핸들링
 - 문서 수신 및 검증 파이프라인 실행
 - 검증 결과 리포팅
 
 **제공 도구:**
+
 ```typescript
 // Tool: validate_ooxml
 {
@@ -189,6 +196,7 @@ interface StreamingXmlParser {
 ```
 
 **의존성:**
+
 - `@modelcontextprotocol/sdk` - MCP SDK
 - `@ooxml/core` - 검증 엔진
 - `@ooxml/parser` - 문서 처리
@@ -200,6 +208,7 @@ interface StreamingXmlParser {
 **역할:** 사용자가 로컬에서 OOXML 문서를 분석하고 편집할 수 있는 데스크톱 애플리케이션
 
 **기능:**
+
 1. **파일 탐색기** - 로컬 OOXML 파일 열기
 2. **문서 구조 뷰어** - 파트 트리 시각화
 3. **검증 대시보드** - 오류/경고 목록 및 상세 정보
@@ -211,6 +220,7 @@ interface StreamingXmlParser {
 5. **리포트 내보내기** - HTML, JSON, CSV 형식
 
 **화면 구성:**
+
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  File  Edit  View  Tools  Help                          ─ □ ✕ │
@@ -243,6 +253,7 @@ interface StreamingXmlParser {
 ```
 
 **의존성:**
+
 - `electron` - 데스크톱 프레임워크
 - `electron-builder` - 패키징
 - `react` + `@tanstack/react-query` - UI
@@ -969,22 +980,22 @@ jobs:
 
 ## 7. 기술 스택 요약
 
-| 레이어 | 기술 | 용도 |
-|--------|------|------|
-| **언어** | TypeScript 5.3+ | 전체 |
-| **모노레포** | pnpm + Turborepo | 워크스페이스 관리 |
-| **라이브러리 빌드** | tsup | core, parser 번들링 |
-| **테스트** | Vitest | 단위/통합 테스트 |
-| **린팅** | ESLint + Prettier | 코드 품질 |
-| **버전 관리** | Changesets | npm 배포 |
-| **MCP** | @modelcontextprotocol/sdk | MCP 서버 |
-| **Electron** | Electron + electron-vite | 데스크톱 앱 |
-| **UI** | React + TanStack Query | 데스크톱 UI |
-| **상태 관리** | Zustand | 데스크톱 상태 |
-| **에디터** | Monaco Editor | XML 편집 (선택) |
-| **ZIP 처리** | adm-zip | OOXML 압축/해제 |
-| **XML 파싱** | fast-xml-parser, sax | XML 처리 |
-| **CI/CD** | GitHub Actions | 자동화 |
+| 레이어              | 기술                      | 용도                |
+| ------------------- | ------------------------- | ------------------- |
+| **언어**            | TypeScript 5.3+           | 전체                |
+| **모노레포**        | pnpm + Turborepo          | 워크스페이스 관리   |
+| **라이브러리 빌드** | tsup                      | core, parser 번들링 |
+| **테스트**          | Vitest                    | 단위/통합 테스트    |
+| **린팅**            | ESLint + Prettier         | 코드 품질           |
+| **버전 관리**       | Changesets                | npm 배포            |
+| **MCP**             | @modelcontextprotocol/sdk | MCP 서버            |
+| **Electron**        | Electron + electron-vite  | 데스크톱 앱         |
+| **UI**              | React + TanStack Query    | 데스크톱 UI         |
+| **상태 관리**       | Zustand                   | 데스크톱 상태       |
+| **에디터**          | Monaco Editor             | XML 편집 (선택)     |
+| **ZIP 처리**        | adm-zip                   | OOXML 압축/해제     |
+| **XML 파싱**        | fast-xml-parser, sax      | XML 처리            |
+| **CI/CD**           | GitHub Actions            | 자동화              |
 
 ---
 

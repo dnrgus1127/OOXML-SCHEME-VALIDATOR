@@ -8,25 +8,25 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@ooxml/core', '@ooxml/parser']
-      })
+        exclude: ['@ooxml/core', '@ooxml/parser'],
+      }),
     ],
     resolve: {
       alias: {
         '@ooxml/core': resolve(workspaceRoot, 'packages/core/src/index.ts'),
-        '@ooxml/parser': resolve(workspaceRoot, 'packages/parser/src/index.ts')
-      }
+        '@ooxml/parser': resolve(workspaceRoot, 'packages/parser/src/index.ts'),
+      },
     },
     build: {
       outDir: 'dist/main',
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/main/index.ts')
-        }
+          index: resolve(__dirname, 'src/main/index.ts'),
+        },
       },
-        sourcemap: true,
-        minify: false
-    }
+      sourcemap: true,
+      minify: false,
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
@@ -34,10 +34,10 @@ export default defineConfig({
       outDir: 'dist/preload',
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/preload/index.ts')
-        }
-      }
-    }
+          index: resolve(__dirname, 'src/preload/index.ts'),
+        },
+      },
+    },
   },
   renderer: {
     root: '.',
@@ -45,8 +45,8 @@ export default defineConfig({
     build: {
       outDir: 'dist/renderer',
       rollupOptions: {
-        input: 'index.html'
-      }
-    }
-  }
+        input: 'index.html',
+      },
+    },
+  },
 })

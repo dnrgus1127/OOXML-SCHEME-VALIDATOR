@@ -116,9 +116,7 @@ function TreeNodeComponent({ node, selectedPart, onSelectPart, depth }: TreeNode
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
       >
-        {node.isDirectory && (
-          <span className="expand-icon">{expanded ? '▼' : '▶'}</span>
-        )}
+        {node.isDirectory && <span className="expand-icon">{expanded ? '▼' : '▶'}</span>}
         <span className="icon">{getIcon(node)}</span>
         <span className="name">{node.name}</span>
         {node.part && <span className="size">{formatSize(node.part.size)}</span>}
@@ -141,7 +139,12 @@ function TreeNodeComponent({ node, selectedPart, onSelectPart, depth }: TreeNode
   )
 }
 
-export function DocumentTree({ documentType, parts, selectedPart, onSelectPart }: DocumentTreeProps) {
+export function DocumentTree({
+  documentType,
+  parts,
+  selectedPart,
+  onSelectPart,
+}: DocumentTreeProps) {
   const tree = useMemo(() => buildTree(parts), [parts])
   const partCount = Object.keys(parts).length
 

@@ -28,14 +28,52 @@ const parser = new XMLParser({
 
 // XSD built-in types
 const XSD_BUILTIN_TYPES = new Set([
-  'string', 'boolean', 'decimal', 'float', 'double', 'duration', 'dateTime',
-  'time', 'date', 'gYearMonth', 'gYear', 'gMonthDay', 'gDay', 'gMonth',
-  'hexBinary', 'base64Binary', 'anyURI', 'QName', 'NOTATION',
-  'normalizedString', 'token', 'language', 'NMTOKEN', 'NMTOKENS',
-  'Name', 'NCName', 'ID', 'IDREF', 'IDREFS', 'ENTITY', 'ENTITIES',
-  'integer', 'nonPositiveInteger', 'negativeInteger', 'long', 'int',
-  'short', 'byte', 'nonNegativeInteger', 'unsignedLong', 'unsignedInt',
-  'unsignedShort', 'unsignedByte', 'positiveInteger', 'anyType', 'anySimpleType',
+  'string',
+  'boolean',
+  'decimal',
+  'float',
+  'double',
+  'duration',
+  'dateTime',
+  'time',
+  'date',
+  'gYearMonth',
+  'gYear',
+  'gMonthDay',
+  'gDay',
+  'gMonth',
+  'hexBinary',
+  'base64Binary',
+  'anyURI',
+  'QName',
+  'NOTATION',
+  'normalizedString',
+  'token',
+  'language',
+  'NMTOKEN',
+  'NMTOKENS',
+  'Name',
+  'NCName',
+  'ID',
+  'IDREF',
+  'IDREFS',
+  'ENTITY',
+  'ENTITIES',
+  'integer',
+  'nonPositiveInteger',
+  'negativeInteger',
+  'long',
+  'int',
+  'short',
+  'byte',
+  'nonNegativeInteger',
+  'unsignedLong',
+  'unsignedInt',
+  'unsignedShort',
+  'unsignedByte',
+  'positiveInteger',
+  'anyType',
+  'anySimpleType',
 ])
 
 interface ParsedSchema {
@@ -153,12 +191,12 @@ function nodeTag(node: any): string {
 /** Get the ordered children array of a preserveOrder node */
 function nodeChildren(node: any): any[] {
   const tag = nodeTag(node)
-  return tag ? (node[tag] || []) : []
+  return tag ? node[tag] || [] : []
 }
 
 /** Find all child nodes matching a tag (supports xsd: and xs: prefixes) */
 function findByTag(children: any[], baseName: string): any[] {
-  return children.filter(child => {
+  return children.filter((child) => {
     const tag = nodeTag(child)
     return tag === `xsd:${baseName}` || tag === `xs:${baseName}`
   })
@@ -166,7 +204,7 @@ function findByTag(children: any[], baseName: string): any[] {
 
 /** Find the first child node matching a tag */
 function findFirstByTag(children: any[], baseName: string): any | undefined {
-  return children.find(child => {
+  return children.find((child) => {
     const tag = nodeTag(child)
     return tag === `xsd:${baseName}` || tag === `xs:${baseName}`
   })
@@ -287,9 +325,18 @@ function extractFacets(restrictionNode: any): ParsedFacet[] {
   const facets: ParsedFacet[] = []
   const children = nodeChildren(restrictionNode)
   const facetTypes = [
-    'enumeration', 'pattern', 'minLength', 'maxLength', 'length',
-    'minInclusive', 'maxInclusive', 'minExclusive', 'maxExclusive',
-    'totalDigits', 'fractionDigits', 'whiteSpace',
+    'enumeration',
+    'pattern',
+    'minLength',
+    'maxLength',
+    'length',
+    'minInclusive',
+    'maxInclusive',
+    'minExclusive',
+    'maxExclusive',
+    'totalDigits',
+    'fractionDigits',
+    'whiteSpace',
   ]
 
   for (const facetType of facetTypes) {
@@ -381,21 +428,30 @@ function parseParticles(compositorNode: any): ParsedParticle[] {
         ref: attr(child, 'ref') || undefined,
         elementType: attr(child, 'type') || undefined,
         minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+        maxOccurs:
+          attr(child, 'maxOccurs') === 'unbounded'
+            ? 'unbounded'
+            : parseInt(attr(child, 'maxOccurs') || '1', 10),
       })
     } else if (isXsdTag(tag, 'sequence')) {
       particles.push({
         type: 'sequence',
         particles: parseParticles(child),
         minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+        maxOccurs:
+          attr(child, 'maxOccurs') === 'unbounded'
+            ? 'unbounded'
+            : parseInt(attr(child, 'maxOccurs') || '1', 10),
       })
     } else if (isXsdTag(tag, 'choice')) {
       particles.push({
         type: 'choice',
         particles: parseParticles(child),
         minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+        maxOccurs:
+          attr(child, 'maxOccurs') === 'unbounded'
+            ? 'unbounded'
+            : parseInt(attr(child, 'maxOccurs') || '1', 10),
       })
     } else if (isXsdTag(tag, 'group')) {
       const ref = attr(child, 'ref')
@@ -404,7 +460,10 @@ function parseParticles(compositorNode: any): ParsedParticle[] {
           type: 'group',
           ref,
           minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-          maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+          maxOccurs:
+            attr(child, 'maxOccurs') === 'unbounded'
+              ? 'unbounded'
+              : parseInt(attr(child, 'maxOccurs') || '1', 10),
         })
       }
     } else if (isXsdTag(tag, 'any')) {
@@ -413,7 +472,10 @@ function parseParticles(compositorNode: any): ParsedParticle[] {
         namespace: attr(child, 'namespace') || '##any',
         processContents: attr(child, 'processContents') || 'strict',
         minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs: attr(child, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(child, 'maxOccurs') || '1', 10),
+        maxOccurs:
+          attr(child, 'maxOccurs') === 'unbounded'
+            ? 'unbounded'
+            : parseInt(attr(child, 'maxOccurs') || '1', 10),
       })
     }
   }
@@ -427,7 +489,10 @@ function parseElement(elNode: any): ParsedElement {
     ref: attr(elNode, 'ref') || undefined,
     type: attr(elNode, 'type') || undefined,
     minOccurs: parseInt(attr(elNode, 'minOccurs') || '1', 10),
-    maxOccurs: attr(elNode, 'maxOccurs') === 'unbounded' ? 'unbounded' : parseInt(attr(elNode, 'maxOccurs') || '1', 10),
+    maxOccurs:
+      attr(elNode, 'maxOccurs') === 'unbounded'
+        ? 'unbounded'
+        : parseInt(attr(elNode, 'maxOccurs') || '1', 10),
     default: attr(elNode, 'default'),
     fixed: attr(elNode, 'fixed'),
     nillable: attr(elNode, 'nillable') === 'true',
@@ -539,7 +604,9 @@ function parseComplexContent(ccNode: any): ParsedComplexContent {
         ? { type: 'choice', particles: parseParticles(choice) }
         : undefined,
     attributes: attrs.map(parseAttribute),
-    attributeGroups: attrGroups.filter((ref: any) => attr(ref, 'ref')).map((ref: any) => attr(ref, 'ref')!),
+    attributeGroups: attrGroups
+      .filter((ref: any) => attr(ref, 'ref'))
+      .map((ref: any) => attr(ref, 'ref')!),
   }
 }
 
@@ -569,23 +636,29 @@ function generateOccurs(minOccurs: number, maxOccurs: number | 'unbounded'): str
 
 function generateFacets(facets: ParsedFacet[]): string {
   // Group enumerations and patterns
-  const enums = facets.filter(f => f.type === 'enumeration')
-  const patterns = facets.filter(f => f.type === 'pattern')
-  const others = facets.filter(f => f.type !== 'enumeration' && f.type !== 'pattern')
+  const enums = facets.filter((f) => f.type === 'enumeration')
+  const patterns = facets.filter((f) => f.type === 'pattern')
+  const others = facets.filter((f) => f.type !== 'enumeration' && f.type !== 'pattern')
 
   const result: string[] = []
 
   if (enums.length > 0) {
-    result.push(`{ type: "enumeration", values: [${enums.map(f => `"${escapeString(f.value)}"`).join(', ')}] }`)
+    result.push(
+      `{ type: "enumeration", values: [${enums.map((f) => `"${escapeString(f.value)}"`).join(', ')}] }`
+    )
   }
 
   if (patterns.length > 0) {
-    result.push(`{ type: "pattern", patterns: [${patterns.map(f => `"${escapeString(f.value)}"`).join(', ')}] }`)
+    result.push(
+      `{ type: "pattern", patterns: [${patterns.map((f) => `"${escapeString(f.value)}"`).join(', ')}] }`
+    )
   }
 
   for (const f of others) {
     if (['minLength', 'maxLength', 'length', 'totalDigits', 'fractionDigits'].includes(f.type)) {
-      result.push(`{ type: "${f.type}", value: ${parseInt(f.value, 10)}${f.fixed ? ', fixed: true' : ''} }`)
+      result.push(
+        `{ type: "${f.type}", value: ${parseInt(f.value, 10)}${f.fixed ? ', fixed: true' : ''} }`
+      )
     } else if (f.type === 'whiteSpace') {
       result.push(`{ type: "whiteSpace", value: "${f.value}" as const }`)
     } else {
@@ -659,7 +732,9 @@ function generateParticle(p: ParsedParticle): string {
 
 function generateComplexType(ct: ParsedComplexType): string {
   const attrs = ct.attributes.map(generateAttribute).join(', ')
-  const attrGroups = ct.attributeGroups.map(ag => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`).join(', ')
+  const attrGroups = ct.attributeGroups
+    .map((ag) => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`)
+    .join(', ')
 
   let content: string
 
@@ -676,7 +751,9 @@ function generateComplexType(ct: ParsedComplexType): string {
     }
   } else if (ct.complexContent) {
     const ccAttrs = ct.complexContent.attributes.map(generateAttribute).join(', ')
-    const ccAttrGroups = ct.complexContent.attributeGroups.map(ag => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`).join(', ')
+    const ccAttrGroups = ct.complexContent.attributeGroups
+      .map((ag) => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`)
+      .join(', ')
     const compositor = ct.complexContent.content
       ? `{ kind: "${ct.complexContent.content.type}", particles: [${ct.complexContent.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
       : 'undefined'
@@ -716,7 +793,7 @@ function generateGroup(gr: ParsedGroup): string {
 
 function generateAttributeGroup(ag: ParsedAttributeGroup): string {
   const attrs = ag.attributes.map(generateAttribute).join(', ')
-  const refs = ag.attributeGroups.map(ref => makeTypeRef(ref)).join(', ')
+  const refs = ag.attributeGroups.map((ref) => makeTypeRef(ref)).join(', ')
   return `{ kind: "attributeGroup", name: "${ag.name}", attributes: [${attrs}], attributeGroupRefs: [${refs}] }`
 }
 
@@ -734,39 +811,42 @@ function generateTypeScript(schema: ParsedSchema, filename: string): string {
   const varName = camelCase(basename(filename, '.xsd'))
 
   // Generate imports
-  const imports = schema.imports.map(imp =>
-    `{ kind: "import", namespace: "${imp.namespace}", schemaLocation: "${imp.schemaLocation}" }`
-  ).join(',\n    ')
+  const imports = schema.imports
+    .map(
+      (imp) =>
+        `{ kind: "import", namespace: "${imp.namespace}", schemaLocation: "${imp.schemaLocation}" }`
+    )
+    .join(',\n    ')
 
   // Generate simpleTypes as Map entries
-  const simpleTypeEntries = schema.simpleTypes.map(st =>
-    `["${st.name}", ${generateSimpleType(st)}]`
-  ).join(',\n    ')
+  const simpleTypeEntries = schema.simpleTypes
+    .map((st) => `["${st.name}", ${generateSimpleType(st)}]`)
+    .join(',\n    ')
 
   // Generate complexTypes as Map entries
-  const complexTypeEntries = schema.complexTypes.map(ct =>
-    `["${ct.name}", ${generateComplexType(ct)}]`
-  ).join(',\n    ')
+  const complexTypeEntries = schema.complexTypes
+    .map((ct) => `["${ct.name}", ${generateComplexType(ct)}]`)
+    .join(',\n    ')
 
   // Generate elements as Map entries
-  const elementEntries = schema.elements.map(el =>
-    `["${el.name}", ${generateElement(el)}]`
-  ).join(',\n    ')
+  const elementEntries = schema.elements
+    .map((el) => `["${el.name}", ${generateElement(el)}]`)
+    .join(',\n    ')
 
   // Generate groups as Map entries
-  const groupEntries = schema.groups.map(gr =>
-    `["${gr.name}", ${generateGroup(gr)}]`
-  ).join(',\n    ')
+  const groupEntries = schema.groups
+    .map((gr) => `["${gr.name}", ${generateGroup(gr)}]`)
+    .join(',\n    ')
 
   // Generate attributeGroups as Map entries
-  const attrGroupEntries = schema.attributeGroups.map(ag =>
-    `["${ag.name}", ${generateAttributeGroup(ag)}]`
-  ).join(',\n    ')
+  const attrGroupEntries = schema.attributeGroups
+    .map((ag) => `["${ag.name}", ${generateAttributeGroup(ag)}]`)
+    .join(',\n    ')
 
   // Generate namespace declarations
-  const nsEntries = schema.namespaces.map(ns =>
-    `{ prefix: "${ns.prefix}", uri: "${ns.uri}" }`
-  ).join(', ')
+  const nsEntries = schema.namespaces
+    .map((ns) => `{ prefix: "${ns.prefix}", uri: "${ns.uri}" }`)
+    .join(', ')
 
   lines.push(`export const ${varName}Schema: XsdSchema = {`)
   lines.push(`  targetNamespace: "${schema.targetNamespace}",`)
@@ -873,13 +953,13 @@ async function main(): Promise<void> {
       totalElements += r.stats.elements
     }
   }
-  console.log(`Total: ${totalSimple} simpleTypes, ${totalComplex} complexTypes, ${totalElements} elements`)
+  console.log(
+    `Total: ${totalSimple} simpleTypes, ${totalComplex} complexTypes, ${totalElements} elements`
+  )
 
   if (successCount < results.length) {
     console.log('\nFailed files:')
-    results
-      .filter((r) => !r.success)
-      .forEach((r) => console.log(`  - ${r.filename}: ${r.error}`))
+    results.filter((r) => !r.success).forEach((r) => console.log(`  - ${r.filename}: ${r.error}`))
   }
 }
 

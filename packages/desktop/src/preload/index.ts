@@ -18,7 +18,8 @@ const api = {
 
   // OOXML operations
   parseDocument: (base64Data: string) => ipcRenderer.invoke('ooxml:parse', base64Data),
-  getPart: (base64Data: string, partPath: string) => ipcRenderer.invoke('ooxml:getPart', base64Data, partPath),
+  getPart: (base64Data: string, partPath: string) =>
+    ipcRenderer.invoke('ooxml:getPart', base64Data, partPath),
   updatePart: (base64Data: string, partPath: string, content: string) =>
     ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content),
   validate: (base64Data: string) => ipcRenderer.invoke('ooxml:validate', base64Data),

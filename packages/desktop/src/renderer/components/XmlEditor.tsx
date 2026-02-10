@@ -60,8 +60,12 @@ function formatXml(xml: string): string {
       const indentedLine = '  '.repeat(indent) + trimmed
 
       // Increase indent for opening tags (not self-closing)
-      if (trimmed.startsWith('<') && !trimmed.startsWith('</') &&
-          !trimmed.startsWith('<?') && !trimmed.endsWith('/>')) {
+      if (
+        trimmed.startsWith('<') &&
+        !trimmed.startsWith('</') &&
+        !trimmed.startsWith('<?') &&
+        !trimmed.endsWith('/>')
+      ) {
         indent++
       }
 
@@ -154,7 +158,9 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
       <div className="editor-body">
         <div className="line-numbers" ref={lineNumbersRef}>
           {localContent.split('\n').map((_, i) => (
-            <div key={i} className="line-number">{i + 1}</div>
+            <div key={i} className="line-number">
+              {i + 1}
+            </div>
           ))}
         </div>
 

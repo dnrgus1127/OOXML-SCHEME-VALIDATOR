@@ -59,7 +59,8 @@ export async function getOoxmlPart(input: GetOoxmlPartInput): Promise<GetOoxmlPa
 
   const format = input.format ?? 'json'
   const pretty = input.pretty ?? true
-  const isXml = part.contentType.includes('xml') ||
+  const isXml =
+    part.contentType.includes('xml') ||
     part.content.toString('utf-8', 0, 10).trimStart().startsWith('<')
 
   let content: string | JsonElement
