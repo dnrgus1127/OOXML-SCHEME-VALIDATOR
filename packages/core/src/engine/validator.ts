@@ -85,6 +85,15 @@ export class ValidationEngine {
         resolver
       )
 
+      if (result.skippedRequired) {
+        for (const missing of result.skippedRequired) {
+          this.errorHandler.pushError(
+            'MISSING_REQUIRED_ELEMENT',
+            `필수 요소 '${missing}'가 누락되었습니다.`
+          )
+        }
+      }
+
       if (!result.success) {
         this.errorHandler.pushError(
           result.errorCode ?? 'INVALID_CONTENT',

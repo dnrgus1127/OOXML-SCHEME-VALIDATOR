@@ -27,6 +27,14 @@ interface NamespaceResolver {
   resolveNamespaceUri(prefix?: string): string
 }
 
+export interface CompositorValidationResult {
+  success: boolean
+  errorCode?: string
+  matchedParticle?: FlattenedParticle
+  /** 스킵된 필수 요소 이름 목록 (skip-ahead 복구 시) */
+  skippedRequired?: string[]
+}
+
 /**
  * 스키마 타입으로부터 compositor 상태를 초기화합니다.
  *
@@ -236,7 +244,7 @@ export function validateCompositorChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver
-): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
+): CompositorValidationResult {
   switch (state.kind) {
     case 'sequence':
       return validateSequenceChild(childNamespaceUri, childLocalName, state, registry, resolver)
@@ -302,6 +310,77 @@ export function checkMissingRequiredElements(
 }
 
 /**
+ * 필수 요소가 블로킹할 때, 시퀀스의 후속 파티클에서 매칭을 시도합니다.
+ * 매칭 성공 시 건너뛴 필수 요소들을 skippedRequired로 보고하고,
+ * 해당 파티클의 occurrenceCounts를 minOccurs로 설정하여 endElement 중복 보고를 방지합니다.
+ */
+function trySkipAhead(
+  childNamespaceUri: string,
+  childLocalName: string,
+  qualifiedName: string,
+  blockingIndex: number,
+  state: CompositorState,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver
+): CompositorValidationResult | undefined {
+  for (let j = blockingIndex + 1; j < state.flattenedParticles.length; j += 1) {
+    const candidate = state.flattenedParticles[j]
+    if (!candidate) continue
+
+    let matched = false
+    let matchedParticle: FlattenedParticle | undefined
+
+    if (isNestedCompositor(candidate.particle)) {
+      const nested = getOrCreateNestedState(state, candidate, registry, resolver)
+      const nestedResult = validateCompositorChild(
+        childNamespaceUri,
+        childLocalName,
+        nested,
+        registry,
+        resolver
+      )
+      if (nestedResult.success) {
+        matched = true
+        matchedParticle = nestedResult.matchedParticle
+        if (!state.occurrenceCounts.has(j)) {
+          state.occurrenceCounts.set(j, 1)
+        }
+        state.currentIndex = j
+      }
+    } else {
+      const canMatch = particleAllows(qualifiedName, candidate, state, registry, resolver)
+      if (canMatch) {
+        matched = true
+        matchedParticle = candidate
+        const count = (state.occurrenceCounts.get(j) ?? 0) + 1
+        state.occurrenceCounts.set(j, count)
+        if (candidate.maxOccurs !== 'unbounded' && count >= candidate.maxOccurs) {
+          state.currentIndex = j + 1
+        } else {
+          state.currentIndex = j
+        }
+      }
+    }
+
+    if (matched) {
+      const skippedRequired: string[] = []
+      for (let k = blockingIndex; k < j; k += 1) {
+        const skipped = state.flattenedParticles[k]
+        if (!skipped) continue
+        const skippedCount = state.occurrenceCounts.get(k) ?? 0
+        if (skippedCount < skipped.minOccurs) {
+          skippedRequired.push(particleDescription(skipped))
+          state.occurrenceCounts.set(k, skipped.minOccurs)
+        }
+      }
+      return { success: true, matchedParticle, skippedRequired }
+    }
+  }
+
+  return undefined
+}
+
+/**
  * Sequence compositor에서 자식 요소를 검증합니다.
  * Sequence는 스키마에 정의된 순서대로 요소가 나타나야 합니다.
  *
@@ -318,7 +397,7 @@ function validateSequenceChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver
-): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
+): CompositorValidationResult {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName)
 
   for (let i = state.currentIndex; i < state.flattenedParticles.length; i += 1) {
@@ -360,6 +439,16 @@ function validateSequenceChild(
         }
       }
       if (count < particle.minOccurs) {
+        const skipResult = trySkipAhead(
+          childNamespaceUri,
+          childLocalName,
+          qualifiedName,
+          i,
+          state,
+          registry,
+          resolver
+        )
+        if (skipResult) return skipResult
         return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' }
       }
       continue
@@ -385,6 +474,16 @@ function validateSequenceChild(
 
     const count = state.occurrenceCounts.get(i) ?? 0
     if (count < particle.minOccurs) {
+      const skipResult = trySkipAhead(
+        childNamespaceUri,
+        childLocalName,
+        qualifiedName,
+        i,
+        state,
+        registry,
+        resolver
+      )
+      if (skipResult) return skipResult
       return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' }
     }
   }
@@ -409,7 +508,7 @@ function validateChoiceChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver
-): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
+): CompositorValidationResult {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName)
 
   if (state.selectedBranch !== null) {
@@ -537,7 +636,7 @@ function validateAllChild(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver
-): { success: boolean; errorCode?: string; matchedParticle?: FlattenedParticle } {
+): CompositorValidationResult {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName)
 
   const particle = state.flattenedParticles.find((entry) => entry.allowedNames?.has(qualifiedName))
