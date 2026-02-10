@@ -1,5 +1,5 @@
-import type { SchemaRegistry } from './types'
-import { resolveNamespaceUri } from './runtime'
+import type { SchemaRegistry } from '../types'
+import { resolveNamespaceUri } from '../runtime'
 
 /**
  * Resolve a namespace URI from XML context with schema prefix fallback.

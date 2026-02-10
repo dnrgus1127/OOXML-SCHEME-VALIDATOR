@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { ValidationEngine } from '../validator'
-import { loadSchemaRegistry } from '../schema-loader'
+import { ValidationEngine } from '../engine/validator'
+import { loadSchemaRegistry } from '../schema/schema-loader'
 import type { SchemaRegistry } from '../types'
-import { initCompositorState } from '../compositor'
+import { initCompositorState } from '../engine/compositor'
 import { resolveNamespaceUri } from '../runtime'
 
 const CHART_NS = 'http://schemas.openxmlformats.org/drawingml/2006/chart'

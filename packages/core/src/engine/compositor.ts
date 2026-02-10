@@ -10,7 +10,7 @@ import type {
   XsdGroup,
   XsdGroupRef,
   XsdSequence,
-} from './types'
+} from '../types'
 import {
   hasComplexContent,
   hasElementContent,
@@ -20,8 +20,8 @@ import {
   isElement,
   isGroupRef,
   isSequence,
-} from './types'
-import { CompositorState, FlattenedParticle, makeQualifiedName } from './runtime'
+} from '../types'
+import { CompositorState, FlattenedParticle, makeQualifiedName } from '../runtime'
 
 interface NamespaceResolver {
   resolveNamespaceUri(prefix?: string): string

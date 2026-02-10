@@ -5,7 +5,7 @@ import type {
   ValidationWarning,
 } from './types'
 import type { XmlElementInfo } from './runtime'
-import { ValidationEngine } from './validator'
+import { ValidationEngine } from './engine/validator'
 
 export type XmlValidationEvent =
   | { type: 'startDocument' }
