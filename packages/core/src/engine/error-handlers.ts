@@ -1,5 +1,6 @@
 import type { Facet } from '../types'
 import type { RuntimeValidationContext } from '../runtime'
+import { formatMessage } from '../i18n/format'
 
 export type ErrorCallback = (code: string, message: string, value?: string) => void
 
@@ -26,7 +27,8 @@ export function createErrorHandler(context: RuntimeValidationContext): Validatio
 
     pushFacetError(facet: Facet, value: string): void {
       const code = facet.type === 'enumeration' ? 'INVALID_ENUM_VALUE' : 'INVALID_VALUE'
-      this.pushError(code, `Facet 검증 실패 (${facet.type})`, value)
+      const messageKey = facet.type === 'enumeration' ? 'VALUE.INVALID_ENUM' : 'VALUE.INVALID_FACET'
+      this.pushError(code, formatMessage(messageKey, facet.type), value)
     },
 
     currentPath(): string {

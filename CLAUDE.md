@@ -2,16 +2,24 @@
 
 ## Project Overview
 
-OOXML Schema Validator — a monorepo toolkit for validating XLSX, DOCX, and PPTX files against XSD schemas using a streaming event-based engine. Includes an MCP server for AI agent integration and an Electron desktop app.
+OOXML Schema Validator — a monorepo toolkit for validating XLSX, DOCX, and PPTX files against XSD schemas using a streaming event-based engine. Primary focus is on the core validation engine and Electron desktop app. MCP integration is planned for future development.
 
 ## Monorepo Structure
 
-- `packages/core` — Validation engine, schema registry, compositor state management (zero runtime deps)
+### Primary Development Focus
+
+- `packages/core` — Validation engine, schema registry, compositor state management (zero runtime deps) **[ACTIVE]**
+- `packages/desktop` — Electron + React desktop application with Monaco editor **[ACTIVE]**
+
+### Supporting Packages
+
 - `packages/parser` — OOXML document parsing, ZIP handling, XML streaming/conversion
-- `packages/mcp` — MCP server exposing validation tools (`validate_ooxml`, `analyze_ooxml_structure`, `get_ooxml_part`)
-- `packages/desktop` — Electron + React desktop application with Monaco editor
 - `tools/xsd-converter` — Build tool that converts XSD files to JSON schemas
 - `schemas/` — OOXML XSD source files (sml, wml, pml, dml, shared)
+
+### Future Development
+
+- `packages/mcp` — MCP server exposing validation tools (lower priority)
 
 ## Common Commands
 

@@ -97,7 +97,17 @@ describe('sequence compositor skip-ahead recovery', () => {
 
     return createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', { kind: 'element' as const, name: 'root', typeRef: { name: 'CT_Root', isBuiltin: false }, occurs: { minOccurs: 1, maxOccurs: 1 } }]])
+      new Map([
+        [
+          'root',
+          {
+            kind: 'element' as const,
+            name: 'root',
+            typeRef: { name: 'CT_Root', isBuiltin: false },
+            occurs: { minOccurs: 1, maxOccurs: 1 },
+          },
+        ],
+      ])
     )
   }
 
@@ -230,7 +240,17 @@ describe('sequence compositor skip-ahead recovery', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', { kind: 'element' as const, name: 'root', typeRef: { name: 'CT_Root', isBuiltin: false }, occurs: { minOccurs: 1, maxOccurs: 1 } }]])
+      new Map([
+        [
+          'root',
+          {
+            kind: 'element' as const,
+            name: 'root',
+            typeRef: { name: 'CT_Root', isBuiltin: false },
+            occurs: { minOccurs: 1, maxOccurs: 1 },
+          },
+        ],
+      ])
     )
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
     const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
@@ -301,7 +321,17 @@ describe('sequence compositor skip-ahead recovery', () => {
 
     const schema = createSchemaWithTypes(
       new Map([['CT_Root', rootType]]),
-      new Map([['root', { kind: 'element' as const, name: 'root', typeRef: { name: 'CT_Root', isBuiltin: false }, occurs: { minOccurs: 1, maxOccurs: 1 } }]])
+      new Map([
+        [
+          'root',
+          {
+            kind: 'element' as const,
+            name: 'root',
+            typeRef: { name: 'CT_Root', isBuiltin: false },
+            occurs: { minOccurs: 1, maxOccurs: 1 },
+          },
+        ],
+      ])
     )
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
     const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
@@ -325,7 +355,9 @@ describe('sequence compositor skip-ahead recovery', () => {
 
     // No "schema not found" or "허용되지 않는 요소" errors for ref inside tx
     const schemaNotFound = result.errors.filter(
-      (e) => e.message.includes('스키마에서 요소를 찾을 수 없습니다') || e.message.includes('허용되지 않는 요소')
+      (e) =>
+        e.message.includes('스키마에서 요소를 찾을 수 없습니다') ||
+        e.message.includes('허용되지 않는 요소')
     )
     expect(schemaNotFound).toHaveLength(0)
 
