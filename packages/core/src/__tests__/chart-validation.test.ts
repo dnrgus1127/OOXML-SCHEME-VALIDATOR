@@ -63,6 +63,50 @@ describe('real chart schema validation', () => {
     expect(schemaNotFoundErrors).toHaveLength(0)
   })
 
+  it('should resolve unprefixed schema type when XML uses prefixed namespace declarations', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+    })
+
+    const nsDecl = new Map([
+      ['c', CHART_NS],
+      ['a', DML_MAIN_NS],
+      ['r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'],
+    ])
+
+    engine.startDocument()
+
+    engine.startElement({
+      ...makeEl('chartSpace'),
+      name: 'c:chartSpace',
+      namespaceDeclarations: nsDecl,
+    })
+
+    engine.startElement({
+      ...makeEl('style'),
+      name: 'c:style',
+      attributes: [{ name: 'val', value: '10', localName: 'val' }],
+    })
+    engine.endElement({ ...makeEl('style'), name: 'c:style' })
+
+    engine.startElement({ ...makeEl('chart'), name: 'c:chart' })
+    engine.startElement({ ...makeEl('plotArea'), name: 'c:plotArea' })
+    engine.endElement({ ...makeEl('plotArea'), name: 'c:plotArea' })
+    engine.endElement({ ...makeEl('chart'), name: 'c:chart' })
+
+    engine.endElement({ ...makeEl('chartSpace'), name: 'c:chartSpace' })
+
+    const result = engine.endDocument()
+
+    const schemaNotFoundErrors = result.errors.filter(
+      (e) => e.code === 'INVALID_ELEMENT' || e.code === 'UNKNOWN_TYPE'
+    )
+    expect(schemaNotFoundErrors).toHaveLength(0)
+  })
+
   it('should validate deep nesting: plotArea > areaChart > ser > tx > strRef > f', () => {
     const registry = loadSchemaRegistry('spreadsheet')
 

@@ -46,7 +46,7 @@ export class ValidationEngine {
     this.errorHandler = createErrorHandler(this.context)
   }
 
-  private createResolver(namespaceContext: Map<string, string>) {
+  private createResolver(namespaceContext: Map<string, string>, fallbackNamespaceUri?: string) {
     return {
       resolveNamespaceUri: (prefix?: string): string => {
         const xmlResult = resolveNamespaceUri(namespaceContext, prefix)
@@ -54,7 +54,7 @@ export class ValidationEngine {
         if (prefix) {
           return this.registry.resolveSchemaPrefix(prefix) ?? ''
         }
-        return ''
+        return fallbackNamespaceUri ?? ''
       },
     }
   }
@@ -78,7 +78,7 @@ export class ValidationEngine {
 
     let matchedParticle: FlattenedParticle | undefined
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1]
-    const resolver = this.createResolver(namespaceContext)
+    const resolver = this.createResolver(namespaceContext, parentFrame?.namespaceUri)
 
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
@@ -125,6 +125,7 @@ export class ValidationEngine {
       ? validateAttributes(
           element.attributes,
           schemaType,
+          element.namespaceUri,
           namespaceContext,
           this.registry,
           this.errorHandler
@@ -136,7 +137,11 @@ export class ValidationEngine {
       namespaceUri: element.namespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
-        ? initCompositorState(schemaType, this.registry, resolver)
+        ? initCompositorState(
+            schemaType,
+            this.registry,
+            this.createResolver(namespaceContext, element.namespaceUri)
+          )
         : null,
       textContent: '',
       validatedAttributes,
@@ -166,7 +171,7 @@ export class ValidationEngine {
       const missing = checkMissingRequiredElements(
         currentFrame.compositorState,
         this.registry,
-        this.createResolver(endNsContext)
+        this.createResolver(endNsContext, currentFrame.namespaceUri)
       )
 
       for (const missingElement of missing) {
@@ -183,6 +188,7 @@ export class ValidationEngine {
       checkRequiredAttributes(
         currentFrame.schemaType,
         currentFrame,
+        currentFrame.namespaceUri,
         namespaceContext,
         this.registry,
         this.errorHandler
