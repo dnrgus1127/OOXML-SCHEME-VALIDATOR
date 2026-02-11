@@ -129,14 +129,19 @@ export function flattenParticles(
     if (isGroupRef(particle)) {
       const group = resolveGroup(particle, registry, resolver)
       if (group?.compositor) {
-        const nested = flattenParticles(
-          group.compositor.kind === 'all' ? group.compositor.elements : group.compositor.particles,
-          registry,
-          resolver,
-          index
-        )
-        flattened.push(...nested)
-        index += nested.length
+        const groupedParticle = {
+          ...group.compositor,
+          occurs: particle.occurs,
+        }
+
+        flattened.push({
+          index,
+          particle: groupedParticle,
+          minOccurs: particle.occurs.minOccurs,
+          maxOccurs: particle.occurs.maxOccurs,
+          allowedNames: buildAllowedNames(groupedParticle, registry, resolver),
+        })
+        index += 1
         continue
       }
     }

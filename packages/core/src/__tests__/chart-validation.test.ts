@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { ValidationEngine } from '../engine/validator'
 import { loadSchemaRegistry } from '../schema/schema-loader'
 import type { SchemaRegistry } from '../types'
 import { initCompositorState } from '../engine/compositor'
 import { resolveNamespaceUri } from '../runtime'
+import { validateXmlEvents } from '../mcp'
+import { parseXmlToEventArray } from '../../../parser/src/xml/streaming'
 
 const CHART_NS = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
 const DML_MAIN_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
@@ -105,6 +109,21 @@ describe('real chart schema validation', () => {
       (e) => e.code === 'INVALID_ELEMENT' || e.code === 'UNKNOWN_TYPE'
     )
     expect(schemaNotFoundErrors).toHaveLength(0)
+  })
+
+  it('should validate provided user chart XML without validation errors', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+    const xmlPath = join(process.cwd(), '../../docs/samples/user-chart.xml')
+    const xml = readFileSync(xmlPath, 'utf-8')
+
+    const events = parseXmlToEventArray(xml) as any
+    const result = validateXmlEvents(registry, events, {
+      allowWhitespace: true,
+      maxErrors: 1000,
+    })
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
   })
 
   it('should validate deep nesting: plotArea > areaChart > ser > tx > strRef > f', () => {

@@ -18,21 +18,22 @@ export function validateSimpleTypeValue(
   simpleType: XsdSimpleType,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri?: string
 ): void {
   const content = simpleType.content
   if (content.kind === 'restriction') {
-    validateRestriction(value, content, namespaceContext, registry, errorHandler)
+    validateRestriction(value, content, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
     return
   }
 
   if (content.kind === 'union') {
-    validateUnion(value, content, namespaceContext, registry, errorHandler)
+    validateUnion(value, content, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
     return
   }
 
   if (content.kind === 'list') {
-    validateList(value, content, namespaceContext, registry, errorHandler)
+    validateList(value, content, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
   }
 }
 
@@ -41,7 +42,8 @@ function validateRestriction(
   restriction: SimpleTypeRestriction,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri?: string
 ): void {
   if (
     !validateBuiltinOrReferencedType(
@@ -49,7 +51,8 @@ function validateRestriction(
       restriction.base,
       namespaceContext,
       registry,
-      errorHandler
+      errorHandler,
+      fallbackNamespaceUri
     )
   ) {
     errorHandler.pushError(
@@ -61,6 +64,26 @@ function validateRestriction(
   }
 
   for (const facet of restriction.facets) {
+    if (
+      restriction.base.isBuiltin &&
+      restriction.base.name === 'hexBinary' &&
+      (facet.type === 'length' || facet.type === 'minLength' || facet.type === 'maxLength')
+    ) {
+      const byteLength = value.length / 2
+      const isValidHexByteLength =
+        facet.type === 'length'
+          ? byteLength === facet.value
+          : facet.type === 'minLength'
+            ? byteLength >= facet.value
+            : byteLength <= facet.value
+
+      if (!isValidHexByteLength) {
+        errorHandler.pushFacetError(facet, value)
+        return
+      }
+      continue
+    }
+
     if (!validateFacet(value, facet)) {
       errorHandler.pushFacetError(facet, value)
       return
@@ -73,11 +96,19 @@ function validateUnion(
   union: SimpleTypeUnion,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri?: string
 ): void {
   for (const memberType of union.memberTypes) {
     if (
-      validateBuiltinOrReferencedType(value, memberType, namespaceContext, registry, errorHandler)
+      validateBuiltinOrReferencedType(
+        value,
+        memberType,
+        namespaceContext,
+        registry,
+        errorHandler,
+        fallbackNamespaceUri
+      )
     ) {
       return
     }
@@ -91,7 +122,8 @@ function validateList(
   list: SimpleTypeList,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri?: string
 ): void {
   const items = value.split(/\s+/).filter(Boolean)
   for (const item of items) {
@@ -101,7 +133,8 @@ function validateList(
         list.itemType,
         namespaceContext,
         registry,
-        errorHandler
+        errorHandler,
+        fallbackNamespaceUri
       )
     ) {
       errorHandler.pushError('INVALID_VALUE', formatMessage('VALUE.INVALID_LIST_ITEM'), item)
@@ -115,7 +148,8 @@ export function validateBuiltinOrReferencedType(
   typeRef: TypeReference,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri?: string
 ): boolean {
   if (typeRef.isBuiltin) {
     return validateBuiltinType(value, typeRef.name)
@@ -125,13 +159,14 @@ export function validateBuiltinOrReferencedType(
     typeRef,
     namespaceContext,
     registry,
-    errorHandler.pushError.bind(errorHandler)
+    errorHandler.pushError.bind(errorHandler),
+    fallbackNamespaceUri
   )
   if (!resolved || !isSimpleType(resolved)) {
     return false
   }
 
-  validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler)
+  validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
   return true
 }
 
@@ -163,7 +198,18 @@ export function validateFacet(value: string, facet: Facet): boolean {
     case 'enumeration':
       return facet.values.includes(value)
     case 'pattern':
-      return facet.patterns.some((pattern) => new RegExp(`^${pattern}$`).test(value))
+      return facet.patterns.some((pattern) => {
+        const regex = new RegExp(`^${pattern}$`)
+        if (regex.test(value)) {
+          return true
+        }
+
+        if (pattern.includes('%') && /^\d+$/.test(value)) {
+          return regex.test(`${value}%`)
+        }
+
+        return false
+      })
     case 'minLength':
       return value.length >= facet.value
     case 'maxLength':

@@ -59,6 +59,23 @@ export class ValidationEngine {
     }
   }
 
+  private resolveSchemaTypeNamespace(schemaType: XsdComplexType | XsdSimpleType | null): string {
+    if (!schemaType) {
+      return ''
+    }
+
+    for (const [namespaceUri, schema] of this.registry.schemas.entries()) {
+      if (schema.complexTypes.get(schemaType.name) === schemaType) {
+        return namespaceUri
+      }
+      if (schema.simpleTypes.get(schemaType.name) === schemaType) {
+        return namespaceUri
+      }
+    }
+
+    return ''
+  }
+
   startDocument(): void {
     this.context.elementStack = []
     this.context.namespaceStack = [new Map()]
@@ -78,7 +95,7 @@ export class ValidationEngine {
 
     let matchedParticle: FlattenedParticle | undefined
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1]
-    const resolver = this.createResolver(namespaceContext, parentFrame?.namespaceUri)
+    const resolver = this.createResolver(namespaceContext, parentFrame?.schemaNamespaceUri)
 
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
@@ -108,39 +125,48 @@ export class ValidationEngine {
       matchedParticle = result.matchedParticle
     }
 
-    const schemaElement = matchedParticle
-      ? (this.extractElementFromParticle(matchedParticle, namespaceContext) ??
-        this.registry.resolveElement(element.namespaceUri, element.localName))
-      : this.registry.resolveElement(element.namespaceUri, element.localName)
+    const isWildcardMatch = Boolean(matchedParticle && isAny(matchedParticle.particle))
 
-    const schemaType = resolveSchemaElementType(
-      schemaElement,
-      namespaceContext,
-      element,
-      this.registry,
-      this.errorHandler.pushError.bind(this.errorHandler)
-    )
+    const schemaElement = isWildcardMatch
+      ? undefined
+      : matchedParticle
+        ? (this.extractElementFromParticle(matchedParticle, namespaceContext) ??
+          this.registry.resolveElement(element.namespaceUri, element.localName))
+        : this.registry.resolveElement(element.namespaceUri, element.localName)
+
+    const schemaType = isWildcardMatch
+      ? null
+      : resolveSchemaElementType(
+          schemaElement,
+          namespaceContext,
+          element,
+          this.registry,
+          this.errorHandler.pushError.bind(this.errorHandler)
+        )
 
     const validatedAttributes = isComplexSchemaType(schemaType)
       ? validateAttributes(
           element.attributes,
           schemaType,
-          element.namespaceUri,
+          this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri,
           namespaceContext,
           this.registry,
           this.errorHandler
         )
       : new Set<string>()
 
+    const schemaNamespaceUri = this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri
+
     const frame: ElementStackFrame = {
       elementName: element.localName,
       namespaceUri: element.namespaceUri,
+      schemaNamespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
         ? initCompositorState(
             schemaType,
             this.registry,
-            this.createResolver(namespaceContext, element.namespaceUri)
+            this.createResolver(namespaceContext, schemaNamespaceUri)
           )
         : null,
       textContent: '',
@@ -171,7 +197,7 @@ export class ValidationEngine {
       const missing = checkMissingRequiredElements(
         currentFrame.compositorState,
         this.registry,
-        this.createResolver(endNsContext, currentFrame.namespaceUri)
+        this.createResolver(endNsContext, currentFrame.schemaNamespaceUri)
       )
 
       for (const missingElement of missing) {
@@ -188,7 +214,7 @@ export class ValidationEngine {
       checkRequiredAttributes(
         currentFrame.schemaType,
         currentFrame,
-        currentFrame.namespaceUri,
+        currentFrame.schemaNamespaceUri,
         namespaceContext,
         this.registry,
         this.errorHandler
@@ -241,7 +267,8 @@ export class ValidationEngine {
         schemaType,
         nsCtx,
         this.registry,
-        this.errorHandler
+        this.errorHandler,
+        frame.schemaNamespaceUri
       )
       return
     }
@@ -253,7 +280,8 @@ export class ValidationEngine {
         baseType,
         nsCtx,
         this.registry,
-        this.errorHandler
+        this.errorHandler,
+        frame.schemaNamespaceUri
       )
       return
     }

@@ -86,7 +86,14 @@ function validateAttributeValue(
   fallbackNamespaceUri: string
 ): void {
   if (schemaDef.inlineType) {
-    validateSimpleTypeValue(value, schemaDef.inlineType, namespaceContext, registry, errorHandler)
+    validateSimpleTypeValue(
+      value,
+      schemaDef.inlineType,
+      namespaceContext,
+      registry,
+      errorHandler,
+      fallbackNamespaceUri
+    )
     return
   }
 
@@ -99,7 +106,14 @@ function validateAttributeValue(
       fallbackNamespaceUri
     )
     if (resolved && isSimpleType(resolved)) {
-      validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler)
+      validateSimpleTypeValue(
+        value,
+        resolved,
+        namespaceContext,
+        registry,
+        errorHandler,
+        fallbackNamespaceUri
+      )
     }
   }
 }
