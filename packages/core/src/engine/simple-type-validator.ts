@@ -11,6 +11,7 @@ import { isSimpleType } from '../types'
 import type { ErrorCallback } from './error-handlers'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveTypeReference } from './type-resolver'
+import { formatMessage } from '../i18n/format'
 
 export function validateSimpleTypeValue(
   value: string,
@@ -51,7 +52,11 @@ function validateRestriction(
       errorHandler
     )
   ) {
-    errorHandler.pushError('INVALID_VALUE', `타입 검증 실패: ${restriction.base.name}`, value)
+    errorHandler.pushError(
+      'INVALID_VALUE',
+      formatMessage('VALUE.INVALID_TYPE', restriction.base.name),
+      value
+    )
     return
   }
 
@@ -78,7 +83,7 @@ function validateUnion(
     }
   }
 
-  errorHandler.pushError('INVALID_VALUE', 'union 멤버 타입과 일치하지 않습니다.', value)
+  errorHandler.pushError('INVALID_VALUE', formatMessage('VALUE.INVALID_UNION'), value)
 }
 
 function validateList(
@@ -99,7 +104,7 @@ function validateList(
         errorHandler
       )
     ) {
-      errorHandler.pushError('INVALID_VALUE', 'list 항목 타입과 일치하지 않습니다.', item)
+      errorHandler.pushError('INVALID_VALUE', formatMessage('VALUE.INVALID_LIST_ITEM'), item)
       return
     }
   }
@@ -128,6 +133,29 @@ export function validateBuiltinOrReferencedType(
 
   validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler)
   return true
+}
+
+/**
+ * Apply whitespace normalization according to XML Schema Part 2 specification
+ * @param value - The string value to normalize
+ * @param mode - The whitespace mode: 'preserve' | 'replace' | 'collapse'
+ * @returns Normalized string value
+ */
+export function applyWhitespace(value: string, mode: 'preserve' | 'replace' | 'collapse'): string {
+  if (mode === 'preserve') {
+    return value
+  }
+
+  // Step 1: replace - Replace each tab, newline, and carriage return with a space
+  let result = value.replace(/[\t\n\r]/g, ' ')
+
+  if (mode === 'replace') {
+    return result
+  }
+
+  // Step 2: collapse - Apply replace + collapse consecutive spaces + trim
+  result = result.replace(/\s{2,}/g, ' ').trim()
+  return result
 }
 
 export function validateFacet(value: string, facet: Facet): boolean {
@@ -159,17 +187,47 @@ export function validateFacet(value: string, facet: Facet): boolean {
       }
       return true
     case 'whiteSpace':
-      return true
+      // WhiteSpace facet validation: check if value matches normalized form
+      const normalized = applyWhitespace(value, facet.value as 'preserve' | 'replace' | 'collapse')
+      return value === normalized
     default:
       return true
   }
 }
 
+/**
+ * Validate URI according to RFC 3986 (simplified)
+ * @param value - The URI string to validate
+ * @returns true if valid URI or relative reference
+ */
+function validateUri(value: string): boolean {
+  if (!value) return true // Empty URI is allowed (optional)
+
+  // Check for invalid characters (spaces, control characters)
+  if (/[\s\x00-\x1F\x7F]/.test(value)) return false
+
+  // RFC 3986 absolute URI pattern: scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+  // Scheme: ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+  const absoluteUriPattern = /^[a-z][a-z0-9+.-]*:.+/i
+
+  // Absolute URI validation
+  if (absoluteUriPattern.test(value)) return true
+
+  // Relative reference validation (OOXML relationships)
+  // Allow: path segments, query, fragment
+  // Examples: "../styles.xml", "rId1", "./file.xml", "#section"
+  const relativeRefPattern = /^([.]{0,2}\/)?[^:]*$/
+
+  return relativeRefPattern.test(value)
+}
+
 export function validateBuiltinType(value: string, typeName: string): boolean {
   switch (typeName) {
     case 'string':
-    case 'normalizedString':
       return true
+    case 'normalizedString':
+      // normalizedString applies 'replace' whitespace processing
+      return value === applyWhitespace(value, 'replace')
     case 'boolean':
       return ['true', 'false', '1', '0'].includes(value)
     case 'integer':
@@ -196,10 +254,18 @@ export function validateBuiltinType(value: string, typeName: string): boolean {
       return /^[A-Za-z0-9+/]*={0,2}$/.test(value)
     case 'dateTime':
       return !Number.isNaN(Date.parse(value))
+    case 'anyURI':
+      return validateUri(value)
     case 'token':
-      return value === value.trim() && !/\s{2,}/.test(value)
+      // token applies 'collapse' whitespace processing
+      return value === applyWhitespace(value, 'collapse')
     case 'NCName':
-      return /^[a-zA-Z_][\w.-]*$/.test(value) && !value.includes(':')
+      // NCName is derived from token, so it also requires collapse
+      return (
+        value === applyWhitespace(value, 'collapse') &&
+        /^[a-zA-Z_][\w.-]*$/.test(value) &&
+        !value.includes(':')
+      )
     default:
       return true
   }

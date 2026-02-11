@@ -12,6 +12,7 @@ import type { ValidationErrorHandler } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
 import { resolveTypeReference } from './type-resolver'
 import { validateSimpleTypeValue } from './simple-type-validator'
+import { formatMessage } from '../i18n/format'
 
 function collectAllAttributes(
   schemaType: XsdComplexType,
@@ -137,7 +138,7 @@ export function validateAttributes(
       if (collected.anyAttribute) {
         continue
       }
-      errorHandler.pushError('INVALID_ATTRIBUTE', `허용되지 않는 속성: ${xmlAttr.name}`)
+      errorHandler.pushError('INVALID_ATTRIBUTE', formatMessage('ATTRIBUTE.INVALID', xmlAttr.name))
       continue
     }
 
@@ -147,7 +148,7 @@ export function validateAttributes(
 
   for (const attr of allowedAttributes.values()) {
     if (attr.use === 'prohibited' && validated.has(attr.name ?? '')) {
-      errorHandler.pushError('INVALID_ATTRIBUTE', `금지된 속성 사용: ${attr.name}`)
+      errorHandler.pushError('INVALID_ATTRIBUTE', formatMessage('ATTRIBUTE.PROHIBITED', attr.name!))
     }
   }
 
@@ -165,7 +166,7 @@ export function checkRequiredAttributes(
 
   for (const attr of collected.attributes) {
     if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
-      errorHandler.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`)
+      errorHandler.pushError('MISSING_REQUIRED_ATTR', formatMessage('ATTRIBUTE.MISSING_REQUIRED', attr.name!))
     }
   }
 
@@ -178,7 +179,7 @@ export function checkRequiredAttributes(
       if (resolved?.attributes) {
         for (const attr of resolved.attributes) {
           if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
-            errorHandler.pushError('MISSING_REQUIRED_ATTR', `필수 속성 누락: ${attr.name}`)
+            errorHandler.pushError('MISSING_REQUIRED_ATTR', formatMessage('ATTRIBUTE.MISSING_REQUIRED', attr.name!))
           }
         }
       }

@@ -2,6 +2,7 @@ import type { SchemaRegistry, XsdComplexType, XsdSimpleType, TypeReference } fro
 import type { XmlElementInfo } from '../runtime'
 import type { ErrorCallback } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
+import { formatMessage } from '../i18n/format'
 
 export function resolveSchemaElementType(
   schemaElement:
@@ -17,7 +18,7 @@ export function resolveSchemaElementType(
   onError: ErrorCallback
 ): XsdComplexType | XsdSimpleType | null {
   if (!schemaElement) {
-    onError('INVALID_ELEMENT', `스키마에서 요소를 찾을 수 없습니다: ${element.name}`)
+    onError('INVALID_ELEMENT', formatMessage('TYPE.ELEMENT_NOT_FOUND', element.name))
     return null
   }
 
@@ -57,7 +58,7 @@ export function resolveTypeReference(
   const namespaceUri = resolveNamespaceWithFallback(namespaceContext, ref.namespacePrefix, registry)
   const type = registry.resolveType(namespaceUri, ref.name)
   if (!type) {
-    onError('UNKNOWN_TYPE', `타입을 찾을 수 없습니다: ${ref.name}`)
+    onError('UNKNOWN_TYPE', formatMessage('TYPE.TYPE_NOT_FOUND', ref.name))
   }
   return type ?? null
 }

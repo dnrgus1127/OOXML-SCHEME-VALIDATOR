@@ -26,6 +26,7 @@ import { createErrorHandler, ValidationErrorHandler } from './error-handlers'
 import { resolveSchemaElementType } from './type-resolver'
 import { validateSimpleTypeValue, validateBuiltinOrReferencedType } from './simple-type-validator'
 import { validateAttributes, checkRequiredAttributes } from './attribute-validator'
+import { setLocale, formatMessage } from '../i18n/format'
 
 export class ValidationEngine {
   private context
@@ -38,6 +39,9 @@ export class ValidationEngine {
     this.context = createRuntimeContext(this.registry)
     if (options) {
       this.context.options = { ...options }
+      if (options.locale) {
+        setLocale(options.locale)
+      }
     }
     this.errorHandler = createErrorHandler(this.context)
   }
@@ -89,7 +93,7 @@ export class ValidationEngine {
         for (const missing of result.skippedRequired) {
           this.errorHandler.pushError(
             'MISSING_REQUIRED_ELEMENT',
-            `필수 요소 '${missing}'가 누락되었습니다.`
+            formatMessage('ELEMENT.MISSING_REQUIRED', missing)
           )
         }
       }
@@ -97,7 +101,7 @@ export class ValidationEngine {
       if (!result.success) {
         this.errorHandler.pushError(
           result.errorCode ?? 'INVALID_CONTENT',
-          `허용되지 않는 요소: ${element.name}`
+          formatMessage('ELEMENT.INVALID', element.name)
         )
       }
 
@@ -168,7 +172,7 @@ export class ValidationEngine {
       for (const missingElement of missing) {
         this.errorHandler.pushError(
           'MISSING_REQUIRED_ELEMENT',
-          `필수 요소 '${missingElement}'가 누락되었습니다.`
+          formatMessage('ELEMENT.MISSING_REQUIRED', missingElement)
         )
       }
     }
@@ -195,7 +199,7 @@ export class ValidationEngine {
       if (currentFrame.textContent.length > 0) {
         this.errorHandler.pushError(
           'UNEXPECTED_TEXT',
-          'element-only 컨텐츠에서 텍스트가 발견되었습니다.'
+          formatMessage('ELEMENT.UNEXPECTED_TEXT.ELEMENT_ONLY')
         )
       }
     }
@@ -252,7 +256,7 @@ export class ValidationEngine {
       if (!schemaType.content.mixed && !this.context.options.allowWhitespace) {
         this.errorHandler.pushError(
           'UNEXPECTED_TEXT',
-          'complexContent에서 텍스트가 허용되지 않습니다.',
+          formatMessage('ELEMENT.UNEXPECTED_TEXT.COMPLEX_CONTENT'),
           textContent
         )
       }

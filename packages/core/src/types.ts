@@ -591,6 +591,8 @@ export interface ValidationOptions {
   customValidators?: Map<string, (value: string) => boolean>
   /** 혼합 컨텐츠에서 공백 허용 여부 */
   allowWhitespace?: boolean
+  /** 에러 메시지 로케일 */
+  locale?: 'en' | 'ko'
 }
 
 /** 검증 컨텍스트 (순회 중 상태 관리) */
