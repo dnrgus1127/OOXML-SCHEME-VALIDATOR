@@ -60,7 +60,7 @@ export class ValidationEngine {
   }
 
   private resolveSchemaTypeNamespace(schemaType: XsdComplexType | XsdSimpleType | null): string {
-    if (!schemaType) {
+    if (!schemaType || !schemaType.name) {
       return ''
     }
 
