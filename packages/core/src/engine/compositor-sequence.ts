@@ -134,7 +134,11 @@ export function validateSequenceChild(
           state.occurrenceCounts.set(i, 1)
         }
         state.currentIndex = i
-        return { success: true, matchedParticle: nestedResult.matchedParticle }
+        return {
+          success: true,
+          matchedParticle: nestedResult.matchedParticle,
+          skippedRequired: nestedResult.skippedRequired,
+        }
       }
       // Nested compositor didn't match — try starting a new occurrence if allowed
       const count = state.occurrenceCounts.get(i) ?? 0
@@ -150,7 +154,11 @@ export function validateSequenceChild(
         if (retryResult.success) {
           state.occurrenceCounts.set(i, count + 1)
           state.currentIndex = i
-          return { success: true, matchedParticle: retryResult.matchedParticle }
+          return {
+            success: true,
+            matchedParticle: retryResult.matchedParticle,
+            skippedRequired: retryResult.skippedRequired,
+          }
         }
       }
       if (count < particle.minOccurs) {
