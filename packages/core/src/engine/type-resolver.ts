@@ -62,7 +62,12 @@ export function resolveTypeReference(
     } as XsdSimpleType
   }
 
-  const namespaceUri = resolveNamespaceWithFallback(namespaceContext, ref.namespacePrefix, registry)
+  const namespaceUri = resolveNamespaceWithFallback(
+    namespaceContext,
+    ref.namespacePrefix,
+    registry,
+    fallbackNamespaceUri
+  )
   const resolvedNamespaceUri = namespaceUri || (!ref.namespacePrefix ? fallbackNamespaceUri ?? '' : '')
   const type = registry.resolveType(resolvedNamespaceUri, ref.name)
   if (!type) {
