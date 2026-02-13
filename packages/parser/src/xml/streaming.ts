@@ -44,25 +44,31 @@ export function* parseXmlToEvents(xml: string): Generator<XmlValidationEvent> {
   })
 
   const events: XmlValidationEvent[] = []
-  let currentNamespaces = new Map<string, string>()
+  const namespaceStack: Map<string, string>[] = [new Map()]
 
   parser.onopentag = (node: sax.QualifiedTag) => {
-    // Collect namespace declarations from this element
-    const nsDeclarations = new Map<string, string>()
+    const parentNamespaces = namespaceStack[namespaceStack.length - 1] ?? new Map<string, string>()
+    const currentNamespaces = new Map(parentNamespaces)
 
-    for (const [key, attr] of Object.entries(node.attributes)) {
-      if (key === 'xmlns' || key.startsWith('xmlns:')) {
-        const prefix = key === 'xmlns' ? '' : key.slice(6)
-        nsDeclarations.set(prefix, attr.value)
-        currentNamespaces.set(prefix, attr.value)
+    for (const [prefix, uri] of Object.entries(node.ns ?? {})) {
+      currentNamespaces.set(prefix, uri)
+    }
+
+    // Collect only namespace declarations introduced/overridden at this element
+    const nsDeclarations = new Map<string, string>()
+    for (const [prefix, uri] of currentNamespaces.entries()) {
+      if (parentNamespaces.get(prefix) !== uri) {
+        nsDeclarations.set(prefix, uri)
       }
     }
+
+    namespaceStack.push(currentNamespaces)
 
     // Convert attributes
     const attributes: XmlAttribute[] = []
     for (const [, attr] of Object.entries(node.attributes)) {
       // Skip namespace declarations for attribute list
-      if (attr.name === 'xmlns' || attr.name.startsWith('xmlns:')) {
+      if (attr.name === 'xmlns' || attr.prefix === 'xmlns' || attr.name.startsWith('xmlns:')) {
         continue
       }
 
@@ -93,6 +99,7 @@ export function* parseXmlToEvents(xml: string): Generator<XmlValidationEvent> {
     const colonIndex = tagName.indexOf(':')
     const prefix = colonIndex >= 0 ? tagName.slice(0, colonIndex) : ''
     const localName = colonIndex >= 0 ? tagName.slice(colonIndex + 1) : tagName
+    const currentNamespaces = namespaceStack[namespaceStack.length - 1] ?? new Map<string, string>()
     const namespaceUri = currentNamespaces.get(prefix) || ''
 
     events.push({
@@ -106,6 +113,10 @@ export function* parseXmlToEvents(xml: string): Generator<XmlValidationEvent> {
         namespaceDeclarations: new Map(),
       },
     })
+
+    if (namespaceStack.length > 1) {
+      namespaceStack.pop()
+    }
   }
 
   parser.ontext = (text: string) => {
