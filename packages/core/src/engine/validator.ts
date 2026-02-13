@@ -131,7 +131,11 @@ export class ValidationEngine {
     const schemaElement = isWildcardMatch
       ? undefined
       : matchedParticle
-        ? (this.extractElementFromParticle(matchedParticle, namespaceContext) ??
+        ? (this.extractElementFromParticle(
+            matchedParticle,
+            namespaceContext,
+            parentFrame?.schemaNamespaceUri
+          ) ??
           this.registry.resolveElement(element.namespaceUri, element.localName))
         : this.registry.resolveElement(element.namespaceUri, element.localName)
 
@@ -300,7 +304,8 @@ export class ValidationEngine {
 
   private extractElementFromParticle(
     particle: FlattenedParticle,
-    namespaceContext: Map<string, string>
+    namespaceContext: Map<string, string>,
+    fallbackNamespaceUri?: string
   ):
     | {
         typeRef?: TypeReference
@@ -314,7 +319,7 @@ export class ValidationEngine {
       if (p.ref && !p.typeRef && !p.inlineComplexType && !p.inlineSimpleType) {
         let refNs = p.ref.namespacePrefix
           ? resolveNamespaceUri(namespaceContext, p.ref.namespacePrefix)
-          : resolveNamespaceUri(namespaceContext)
+          : fallbackNamespaceUri ?? resolveNamespaceUri(namespaceContext)
         if (!refNs && p.ref.namespacePrefix) {
           refNs = this.registry.resolveSchemaPrefix(p.ref.namespacePrefix) ?? ''
         }

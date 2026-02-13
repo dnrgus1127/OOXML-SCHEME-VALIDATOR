@@ -244,11 +244,19 @@ describe('real chart schema validation', () => {
     engine.endElement(makeEl('chartSpace'))
 
     const result = engine.endDocument()
-    const prstDashErrors = result.errors.filter(
+    const prstDashInvalidContentErrors = result.errors.filter(
       (e) => e.code === 'INVALID_CONTENT' && e.message.includes('prstDash')
     )
+    const prstDashUnknownTypeErrors = result.errors.filter(
+      (e) => e.code === 'UNKNOWN_TYPE' && e.path.includes('/prstDash')
+    )
+    const prstDashInvalidElementErrors = result.errors.filter(
+      (e) => e.code === 'INVALID_ELEMENT' && e.path.includes('/prstDash')
+    )
 
-    expect(prstDashErrors).toHaveLength(0)
+    expect(prstDashInvalidContentErrors).toHaveLength(0)
+    expect(prstDashUnknownTypeErrors).toHaveLength(0)
+    expect(prstDashInvalidElementErrors).toHaveLength(0)
   })
 
   it('should correctly resolve CT_PlotArea compositor with nested choices', () => {

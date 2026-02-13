@@ -7,7 +7,6 @@ import type {
 } from '../types'
 import { hasComplexContent, isSimpleType } from '../types'
 import type { XmlAttribute, ElementStackFrame } from '../runtime'
-import { resolveNamespaceUri } from '../runtime'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
 import { resolveTypeReference } from './type-resolver'
@@ -43,13 +42,12 @@ function collectAllAttributes(
       const baseKey = `${derivation.base.namespacePrefix ?? ''}:${derivation.base.name}`
       if (!seen.has(baseKey)) {
         seen.add(baseKey)
-        const baseNs = resolveNamespaceWithFallback(
+        const resolvedBaseNs = resolveNamespaceWithFallback(
           namespaceContext,
           derivation.base.namespacePrefix,
-          registry
+          registry,
+          fallbackNamespaceUri
         )
-        const resolvedBaseNs =
-          baseNs || (!derivation.base.namespacePrefix ? fallbackNamespaceUri : '')
         const baseType = registry.resolveType(resolvedBaseNs, derivation.base.name)
         if (baseType && baseType.kind === 'complexType') {
           const baseAttrs = collectAllAttributes(
@@ -142,9 +140,12 @@ export function validateAttributes(
 
   for (const group of collected.attributeGroups) {
     if (group.ref) {
-      const namespaceUri = group.ref.namespacePrefix
-        ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
-        : resolveNamespaceUri(namespaceContext) || fallbackNamespaceUri
+      const namespaceUri = resolveNamespaceWithFallback(
+        namespaceContext,
+        group.ref.namespacePrefix,
+        registry,
+        fallbackNamespaceUri
+      )
       const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
       if (resolved?.attributes) {
         for (const attr of resolved.attributes) {
@@ -216,9 +217,12 @@ export function checkRequiredAttributes(
 
   for (const group of collected.attributeGroups) {
     if (group.ref) {
-      const namespaceUri = group.ref.namespacePrefix
-        ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
-        : resolveNamespaceUri(namespaceContext) || fallbackNamespaceUri
+      const namespaceUri = resolveNamespaceWithFallback(
+        namespaceContext,
+        group.ref.namespacePrefix,
+        registry,
+        fallbackNamespaceUri
+      )
       const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
       if (resolved?.attributes) {
         for (const attr of resolved.attributes) {
