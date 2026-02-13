@@ -49,12 +49,13 @@ export class ValidationEngine {
   private createResolver(namespaceContext: Map<string, string>, fallbackNamespaceUri?: string) {
     return {
       resolveNamespaceUri: (prefix?: string): string => {
+        if (!prefix) {
+          return fallbackNamespaceUri ?? resolveNamespaceUri(namespaceContext)
+        }
+
         const xmlResult = resolveNamespaceUri(namespaceContext, prefix)
         if (xmlResult) return xmlResult
-        if (prefix) {
-          return this.registry.resolveSchemaPrefix(prefix) ?? ''
-        }
-        return fallbackNamespaceUri ?? ''
+        return this.registry.resolveSchemaPrefix(prefix) ?? ''
       },
     }
   }

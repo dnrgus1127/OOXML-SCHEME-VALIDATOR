@@ -196,6 +196,61 @@ describe('real chart schema validation', () => {
     expect(schemaNotFoundErrors).toHaveLength(0)
   })
 
+  it('should validate nested drawingml elements even when default namespace is chart', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 200,
+      allowWhitespace: true,
+    })
+
+    engine.startDocument()
+
+    engine.startElement({
+      ...makeEl('chartSpace'),
+      namespaceDeclarations: new Map([
+        ['', CHART_NS],
+        ['a', DML_MAIN_NS],
+      ]),
+    })
+
+    engine.startElement(makeEl('chart'))
+    engine.startElement(makeEl('plotArea'))
+    engine.startElement(makeEl('areaChart'))
+    engine.startElement(makeEl('ser'))
+    engine.startElement(makeEl('idx'))
+    engine.endElement(makeEl('idx'))
+    engine.startElement(makeEl('order'))
+    engine.endElement(makeEl('order'))
+
+    engine.startElement(makeEl('spPr'))
+    engine.startElement({ ...makeEl('ln', DML_MAIN_NS), name: 'a:ln' })
+    engine.startElement({
+      ...makeEl('prstDash', DML_MAIN_NS, [{ name: 'val', value: 'solid', localName: 'val' }]),
+      name: 'a:prstDash',
+    })
+    engine.endElement({ ...makeEl('prstDash', DML_MAIN_NS), name: 'a:prstDash' })
+    engine.endElement({ ...makeEl('ln', DML_MAIN_NS), name: 'a:ln' })
+    engine.endElement(makeEl('spPr'))
+
+    engine.endElement(makeEl('ser'))
+    engine.startElement(makeEl('axId'))
+    engine.endElement(makeEl('axId'))
+    engine.startElement(makeEl('axId'))
+    engine.endElement(makeEl('axId'))
+    engine.endElement(makeEl('areaChart'))
+    engine.endElement(makeEl('plotArea'))
+    engine.endElement(makeEl('chart'))
+    engine.endElement(makeEl('chartSpace'))
+
+    const result = engine.endDocument()
+    const prstDashErrors = result.errors.filter(
+      (e) => e.code === 'INVALID_CONTENT' && e.message.includes('prstDash')
+    )
+
+    expect(prstDashErrors).toHaveLength(0)
+  })
+
   it('should correctly resolve CT_PlotArea compositor with nested choices', () => {
     const registry = loadSchemaRegistry('spreadsheet')
 
