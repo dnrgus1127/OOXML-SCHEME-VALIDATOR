@@ -1,9 +1,15 @@
-import { useRef, useEffect, useState } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
+import { EditorToolbox } from './EditorToolbox'
 
 interface XmlEditorProps {
   content: string
   partPath: string
   onChange: (content: string) => void
+}
+
+interface FoldRange {
+  start: number
+  end: number
 }
 
 // Simple XML syntax highlighter (placeholder 방식으로 순서 충돌 방지)
@@ -34,6 +40,54 @@ function highlightXml(xml: string): string {
     .replace(/\x00\/TAG\x01/g, '</span>')
 
   return result
+}
+
+function extractTagName(line: string): string | null {
+  const tagMatch = line.trim().match(/^<\/?([\w:-]+)/)
+  return tagMatch?.[1] ?? null
+}
+
+function getFoldRanges(content: string): FoldRange[] {
+  const lines = content.split('\n')
+  const stack: { lineIndex: number; tagName: string }[] = []
+  const ranges: FoldRange[] = []
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('<') || trimmed.startsWith('<!--') || trimmed.startsWith('<?')) {
+      return
+    }
+
+    if (trimmed.startsWith('</')) {
+      const tagName = extractTagName(trimmed)
+      if (!tagName) return
+
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const candidate = stack[i]
+        if (candidate?.tagName === tagName) {
+          const opening = stack.splice(i, 1)[0]
+          if (!opening) {
+            break
+          }
+          if (index > opening.lineIndex + 1) {
+            ranges.push({ start: opening.lineIndex, end: index })
+          }
+          break
+        }
+      }
+      return
+    }
+
+    if (trimmed.endsWith('/>')) {
+      return
+    }
+
+    const tagName = extractTagName(trimmed)
+    if (!tagName) return
+    stack.push({ lineIndex: index, tagName })
+  })
+
+  return ranges.sort((a, b) => a.start - b.start)
 }
 
 // Format XML with proper indentation
@@ -80,16 +134,18 @@ function formatXml(xml: string): string {
 
 export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const preRef = useRef<HTMLPreElement>(null)
+  const viewerRef = useRef<HTMLDivElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [localContent, setLocalContent] = useState(content)
   const [showHighlighted, setShowHighlighted] = useState(true)
+  const [collapsedLines, setCollapsedLines] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     // Part 변경 시 자동 포맷팅 적용
     const formatted = formatXml(content)
     setLocalContent(formatted)
     onChange(formatted)
+    setCollapsedLines({})
   }, [content, partPath])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -120,9 +176,9 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     const textarea = e.currentTarget
-    if (preRef.current) {
-      preRef.current.scrollTop = textarea.scrollTop
-      preRef.current.scrollLeft = textarea.scrollLeft
+    if (viewerRef.current) {
+      viewerRef.current.scrollTop = textarea.scrollTop
+      viewerRef.current.scrollLeft = textarea.scrollLeft
     }
     if (lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textarea.scrollTop
@@ -134,12 +190,61 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
     const result = formatXml(localContent)
     setLocalContent(result)
     onChange(result)
+    setCollapsedLines({})
   }
 
-  const escapedContent = localContent
+  const foldRanges = useMemo(() => getFoldRanges(localContent), [localContent])
+  const foldRangeMap = useMemo(() => {
+    return foldRanges.reduce(
+      (acc, range) => {
+        acc[range.start] = range
+        return acc
+      },
+      {} as Record<number, FoldRange>
+    )
+  }, [foldRanges])
+
+  const hiddenLines = useMemo(() => {
+    const hidden = new Set<number>()
+    foldRanges.forEach((range) => {
+      if (!collapsedLines[range.start]) return
+      for (let i = range.start + 1; i <= range.end; i++) {
+        hidden.add(i)
+      }
+    })
+    return hidden
+  }, [collapsedLines, foldRanges])
+
+  const handleToggleLine = (lineIndex: number) => {
+    if (!foldRangeMap[lineIndex]) return
+
+    setCollapsedLines((prev) => ({
+      ...prev,
+      [lineIndex]: !prev[lineIndex],
+    }))
+  }
+
+  const handleCollapseAll = () => {
+    setCollapsedLines(
+      foldRanges.reduce(
+        (acc, range) => {
+          acc[range.start] = true
+          return acc
+        },
+        {} as Record<number, boolean>
+      )
+    )
+  }
+
+  const handleExpandAll = () => {
+    setCollapsedLines({})
+  }
+
+  const escapedLines = localContent
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .split('\n')
 
   return (
     <div className="xml-editor">
@@ -155,7 +260,7 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
         </div>
       </div>
 
-      <div className="editor-body">
+      <div className="editor-body with-toolbox">
         <div className="line-numbers" ref={lineNumbersRef}>
           {localContent.split('\n').map((_, i) => (
             <div key={i} className="line-number">
@@ -165,12 +270,42 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
         </div>
 
         <div className="editor-content">
+          <EditorToolbox
+            className="editor-toolbox-overlay"
+            title="XML 뷰어 도구"
+            actions={[
+              { label: '전체 접기', onClick: handleCollapseAll, disabled: foldRanges.length === 0 },
+              { label: '전체 펼치기', onClick: handleExpandAll, disabled: foldRanges.length === 0 },
+            ]}
+          />
+
           {showHighlighted ? (
-            <pre
-              ref={preRef}
-              className="highlighted"
-              dangerouslySetInnerHTML={{ __html: highlightXml(escapedContent) }}
-            />
+            <div className="highlighted highlighted-xml-viewer" ref={viewerRef}>
+              {escapedLines.map((line, index) => {
+                if (hiddenLines.has(index)) {
+                  return null
+                }
+
+                const foldRange = foldRangeMap[index]
+                const isCollapsed = collapsedLines[index]
+                const contentToShow = isCollapsed
+                  ? `${line} ... (${foldRange ? foldRange.end - foldRange.start : 0} lines)`
+                  : line
+
+                return (
+                  <div key={index} className="highlighted-line">
+                    <button
+                      className="fold-toggle"
+                      onClick={() => handleToggleLine(index)}
+                      disabled={!foldRange}
+                    >
+                      {foldRange ? (isCollapsed ? '▶' : '▼') : '·'}
+                    </button>
+                    <span dangerouslySetInnerHTML={{ __html: highlightXml(contentToShow) }} />
+                  </div>
+                )
+              })}
+            </div>
           ) : null}
 
           <textarea
@@ -181,6 +316,7 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
             onScroll={handleScroll}
             className={showHighlighted ? 'transparent' : ''}
             spellCheck={false}
+            readOnly={showHighlighted}
           />
         </div>
       </div>

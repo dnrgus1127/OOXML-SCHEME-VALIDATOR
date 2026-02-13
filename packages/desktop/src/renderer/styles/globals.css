@@ -21,7 +21,9 @@
   --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
 }
@@ -50,7 +52,8 @@ body {
   -webkit-app-region: drag;
 }
 
-.toolbar-left, .toolbar-right {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -247,7 +250,8 @@ body {
   overflow: hidden;
 }
 
-.loading, .placeholder {
+.loading,
+.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -297,10 +301,44 @@ body {
   background: var(--bg-hover);
 }
 
+.editor-toolbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.toolbox-title {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.toolbox-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.editor-toolbox-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+}
+
+.editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .editor-body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .line-numbers {
@@ -310,6 +348,15 @@ body {
   text-align: right;
   user-select: none;
   overflow: hidden;
+}
+
+.editor-body.with-toolbox .line-numbers {
+  padding-top: 44px;
+}
+
+.editor-body.with-toolbox .editor-content textarea,
+.editor-body.with-toolbox .highlighted-xml-viewer {
+  padding-top: 44px;
 }
 
 .line-number {
@@ -325,8 +372,7 @@ body {
   overflow: hidden;
 }
 
-.editor-content textarea,
-.editor-content pre {
+.editor-content textarea {
   position: absolute;
   top: 0;
   left: 0;
@@ -354,11 +400,37 @@ body {
   color: transparent;
 }
 
-.editor-content pre {
-  pointer-events: none;
+.highlighted-xml-viewer {
+  position: absolute;
+  inset: 0;
+  padding: 8px;
   margin: 0;
   background: var(--bg-primary);
-  overflow: hidden;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: auto;
+}
+
+.highlighted-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: pre;
+}
+
+.fold-toggle {
+  width: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.fold-toggle:disabled {
+  cursor: default;
 }
 
 /* Scrollbar styling */
@@ -381,10 +453,18 @@ body {
   background: #808080;
 }
 
-.highlighted .tag { color: #569cd6; }
-.highlighted .attr { color: #9cdcfe; }
-.highlighted .value { color: #ce9178; }
-.highlighted .comment { color: #6a9955; }
+.highlighted .tag {
+  color: #569cd6;
+}
+.highlighted .attr {
+  color: #9cdcfe;
+}
+.highlighted .value {
+  color: #ce9178;
+}
+.highlighted .comment {
+  color: #6a9955;
+}
 
 /* Validation Panel */
 .validation-panel {
@@ -447,8 +527,12 @@ body {
   font-size: 16px;
 }
 
-.validation-summary.valid .status-icon { color: var(--success); }
-.validation-summary.invalid .status-icon { color: var(--error); }
+.validation-summary.valid .status-icon {
+  color: var(--success);
+}
+.validation-summary.invalid .status-icon {
+  color: var(--error);
+}
 
 .status-text {
   flex: 1;
@@ -487,8 +571,12 @@ body {
   flex-shrink: 0;
 }
 
-.validation-item.valid .item-icon { color: var(--success); }
-.validation-item.invalid .item-icon { color: var(--error); }
+.validation-item.valid .item-icon {
+  color: var(--success);
+}
+.validation-item.invalid .item-icon {
+  color: var(--error);
+}
 
 .item-path {
   font-family: var(--font-mono);
@@ -521,8 +609,12 @@ body {
   background: var(--bg-hover);
 }
 
-.validation-item-container.valid .item-icon { color: var(--success); }
-.validation-item-container.invalid .item-icon { color: var(--error); }
+.validation-item-container.valid .item-icon {
+  color: var(--success);
+}
+.validation-item-container.invalid .item-icon {
+  color: var(--error);
+}
 
 .item-error-count {
   font-size: 11px;
