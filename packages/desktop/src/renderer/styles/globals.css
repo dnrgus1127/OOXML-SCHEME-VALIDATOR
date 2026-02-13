@@ -340,19 +340,6 @@ body {
   font-size: 12px;
 }
 
-.highlighted .tag {
-  color: #569cd6;
-}
-.highlighted .attr {
-  color: #9cdcfe;
-}
-.highlighted .value {
-  color: #ce9178;
-}
-.highlighted .comment {
-  color: #6a9955;
-}
-
 /* Validation Panel */
 .validation-panel {
   width: 300px;

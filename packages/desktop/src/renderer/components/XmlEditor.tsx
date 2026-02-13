@@ -50,7 +50,6 @@ function formatXml(xml: string): string {
 
 export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
-  const monacoRef = useRef<any>(null)
   const editorRef = useRef<any>(null)
 
   const [localContent, setLocalContent] = useState(content)
@@ -67,13 +66,13 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
         const monaco = await import('monaco-editor')
         if (disposed || !editorContainerRef.current) return
 
-        monacoRef.current = monaco
         editorRef.current = monaco.editor.create(editorContainerRef.current, {
           value: localContent,
           language: 'xml',
           theme: 'vs-dark',
           automaticLayout: true,
           minimap: { enabled: false },
+          // Monaco 기본 gutter/folding 사용 (라인 번호/접기 영역 자동 동기화)
           folding: true,
           showFoldingControls: 'mouseover',
           scrollBeyondLastLine: false,
