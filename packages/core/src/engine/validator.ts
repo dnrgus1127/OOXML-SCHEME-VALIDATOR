@@ -46,7 +46,7 @@ export class ValidationEngine {
     this.errorHandler = createErrorHandler(this.context)
   }
 
-  private createResolver(namespaceContext: Map<string, string>) {
+  private createResolver(namespaceContext: Map<string, string>, fallbackNamespaceUri?: string) {
     return {
       resolveNamespaceUri: (prefix?: string): string => {
         const xmlResult = resolveNamespaceUri(namespaceContext, prefix)
@@ -54,9 +54,26 @@ export class ValidationEngine {
         if (prefix) {
           return this.registry.resolveSchemaPrefix(prefix) ?? ''
         }
-        return ''
+        return fallbackNamespaceUri ?? ''
       },
     }
+  }
+
+  private resolveSchemaTypeNamespace(schemaType: XsdComplexType | XsdSimpleType | null): string {
+    if (!schemaType || !schemaType.name) {
+      return ''
+    }
+
+    for (const [namespaceUri, schema] of this.registry.schemas.entries()) {
+      if (schema.complexTypes.get(schemaType.name) === schemaType) {
+        return namespaceUri
+      }
+      if (schema.simpleTypes.get(schemaType.name) === schemaType) {
+        return namespaceUri
+      }
+    }
+
+    return ''
   }
 
   startDocument(): void {
@@ -78,7 +95,7 @@ export class ValidationEngine {
 
     let matchedParticle: FlattenedParticle | undefined
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1]
-    const resolver = this.createResolver(namespaceContext)
+    const resolver = this.createResolver(namespaceContext, parentFrame?.schemaNamespaceUri)
 
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
@@ -108,35 +125,49 @@ export class ValidationEngine {
       matchedParticle = result.matchedParticle
     }
 
-    const schemaElement = matchedParticle
-      ? (this.extractElementFromParticle(matchedParticle, namespaceContext) ??
-        this.registry.resolveElement(element.namespaceUri, element.localName))
-      : this.registry.resolveElement(element.namespaceUri, element.localName)
+    const isWildcardMatch = Boolean(matchedParticle && isAny(matchedParticle.particle))
 
-    const schemaType = resolveSchemaElementType(
-      schemaElement,
-      namespaceContext,
-      element,
-      this.registry,
-      this.errorHandler.pushError.bind(this.errorHandler)
-    )
+    const schemaElement = isWildcardMatch
+      ? undefined
+      : matchedParticle
+        ? (this.extractElementFromParticle(matchedParticle, namespaceContext) ??
+          this.registry.resolveElement(element.namespaceUri, element.localName))
+        : this.registry.resolveElement(element.namespaceUri, element.localName)
+
+    const schemaType = isWildcardMatch
+      ? null
+      : resolveSchemaElementType(
+          schemaElement,
+          namespaceContext,
+          element,
+          this.registry,
+          this.errorHandler.pushError.bind(this.errorHandler)
+        )
 
     const validatedAttributes = isComplexSchemaType(schemaType)
       ? validateAttributes(
           element.attributes,
           schemaType,
+          this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri,
           namespaceContext,
           this.registry,
           this.errorHandler
         )
       : new Set<string>()
 
+    const schemaNamespaceUri = this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri
+
     const frame: ElementStackFrame = {
       elementName: element.localName,
       namespaceUri: element.namespaceUri,
+      schemaNamespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
-        ? initCompositorState(schemaType, this.registry, resolver)
+        ? initCompositorState(
+            schemaType,
+            this.registry,
+            this.createResolver(namespaceContext, schemaNamespaceUri)
+          )
         : null,
       textContent: '',
       validatedAttributes,
@@ -166,7 +197,7 @@ export class ValidationEngine {
       const missing = checkMissingRequiredElements(
         currentFrame.compositorState,
         this.registry,
-        this.createResolver(endNsContext)
+        this.createResolver(endNsContext, currentFrame.schemaNamespaceUri)
       )
 
       for (const missingElement of missing) {
@@ -183,6 +214,7 @@ export class ValidationEngine {
       checkRequiredAttributes(
         currentFrame.schemaType,
         currentFrame,
+        currentFrame.schemaNamespaceUri,
         namespaceContext,
         this.registry,
         this.errorHandler
@@ -235,7 +267,8 @@ export class ValidationEngine {
         schemaType,
         nsCtx,
         this.registry,
-        this.errorHandler
+        this.errorHandler,
+        frame.schemaNamespaceUri
       )
       return
     }
@@ -247,7 +280,8 @@ export class ValidationEngine {
         baseType,
         nsCtx,
         this.registry,
-        this.errorHandler
+        this.errorHandler,
+        frame.schemaNamespaceUri
       )
       return
     }

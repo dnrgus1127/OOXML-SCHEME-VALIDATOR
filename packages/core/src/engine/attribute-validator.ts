@@ -18,6 +18,7 @@ function collectAllAttributes(
   schemaType: XsdComplexType,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
+  fallbackNamespaceUri: string,
   visited?: Set<string>
 ): {
   attributes: XsdAttribute[]
@@ -47,9 +48,17 @@ function collectAllAttributes(
           derivation.base.namespacePrefix,
           registry
         )
-        const baseType = registry.resolveType(baseNs, derivation.base.name)
+        const resolvedBaseNs =
+          baseNs || (!derivation.base.namespacePrefix ? fallbackNamespaceUri : '')
+        const baseType = registry.resolveType(resolvedBaseNs, derivation.base.name)
         if (baseType && baseType.kind === 'complexType') {
-          const baseAttrs = collectAllAttributes(baseType, namespaceContext, registry, seen)
+          const baseAttrs = collectAllAttributes(
+            baseType,
+            namespaceContext,
+            registry,
+            resolvedBaseNs,
+            seen
+          )
           const derivedNames = new Set(attributes.filter((a) => a.name).map((a) => a.name!))
           for (const baseAttr of baseAttrs.attributes) {
             if (baseAttr.name && !derivedNames.has(baseAttr.name)) {
@@ -73,10 +82,18 @@ function validateAttributeValue(
   schemaDef: XsdAttribute,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  fallbackNamespaceUri: string
 ): void {
   if (schemaDef.inlineType) {
-    validateSimpleTypeValue(value, schemaDef.inlineType, namespaceContext, registry, errorHandler)
+    validateSimpleTypeValue(
+      value,
+      schemaDef.inlineType,
+      namespaceContext,
+      registry,
+      errorHandler,
+      fallbackNamespaceUri
+    )
     return
   }
 
@@ -85,10 +102,18 @@ function validateAttributeValue(
       schemaDef.typeRef,
       namespaceContext,
       registry,
-      errorHandler.pushError.bind(errorHandler)
+      errorHandler.pushError.bind(errorHandler),
+      fallbackNamespaceUri
     )
     if (resolved && isSimpleType(resolved)) {
-      validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler)
+      validateSimpleTypeValue(
+        value,
+        resolved,
+        namespaceContext,
+        registry,
+        errorHandler,
+        fallbackNamespaceUri
+      )
     }
   }
 }
@@ -96,11 +121,17 @@ function validateAttributeValue(
 export function validateAttributes(
   attributes: XmlAttribute[],
   schemaType: XsdComplexType,
+  fallbackNamespaceUri: string,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
   errorHandler: ValidationErrorHandler
 ): Set<string> {
-  const collected = collectAllAttributes(schemaType, namespaceContext, registry)
+  const collected = collectAllAttributes(
+    schemaType,
+    namespaceContext,
+    registry,
+    fallbackNamespaceUri
+  )
   const allowedAttributes = new Map<string, XsdAttribute>()
 
   for (const attr of collected.attributes) {
@@ -113,7 +144,7 @@ export function validateAttributes(
     if (group.ref) {
       const namespaceUri = group.ref.namespacePrefix
         ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
-        : resolveNamespaceUri(namespaceContext)
+        : resolveNamespaceUri(namespaceContext) || fallbackNamespaceUri
       const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
       if (resolved?.attributes) {
         for (const attr of resolved.attributes) {
@@ -142,7 +173,14 @@ export function validateAttributes(
       continue
     }
 
-    validateAttributeValue(xmlAttr.value, schemaDef, namespaceContext, registry, errorHandler)
+    validateAttributeValue(
+      xmlAttr.value,
+      schemaDef,
+      namespaceContext,
+      registry,
+      errorHandler,
+      fallbackNamespaceUri
+    )
     validated.add(attrName)
   }
 
@@ -158,11 +196,17 @@ export function validateAttributes(
 export function checkRequiredAttributes(
   schemaType: XsdComplexType,
   frame: ElementStackFrame,
+  fallbackNamespaceUri: string,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
   errorHandler: ValidationErrorHandler
 ): void {
-  const collected = collectAllAttributes(schemaType, namespaceContext, registry)
+  const collected = collectAllAttributes(
+    schemaType,
+    namespaceContext,
+    registry,
+    fallbackNamespaceUri
+  )
 
   for (const attr of collected.attributes) {
     if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
@@ -174,7 +218,7 @@ export function checkRequiredAttributes(
     if (group.ref) {
       const namespaceUri = group.ref.namespacePrefix
         ? resolveNamespaceUri(namespaceContext, group.ref.namespacePrefix)
-        : resolveNamespaceUri(namespaceContext)
+        : resolveNamespaceUri(namespaceContext) || fallbackNamespaceUri
       const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
       if (resolved?.attributes) {
         for (const attr of resolved.attributes) {

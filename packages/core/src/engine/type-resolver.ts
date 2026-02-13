@@ -31,7 +31,13 @@ export function resolveSchemaElementType(
   }
 
   if (schemaElement.typeRef) {
-    return resolveTypeReference(schemaElement.typeRef, namespaceContext, registry, onError)
+    return resolveTypeReference(
+      schemaElement.typeRef,
+      namespaceContext,
+      registry,
+      onError,
+      element.namespaceUri
+    )
   }
 
   return null
@@ -41,7 +47,8 @@ export function resolveTypeReference(
   ref: TypeReference,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  onError: ErrorCallback
+  onError: ErrorCallback,
+  fallbackNamespaceUri?: string
 ): XsdComplexType | XsdSimpleType | null {
   if (ref.isBuiltin) {
     return {
@@ -56,7 +63,8 @@ export function resolveTypeReference(
   }
 
   const namespaceUri = resolveNamespaceWithFallback(namespaceContext, ref.namespacePrefix, registry)
-  const type = registry.resolveType(namespaceUri, ref.name)
+  const resolvedNamespaceUri = namespaceUri || (!ref.namespacePrefix ? fallbackNamespaceUri ?? '' : '')
+  const type = registry.resolveType(resolvedNamespaceUri, ref.name)
   if (!type) {
     onError('UNKNOWN_TYPE', formatMessage('TYPE.TYPE_NOT_FOUND', ref.name))
   }
