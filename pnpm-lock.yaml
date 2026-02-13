@@ -148,6 +148,25 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.30)
 
+  tools/validate-xml:
+    dependencies:
+      '@ooxml/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ooxml/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.30
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   tools/xsd-converter:
     dependencies:
       fast-xml-parser:
