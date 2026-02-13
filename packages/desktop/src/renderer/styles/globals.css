@@ -21,7 +21,9 @@
   --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
 }
@@ -50,7 +52,8 @@ body {
   -webkit-app-region: drag;
 }
 
-.toolbar-left, .toolbar-right {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -247,7 +250,8 @@ body {
   overflow: hidden;
 }
 
-.loading, .placeholder {
+.loading,
+.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -297,26 +301,16 @@ body {
   background: var(--bg-hover);
 }
 
+.editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .editor-body {
   display: flex;
   flex: 1;
   overflow: hidden;
-}
-
-.line-numbers {
-  padding: 8px 12px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
-  text-align: right;
-  user-select: none;
-  overflow: hidden;
-}
-
-.line-number {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-muted);
+  position: relative;
 }
 
 .editor-content {
@@ -325,66 +319,26 @@ body {
   overflow: hidden;
 }
 
-.editor-content textarea,
-.editor-content pre {
+.monaco-editor-host {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  padding: 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: pre;
-  overflow-wrap: normal;
+  inset: 0;
 }
 
-.editor-content textarea {
-  background: transparent;
-  border: none;
-  resize: none;
-  outline: none;
-  color: var(--text-primary);
-  caret-color: white;
-  overflow: auto;
-}
-
-.editor-content textarea.transparent {
-  color: transparent;
-}
-
-.editor-content pre {
-  pointer-events: none;
-  margin: 0;
+.editor-body.monaco-mode .editor-content {
   background: var(--bg-primary);
-  overflow: hidden;
 }
 
-/* Scrollbar styling */
-.editor-content textarea::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-.editor-content textarea::-webkit-scrollbar-track {
+.editor-fallback-message {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
   background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
 }
-
-.editor-content textarea::-webkit-scrollbar-thumb {
-  background: #606060;
-  border-radius: 6px;
-  border: 3px solid var(--bg-secondary);
-}
-
-.editor-content textarea::-webkit-scrollbar-thumb:hover {
-  background: #808080;
-}
-
-.highlighted .tag { color: #569cd6; }
-.highlighted .attr { color: #9cdcfe; }
-.highlighted .value { color: #ce9178; }
-.highlighted .comment { color: #6a9955; }
 
 /* Validation Panel */
 .validation-panel {
@@ -447,8 +401,12 @@ body {
   font-size: 16px;
 }
 
-.validation-summary.valid .status-icon { color: var(--success); }
-.validation-summary.invalid .status-icon { color: var(--error); }
+.validation-summary.valid .status-icon {
+  color: var(--success);
+}
+.validation-summary.invalid .status-icon {
+  color: var(--error);
+}
 
 .status-text {
   flex: 1;
@@ -487,8 +445,12 @@ body {
   flex-shrink: 0;
 }
 
-.validation-item.valid .item-icon { color: var(--success); }
-.validation-item.invalid .item-icon { color: var(--error); }
+.validation-item.valid .item-icon {
+  color: var(--success);
+}
+.validation-item.invalid .item-icon {
+  color: var(--error);
+}
 
 .item-path {
   font-family: var(--font-mono);
@@ -521,8 +483,12 @@ body {
   background: var(--bg-hover);
 }
 
-.validation-item-container.valid .item-icon { color: var(--success); }
-.validation-item-container.invalid .item-icon { color: var(--error); }
+.validation-item-container.valid .item-icon {
+  color: var(--success);
+}
+.validation-item-container.invalid .item-icon {
+  color: var(--error);
+}
 
 .item-error-count {
   font-size: 11px;
