@@ -301,34 +301,6 @@ body {
   background: var(--bg-hover);
 }
 
-.editor-toolbox {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-}
-
-.toolbox-title {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.toolbox-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.editor-toolbox-overlay {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 3;
-}
-
 .editor-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -350,7 +322,6 @@ body {
 .monaco-editor-host {
   position: absolute;
   inset: 0;
-  padding-top: 44px;
 }
 
 .editor-body.monaco-mode .editor-content {

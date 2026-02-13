@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { EditorToolbox } from './EditorToolbox'
 
 interface XmlEditorProps {
   content: string
@@ -138,6 +137,12 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
       <div className="editor-header">
         <span className="part-path">{partPath}</span>
         <div className="editor-actions">
+          <button onClick={handleCollapseAll} className="editor-btn" disabled={!isMonacoReady}>
+            전체 접기
+          </button>
+          <button onClick={handleExpandAll} className="editor-btn" disabled={!isMonacoReady}>
+            전체 펼치기
+          </button>
           <button
             onClick={handleFormat}
             className="editor-btn"
@@ -150,23 +155,6 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
 
       <div className="editor-body monaco-mode">
         <div className="editor-content">
-          <EditorToolbox
-            className="editor-toolbox-overlay"
-            title="XML 뷰어 도구"
-            actions={[
-              {
-                label: '전체 접기',
-                onClick: handleCollapseAll,
-                disabled: !isMonacoReady,
-              },
-              {
-                label: '전체 펼치기',
-                onClick: handleExpandAll,
-                disabled: !isMonacoReady,
-              },
-            ]}
-          />
-
           <div ref={editorContainerRef} className="monaco-editor-host" />
 
           {monacoLoadError ? (
