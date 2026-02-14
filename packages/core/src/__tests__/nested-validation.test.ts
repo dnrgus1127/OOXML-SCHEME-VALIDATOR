@@ -431,6 +431,53 @@ describe('complexContent validation', () => {
     expect(elementErrors).toHaveLength(0)
     expect(result.valid).toBe(true)
   })
+
+  it('should not report missing sequence when nested sequence has no particles', () => {
+    const rootType: XsdComplexType = {
+      kind: 'complexType',
+      name: 'CT_EmptyNested',
+      content: {
+        kind: 'elementOnly',
+        compositor: {
+          kind: 'sequence',
+          particles: [
+            {
+              kind: 'sequence',
+              particles: [],
+              occurs: { minOccurs: 1, maxOccurs: 1 },
+            },
+          ],
+          occurs: { minOccurs: 1, maxOccurs: 1 },
+        },
+      },
+      attributes: [],
+      attributeGroups: [],
+    }
+
+    const rootElement: XsdElement = {
+      kind: 'element',
+      name: 'root',
+      typeRef: { name: 'CT_EmptyNested', isBuiltin: false },
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+
+    const schema = createSchemaWithTypes(
+      new Map([['CT_EmptyNested', rootType]]),
+      new Map([['root', rootElement]])
+    )
+
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry)
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+    engine.endElement(makeElement('root', TEST_NS))
+    const result = engine.endDocument()
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.valid).toBe(true)
+  })
 })
 
 describe('nested compositor validation', () => {
