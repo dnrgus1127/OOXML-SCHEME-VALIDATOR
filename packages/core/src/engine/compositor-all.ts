@@ -1,6 +1,10 @@
 import type { SchemaRegistry } from '../types'
 import { CompositorState, makeQualifiedName } from '../runtime'
-import type { NamespaceResolver, CompositorValidationResult } from './compositor-types'
+import type {
+  NamespaceResolver,
+  CompositorValidationResult,
+  OccurrenceViolation,
+} from './compositor-types'
 import { particleDescription } from './compositor-utils'
 
 /**
@@ -37,7 +41,19 @@ export function validateAllChild(
   }
 
   if (state.appearedElements.has(qualifiedName)) {
-    return { success: false, errorCode: 'TOO_MANY_ELEMENTS' }
+    const actualCount = (state.occurrenceCounts.get(particle.index) ?? 0) + 1
+    return {
+      success: false,
+      errorCode: 'TOO_MANY_ELEMENTS',
+      matchedParticle: particle,
+      occurrenceViolation: {
+        elementName: particleDescription(particle),
+        minOccurs: particle.minOccurs,
+        maxOccurs: particle.maxOccurs,
+        actualCount,
+        kind: 'tooMany',
+      },
+    }
   }
 
   state.appearedElements.add(qualifiedName)
@@ -45,7 +61,18 @@ export function validateAllChild(
   state.occurrenceCounts.set(particle.index, count)
 
   if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
-    return { success: false, errorCode: 'TOO_MANY_ELEMENTS' }
+    return {
+      success: false,
+      errorCode: 'TOO_MANY_ELEMENTS',
+      matchedParticle: particle,
+      occurrenceViolation: {
+        elementName: particleDescription(particle),
+        minOccurs: particle.minOccurs,
+        maxOccurs: particle.maxOccurs,
+        actualCount: count,
+        kind: 'tooMany',
+      },
+    }
   }
 
   const nestedState = state.nestedStates.get(particle.index)
@@ -68,20 +95,41 @@ export function validateAllChild(
  * @param state - 검사할 compositor 상태
  * @param registry - 스키마 레지스트리
  * @param resolver - 네임스페이스 URI 변환기
- * @param checkMissingRequiredElements - 재귀 호출 함수 (순환 의존성 방지)
+ * @param _checkMissingRequiredElementsRecursive - 재귀 호출 함수 (순환 의존성 방지)
  * @returns 누락된 필수 요소들의 설명 배열
  */
 export function checkMissingRequiredElements(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-  checkMissingRequiredElementsRecursive: (
+  _checkMissingRequiredElementsRecursive: (
     state: CompositorState,
     registry: SchemaRegistry,
     resolver: NamespaceResolver
   ) => string[]
 ): string[] {
-  const missing: string[] = []
+  return checkMissingRequiredElementDetails(
+    state,
+    registry,
+    resolver,
+    checkMissingRequiredElementDetails
+  ).map((detail) => detail.elementName)
+}
+
+/**
+ * Compositor 상태에서 필수 요소 occurrence(minOccurs)가 부족한 상세 정보를 반환합니다.
+ */
+export function checkMissingRequiredElementDetails(
+  state: CompositorState,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver,
+  checkMissingRequiredElementDetailsRecursive: (
+    state: CompositorState,
+    registry: SchemaRegistry,
+    resolver: NamespaceResolver
+  ) => OccurrenceViolation[]
+): OccurrenceViolation[] {
+  const missing: OccurrenceViolation[] = []
 
   if (state.kind === 'choice') {
     if (state.selectedBranch === null) {
@@ -92,12 +140,20 @@ export function checkMissingRequiredElements(
     if (particle) {
       const count = state.occurrenceCounts.get(particle.index) ?? 0
       if (count < particle.minOccurs) {
-        missing.push(particleDescription(particle))
+        missing.push({
+          elementName: particleDescription(particle),
+          minOccurs: particle.minOccurs,
+          maxOccurs: particle.maxOccurs,
+          actualCount: count,
+          kind: 'tooFew',
+        })
       }
 
       const nestedState = state.nestedStates.get(particle.index)
       if (nestedState) {
-        missing.push(...checkMissingRequiredElementsRecursive(nestedState, registry, resolver))
+        missing.push(
+          ...checkMissingRequiredElementDetailsRecursive(nestedState, registry, resolver)
+        )
       }
     }
 
@@ -107,13 +163,19 @@ export function checkMissingRequiredElements(
   for (const particle of state.flattenedParticles) {
     const count = state.occurrenceCounts.get(particle.index) ?? 0
     if (count < particle.minOccurs) {
-      missing.push(particleDescription(particle))
+      missing.push({
+        elementName: particleDescription(particle),
+        minOccurs: particle.minOccurs,
+        maxOccurs: particle.maxOccurs,
+        actualCount: count,
+        kind: 'tooFew',
+      })
       continue
     }
 
     const nestedState = state.nestedStates.get(particle.index)
     if (nestedState) {
-      missing.push(...checkMissingRequiredElementsRecursive(nestedState, registry, resolver))
+      missing.push(...checkMissingRequiredElementDetailsRecursive(nestedState, registry, resolver))
     }
   }
 

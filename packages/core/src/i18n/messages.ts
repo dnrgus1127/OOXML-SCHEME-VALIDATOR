@@ -32,6 +32,18 @@ export const ERROR_MESSAGES: MessageMap = {
     en: (element: string) => `Invalid element: ${element}`,
     ko: (element: string) => `허용되지 않는 요소: ${element}`,
   },
+  'ELEMENT.COUNT_EXCEEDED': {
+    en: (element: string, allowed: number, diff: number, actual: number) =>
+      `Element '${element}' count exceeds allowed ${allowed} by ${diff}. (actual ${actual})`,
+    ko: (element: string, allowed: number, diff: number, actual: number) =>
+      `'${element}' 요소의 개수가 스키마에서 허용되는 개수인 ${allowed}개보다 ${diff}개 많습니다. (실제 ${actual}개)`,
+  },
+  'ELEMENT.COUNT_SHORTAGE': {
+    en: (element: string, required: number, diff: number, actual: number) =>
+      `Element '${element}' count is short of required ${required} by ${diff}. (actual ${actual})`,
+    ko: (element: string, required: number, diff: number, actual: number) =>
+      `'${element}' 요소의 개수가 스키마에서 허용되는 개수인 ${required}개보다 ${diff}개 적습니다. (실제 ${actual}개)`,
+  },
   'ELEMENT.UNEXPECTED_TEXT.ELEMENT_ONLY': {
     en: () => 'Text content is not allowed in element-only content',
     ko: () => 'element-only 컨텐츠에서 텍스트가 발견되었습니다',

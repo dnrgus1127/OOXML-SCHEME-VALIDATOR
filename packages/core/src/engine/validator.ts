@@ -18,10 +18,11 @@ import {
   FlattenedParticle,
 } from '../runtime'
 import {
-  checkMissingRequiredElements,
+  checkMissingRequiredElementDetails,
   initCompositorState,
   validateCompositorChild,
 } from './compositor'
+import type { OccurrenceViolation } from './compositor-types'
 import { createErrorHandler, ValidationErrorHandler } from './error-handlers'
 import { resolveSchemaElementType } from './type-resolver'
 import { validateSimpleTypeValue, validateBuiltinOrReferencedType } from './simple-type-validator'
@@ -98,6 +99,8 @@ export class ValidationEngine {
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1]
     const resolver = this.createResolver(namespaceContext, parentFrame?.schemaNamespaceUri)
 
+    let shouldResolveSchema = true
+
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
         element.namespaceUri,
@@ -107,7 +110,14 @@ export class ValidationEngine {
         resolver
       )
 
-      if (result.skippedRequired) {
+      if (result.skippedRequiredDetails?.length) {
+        for (const missingDetail of result.skippedRequiredDetails) {
+          this.errorHandler.pushError(
+            'MISSING_REQUIRED_ELEMENT',
+            this.formatOccurrenceViolationMessage(missingDetail)
+          )
+        }
+      } else if (result.skippedRequired) {
         for (const missing of result.skippedRequired) {
           this.errorHandler.pushError(
             'MISSING_REQUIRED_ELEMENT',
@@ -117,18 +127,24 @@ export class ValidationEngine {
       }
 
       if (!result.success) {
+        const message = result.occurrenceViolation
+          ? this.formatOccurrenceViolationMessage(result.occurrenceViolation)
+          : formatMessage('ELEMENT.INVALID', element.name)
         this.errorHandler.pushError(
           result.errorCode ?? 'INVALID_CONTENT',
-          formatMessage('ELEMENT.INVALID', element.name)
+          message
         )
       }
 
       matchedParticle = result.matchedParticle
+      shouldResolveSchema = result.success || Boolean(result.matchedParticle)
     }
 
     const isWildcardMatch = Boolean(matchedParticle && isAny(matchedParticle.particle))
 
-    const schemaElement = isWildcardMatch
+    const schemaElement = !shouldResolveSchema
+      ? undefined
+      : isWildcardMatch
       ? undefined
       : matchedParticle
         ? (this.extractElementFromParticle(
@@ -139,7 +155,7 @@ export class ValidationEngine {
           this.registry.resolveElement(element.namespaceUri, element.localName))
         : this.registry.resolveElement(element.namespaceUri, element.localName)
 
-    const schemaType = isWildcardMatch
+    const schemaType = !shouldResolveSchema || isWildcardMatch
       ? null
       : resolveSchemaElementType(
           schemaElement,
@@ -199,16 +215,16 @@ export class ValidationEngine {
     if (currentFrame.compositorState) {
       const endNsContext =
         this.context.namespaceStack[this.context.namespaceStack.length - 1] ?? new Map()
-      const missing = checkMissingRequiredElements(
+      const missingDetails = checkMissingRequiredElementDetails(
         currentFrame.compositorState,
         this.registry,
         this.createResolver(endNsContext, currentFrame.schemaNamespaceUri)
       )
 
-      for (const missingElement of missing) {
+      for (const missingDetail of missingDetails) {
         this.errorHandler.pushError(
           'MISSING_REQUIRED_ELEMENT',
-          formatMessage('ELEMENT.MISSING_REQUIRED', missingElement)
+          this.formatOccurrenceViolationMessage(missingDetail)
         )
       }
     }
@@ -300,6 +316,30 @@ export class ValidationEngine {
         )
       }
     }
+  }
+
+  private formatOccurrenceViolationMessage(violation: OccurrenceViolation): string {
+    if (violation.kind === 'tooMany') {
+      if (violation.maxOccurs === 'unbounded') {
+        return formatMessage('ELEMENT.INVALID', violation.elementName)
+      }
+
+      return formatMessage(
+        'ELEMENT.COUNT_EXCEEDED',
+        violation.elementName,
+        violation.maxOccurs,
+        violation.actualCount - violation.maxOccurs,
+        violation.actualCount
+      )
+    }
+
+    return formatMessage(
+      'ELEMENT.COUNT_SHORTAGE',
+      violation.elementName,
+      violation.minOccurs,
+      violation.minOccurs - violation.actualCount,
+      violation.actualCount
+    )
   }
 
   private extractElementFromParticle(

@@ -63,6 +63,56 @@ describe('real chart schema validation', () => {
     expect(schemaNotFoundErrors).toHaveLength(0)
   })
 
+  it('should report maxOccurs violation with count-based message for duplicated style', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
+
+    const nsDecl = new Map([['', CHART_NS]])
+
+    engine.startDocument()
+
+    engine.startElement({
+      ...makeEl('chartSpace'),
+      namespaceDeclarations: nsDecl,
+    })
+
+    engine.startElement({
+      ...makeEl('style'),
+      attributes: [{ name: 'val', value: '4', localName: 'val' }],
+    })
+    engine.endElement(makeEl('style'))
+
+    engine.startElement({
+      ...makeEl('style'),
+      attributes: [{ name: 'val', value: '33', localName: 'val' }],
+    })
+    engine.endElement(makeEl('style'))
+
+    engine.startElement(makeEl('chart'))
+    engine.startElement(makeEl('plotArea'))
+    engine.endElement(makeEl('plotArea'))
+    engine.endElement(makeEl('chart'))
+    engine.endElement(makeEl('chartSpace'))
+
+    const result = engine.endDocument()
+
+    const tooManyErrors = result.errors.filter((e) => e.code === 'TOO_MANY_ELEMENTS')
+    expect(tooManyErrors).toHaveLength(1)
+    expect(tooManyErrors[0]!.message).toContain('style')
+    expect(tooManyErrors[0]!.message).toContain('허용되는 개수인 1개보다 1개 많습니다')
+    expect(tooManyErrors[0]!.message).toContain('실제 2개')
+
+    const schemaNotFoundErrors = result.errors.filter((e) =>
+      e.message.includes('스키마에서 요소를 찾을 수 없습니다')
+    )
+    expect(schemaNotFoundErrors).toHaveLength(0)
+  })
+
   it('should resolve unprefixed schema type when XML uses prefixed namespace declarations', () => {
     const registry = loadSchemaRegistry('spreadsheet')
 

@@ -48,6 +48,12 @@ describe('I18n System', () => {
           "필수 요소 'worksheet'가 누락되었습니다",
         )
         expect(formatMessage('ELEMENT.INVALID', 'unknown')).toBe('허용되지 않는 요소: unknown')
+        expect(formatMessage('ELEMENT.COUNT_EXCEEDED', 'style', 1, 1, 2)).toBe(
+          "'style' 요소의 개수가 스키마에서 허용되는 개수인 1개보다 1개 많습니다. (실제 2개)",
+        )
+        expect(formatMessage('ELEMENT.COUNT_SHORTAGE', 'idx', 1, 1, 0)).toBe(
+          "'idx' 요소의 개수가 스키마에서 허용되는 개수인 1개보다 1개 적습니다. (실제 0개)",
+        )
         expect(formatMessage('ELEMENT.UNEXPECTED_TEXT.ELEMENT_ONLY')).toBe(
           'element-only 컨텐츠에서 텍스트가 발견되었습니다',
         )
@@ -118,6 +124,12 @@ describe('I18n System', () => {
           "Required element 'worksheet' is missing",
         )
         expect(formatMessage('ELEMENT.INVALID', 'unknown')).toBe('Invalid element: unknown')
+        expect(formatMessage('ELEMENT.COUNT_EXCEEDED', 'style', 1, 1, 2)).toBe(
+          "Element 'style' count exceeds allowed 1 by 1. (actual 2)",
+        )
+        expect(formatMessage('ELEMENT.COUNT_SHORTAGE', 'idx', 1, 1, 0)).toBe(
+          "Element 'idx' count is short of required 1 by 1. (actual 0)",
+        )
         expect(formatMessage('ELEMENT.UNEXPECTED_TEXT.ELEMENT_ONLY')).toBe(
           'Text content is not allowed in element-only content',
         )
@@ -212,6 +224,10 @@ describe('I18n System', () => {
       // Single string parameter
       const msg2: string = formatMessage('ELEMENT.MISSING_REQUIRED', 'chart')
       expect(msg2).toBeDefined()
+
+      // Mixed parameter types
+      const msg3: string = formatMessage('ELEMENT.COUNT_EXCEEDED', 'style', 1, 1, 2)
+      expect(msg3).toBeDefined()
 
       // Two string parameters would fail at compile time for most message keys
       // This is enforced by TypeScript

@@ -114,7 +114,11 @@ describe('sequence compositor skip-ahead recovery', () => {
   it('should skip ahead and report precise missing required errors', () => {
     const schema = createSerLikeSchema()
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
-    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
 
     const nsDecl = new Map([['', TEST_NS]])
     engine.startDocument()
@@ -134,6 +138,10 @@ describe('sequence compositor skip-ahead recovery', () => {
     expect(missingErrors).toHaveLength(2)
     expect(missingErrors[0]!.message).toContain('idx')
     expect(missingErrors[1]!.message).toContain('order')
+    expect(missingErrors[0]!.message).toContain('허용되는 개수인 1개보다 1개 적습니다')
+    expect(missingErrors[0]!.message).toContain('실제 0개')
+    expect(missingErrors[1]!.message).toContain('허용되는 개수인 1개보다 1개 적습니다')
+    expect(missingErrors[1]!.message).toContain('실제 0개')
 
     // No "허용되지 않는 요소" errors for tx, cat, val
     const invalidErrors = result.errors.filter((e) => e.message.includes('허용되지 않는 요소'))
@@ -165,7 +173,11 @@ describe('sequence compositor skip-ahead recovery', () => {
   it('should still fail for truly invalid elements', () => {
     const schema = createSerLikeSchema()
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
-    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
 
     const nsDecl = new Map([['', TEST_NS]])
     engine.startDocument()
@@ -177,9 +189,12 @@ describe('sequence compositor skip-ahead recovery', () => {
     const result = engine.endDocument()
 
     // Should still get MISSING_REQUIRED_ELEMENT for idx (no skip-ahead match)
-    expect(result.errors.length).toBeGreaterThan(0)
-    const hasNotAllowed = result.errors.some((e) => e.message.includes('허용되지 않는 요소'))
-    expect(hasNotAllowed).toBe(true)
+    const missingErrors = result.errors.filter((e) => e.code === 'MISSING_REQUIRED_ELEMENT')
+    expect(missingErrors.length).toBeGreaterThan(0)
+    const hasShortageMessage = missingErrors.some((e) =>
+      e.message.includes('허용되는 개수인 1개보다 1개 적습니다')
+    )
+    expect(hasShortageMessage).toBe(true)
   })
 
   it('should not affect normal sequence validation', () => {
