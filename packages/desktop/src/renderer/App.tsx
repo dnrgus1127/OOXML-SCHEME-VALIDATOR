@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HomeScreen } from './screens/HomeScreen'
 import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
+import { useDocumentStore } from './stores/document'
 
 declare global {
   interface Window {
@@ -44,6 +45,19 @@ type Screen = 'home' | 'xml-editor' | 'batch-validator'
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
+  const setFilePath = useDocumentStore((state) => state.setFilePath)
+  const loadDocument = useDocumentStore((state) => state.loadDocument)
+
+  // Keep the global Open menu path working when app starts on the home screen.
+  useEffect(() => {
+    const cleanup = window.electronAPI.onFileOpened(async (path) => {
+      if (currentScreen !== 'home') return
+      setCurrentScreen('xml-editor')
+      setFilePath(path)
+      await loadDocument(path)
+    })
+    return cleanup
+  }, [currentScreen, setFilePath, loadDocument])
 
   const handleNavigateToHome = () => {
     setCurrentScreen('home')
