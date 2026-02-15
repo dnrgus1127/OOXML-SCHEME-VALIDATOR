@@ -22,9 +22,14 @@ function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardP
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
   onOpenBatchFromHome: () => void | Promise<void>
+  onOpenSettingsFromHome: () => void | Promise<void>
 }
 
-export function HomeScreen({ onOpenXmlFromHome, onOpenBatchFromHome }: HomeScreenProps) {
+export function HomeScreen({
+  onOpenXmlFromHome,
+  onOpenBatchFromHome,
+  onOpenSettingsFromHome,
+}: HomeScreenProps) {
   return (
     <div className="home-screen">
       <div className="home-header">
@@ -47,6 +52,14 @@ export function HomeScreen({ onOpenXmlFromHome, onOpenBatchFromHome }: HomeScree
           description="여러 파일을 한번에 검증하고 결과를 보고서로 내보냅니다"
           actionLabel="Select Files"
           onAction={onOpenBatchFromHome}
+        />
+
+        <ToolCard
+          icon="⚙️"
+          title="Settings"
+          description="앱 기본 설정과 툴별 설정을 관리합니다"
+          actionLabel="Open Settings"
+          onAction={onOpenSettingsFromHome}
         />
       </div>
     </div>

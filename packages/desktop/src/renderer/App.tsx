@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { HomeScreen } from './screens/HomeScreen'
 import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
+import { SettingsScreen } from './screens/SettingsScreen'
 import { useDocumentStore } from './stores/document'
 
 declare global {
@@ -42,10 +43,12 @@ declare global {
   }
 }
 
-type Screen = 'home' | 'xml-editor' | 'batch-validator'
+type Screen = 'home' | 'xml-editor' | 'batch-validator' | 'settings'
+type ReturnScreen = Exclude<Screen, 'settings'>
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
+  const [settingsReturnScreen, setSettingsReturnScreen] = useState<ReturnScreen>('home')
   const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
@@ -66,6 +69,15 @@ export default function App() {
   const handleNavigateToHome = () => {
     setBatchInitialFilePaths(null)
     setCurrentScreen('home')
+  }
+
+  const openSettings = (returnScreen: ReturnScreen) => {
+    setSettingsReturnScreen(returnScreen)
+    setCurrentScreen('settings')
+  }
+
+  const closeSettings = () => {
+    setCurrentScreen(settingsReturnScreen)
   }
 
   const handleOpenXmlFromHome = async () => {
@@ -90,19 +102,26 @@ export default function App() {
         <HomeScreen
           onOpenXmlFromHome={handleOpenXmlFromHome}
           onOpenBatchFromHome={handleOpenBatchFromHome}
+          onOpenSettingsFromHome={() => openSettings('home')}
         />
       )}
 
       {currentScreen === 'xml-editor' && (
-        <XmlEditorScreen onNavigateHome={handleNavigateToHome} />
+        <XmlEditorScreen
+          onNavigateHome={handleNavigateToHome}
+          onOpenSettings={() => openSettings('xml-editor')}
+        />
       )}
 
       {currentScreen === 'batch-validator' && (
         <BatchValidator
           onClose={handleNavigateToHome}
           initialFilePaths={batchInitialFilePaths}
+          onOpenSettings={() => openSettings('batch-validator')}
         />
       )}
+
+      {currentScreen === 'settings' && <SettingsScreen onClose={closeSettings} />}
     </div>
   )
 }

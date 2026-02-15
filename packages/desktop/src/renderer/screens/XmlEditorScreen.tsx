@@ -7,9 +7,10 @@ import { Toolbar } from '../components/Toolbar'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
+  onOpenSettings: () => void
 }
 
-export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
+export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScreenProps) {
   const {
     filePath,
     documentData,
@@ -152,6 +153,7 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
         onSave={handleSave}
         onSaveAs={handleSaveAs}
         onValidate={handleValidate}
+        onOpenSettings={onOpenSettings}
         hasDocument={!!documentData}
         filePath={filePath}
         isDirty={isDirty}
