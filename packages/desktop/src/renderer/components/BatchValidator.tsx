@@ -33,16 +33,22 @@ interface FileValidationResult {
 interface BatchValidatorProps {
   onClose?: () => void
   initialFilePaths?: string[] | null
+  onRecentRecord?: () => Promise<void> | void
 }
 
-export function BatchValidator({ onClose, initialFilePaths }: BatchValidatorProps) {
+function getFileName(filePath: string): string {
+  const segments = filePath.split(/[\\/]/)
+  return segments[segments.length - 1] || filePath
+}
+
+export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
-  const hasValidatedInitialFiles = useRef(false)
+  const lastInitialFilesKeyRef = useRef<string | null>(null)
 
   // Listen for batch progress updates
   useEffect(() => {
@@ -52,53 +58,78 @@ export function BatchValidator({ onClose, initialFilePaths }: BatchValidatorProp
     return cleanup
   }, [])
 
-  const validateFiles = useCallback(async (filePaths: string[], append: boolean) => {
-    if (isValidating || filePaths.length === 0) return
+  const persistRecentFiles = useCallback(
+    async (fileResults: FileValidationResult[]) => {
+      const succeeded = fileResults.filter((item) => item.success)
+      if (succeeded.length === 0) return
 
-    setErrorMessage(null)
-    setStatusMessage(null)
-    setIsValidating(true)
-    setProgress({ current: 0, total: filePaths.length })
-    if (!append) {
-      setResults([])
-      setExpandedFiles(new Set())
-    }
+      await window.electronAPI.addRecentFiles(
+        succeeded.map((item) => ({
+          filePath: item.filePath,
+          fileName: item.fileName || getFileName(item.filePath),
+          lastTool: 'batch-validator' as const,
+        }))
+      )
+      await onRecentRecord?.()
+    },
+    [onRecentRecord]
+  )
 
-    try {
-      const result = await window.electronAPI.batchValidate(filePaths)
+  const validateFiles = useCallback(
+    async (filePaths: string[], append: boolean): Promise<boolean> => {
+      if (isValidating || filePaths.length === 0) return false
 
-      if (!result.success || !result.data) {
-        setErrorMessage(result.error ?? 'Batch validation failed')
-        return
+      setErrorMessage(null)
+      setStatusMessage(null)
+      setIsValidating(true)
+      setProgress({ current: 0, total: filePaths.length })
+      if (!append) {
+        setResults([])
+        setExpandedFiles(new Set())
       }
 
-      const newResults = result.data as FileValidationResult[]
-      if (append) {
-        setResults((prev) => {
-          const merged = new Map(prev.map((item) => [item.filePath, item]))
-          for (const item of newResults) {
-            merged.set(item.filePath, item)
-          }
-          return Array.from(merged.values())
-        })
-        setExpandedFiles((prev) => {
-          const next = new Set(prev)
-          for (const item of newResults) {
-            next.add(item.filePath)
-          }
-          return next
-        })
-        setStatusMessage(`Added ${newResults.length} file${newResults.length > 1 ? 's' : ''} from menu`)
-      } else {
-        setResults(newResults)
-        setExpandedFiles(new Set(newResults.map((item) => item.filePath)))
+      try {
+        const result = await window.electronAPI.batchValidate(filePaths)
+
+        if (!result.success || !result.data) {
+          setErrorMessage(result.error ?? 'Batch validation failed')
+          return false
+        }
+
+        const newResults = result.data as FileValidationResult[]
+        if (append) {
+          setResults((prev) => {
+            const merged = new Map(prev.map((item) => [item.filePath, item]))
+            for (const item of newResults) {
+              merged.set(item.filePath, item)
+            }
+            return Array.from(merged.values())
+          })
+          setExpandedFiles((prev) => {
+            const next = new Set(prev)
+            for (const item of newResults) {
+              next.add(item.filePath)
+            }
+            return next
+          })
+          setStatusMessage(
+            `Added ${newResults.length} file${newResults.length > 1 ? 's' : ''} from menu`
+          )
+        } else {
+          setResults(newResults)
+          setExpandedFiles(new Set(newResults.map((item) => item.filePath)))
+        }
+        await persistRecentFiles(newResults)
+        return true
+      } catch (error) {
+        setErrorMessage(`Batch validation failed: ${String(error)}`)
+        return false
+      } finally {
+        setIsValidating(false)
       }
-    } catch (error) {
-      setErrorMessage(`Batch validation failed: ${String(error)}`)
-    } finally {
-      setIsValidating(false)
-    }
-  }, [isValidating])
+    },
+    [isValidating, persistRecentFiles]
+  )
 
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (filePath) => {
@@ -108,10 +139,12 @@ export function BatchValidator({ onClose, initialFilePaths }: BatchValidatorProp
   }, [validateFiles])
 
   useEffect(() => {
-    if (hasValidatedInitialFiles.current) return
     if (!initialFilePaths || initialFilePaths.length === 0) return
 
-    hasValidatedInitialFiles.current = true
+    const key = initialFilePaths.join('\u0000')
+    if (lastInitialFilesKeyRef.current === key) return
+    lastInitialFilesKeyRef.current = key
+
     void validateFiles(initialFilePaths, false)
   }, [initialFilePaths, validateFiles])
 
@@ -152,10 +185,7 @@ export function BatchValidator({ onClose, initialFilePaths }: BatchValidatorProp
   const totalFiles = results.length
   const validFiles = results.filter((r) => r.success && r.validation?.valid).length
   const invalidFiles = results.filter((r) => !r.success || !r.validation?.valid).length
-  const totalErrors = results.reduce(
-    (sum, r) => sum + (r.validation?.summary?.totalErrors || 0),
-    0
-  )
+  const totalErrors = results.reduce((sum, r) => sum + (r.validation?.summary?.totalErrors || 0), 0)
 
   return (
     <div className="batch-validator">

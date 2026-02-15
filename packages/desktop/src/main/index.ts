@@ -6,7 +6,7 @@
 
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { basename, join } from 'path'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readFile as readFileAsync } from 'fs/promises'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
@@ -17,6 +17,14 @@ import {
   type SchemaRegistry,
 } from '@ooxml/core'
 import { shouldValidateXmlPart } from './part-validation-filter'
+import {
+  addRecentFile,
+  addRecentFiles,
+  clearRecentFiles,
+  listRecentFiles,
+  removeRecentFile,
+} from './recent-files-store'
+import type { OpenTool } from '../shared/recent-files'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -197,6 +205,58 @@ function setupIpcHandlers(): void {
     } catch (error) {
       return { success: false, error: String(error) }
     }
+  })
+
+  // Check file existence
+  ipcMain.handle('fs:exists', async (_, filePath: string) => {
+    try {
+      return existsSync(filePath)
+    } catch {
+      return false
+    }
+  })
+
+  // Recent files
+  ipcMain.handle('recent-files:list', async () => {
+    return listRecentFiles()
+  })
+
+  const isValidRecentFileInput = (
+    input: unknown
+  ): input is {
+    filePath: string
+    fileName?: string
+    lastTool: OpenTool
+  } => {
+    if (!input || typeof input !== 'object') return false
+    const value = input as { filePath?: unknown; fileName?: unknown; lastTool?: unknown }
+    if (typeof value.filePath !== 'string' || value.filePath.length === 0) return false
+    if (value.fileName != null && typeof value.fileName !== 'string') return false
+    return value.lastTool === 'xml-editor' || value.lastTool === 'batch-validator'
+  }
+
+  ipcMain.handle(
+    'recent-files:add',
+    async (_, input: { filePath: string; fileName?: string; lastTool: OpenTool }) => {
+      if (!isValidRecentFileInput(input)) return listRecentFiles()
+      return addRecentFile(input)
+    }
+  )
+
+  ipcMain.handle('recent-files:add-many', async (_, inputs: unknown[]) => {
+    if (!Array.isArray(inputs) || inputs.length === 0) return listRecentFiles()
+    const validInputs = inputs.filter(isValidRecentFileInput)
+    if (validInputs.length === 0) return listRecentFiles()
+    return addRecentFiles(validInputs)
+  })
+
+  ipcMain.handle('recent-files:remove', async (_, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath) return listRecentFiles()
+    return removeRecentFile(filePath)
+  })
+
+  ipcMain.handle('recent-files:clear', async () => {
+    return clearRecentFiles()
   })
 
   // Parse OOXML document

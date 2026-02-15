@@ -49,7 +49,7 @@ interface DocumentState {
 
   // Actions
   setFilePath: (path: string | null) => void
-  loadDocument: (path: string) => Promise<void>
+  loadDocument: (path: string) => Promise<boolean>
   selectPart: (partPath: string) => Promise<void>
   updatePartContent: (content: string) => void
   saveDocument: (path: string) => Promise<boolean>
@@ -100,11 +100,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         validationResults: null,
         isLoading: false,
       })
+      return true
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
         isLoading: false,
       })
+      return false
     }
   },
 
