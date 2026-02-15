@@ -195,6 +195,37 @@ describe('sequence compositor skip-ahead recovery', () => {
     expect(hasMissingRequiredMessage).toBe(true)
   })
 
+  it('should increase actual occurrence count for repeated maxOccurs violations', () => {
+    const schema = createSerLikeSchema()
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+    engine.startElement(makeElement('idx'))
+    engine.endElement(makeElement('idx'))
+    engine.startElement(makeElement('order'))
+    engine.endElement(makeElement('order'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.endElement(makeElement('root', TEST_NS, [], nsDecl))
+    const result = engine.endDocument()
+
+    const tooManyErrors = result.errors.filter((e) => e.code === 'TOO_MANY_ELEMENTS')
+    expect(tooManyErrors).toHaveLength(2)
+    expect(tooManyErrors[0]!.message).toContain('실제 2개')
+    expect(tooManyErrors[1]!.message).toContain('실제 3개')
+  })
+
   it('should not affect normal sequence validation', () => {
     const schema = createSerLikeSchema()
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))

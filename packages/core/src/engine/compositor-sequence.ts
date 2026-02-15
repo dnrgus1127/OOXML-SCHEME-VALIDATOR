@@ -149,6 +149,7 @@ export function validateSequenceChild(
 
   const createTooManyResult = (particle: FlattenedParticle): CompositorValidationResult => {
     const actualCount = (state.occurrenceCounts.get(particle.index) ?? 0) + 1
+    state.occurrenceCounts.set(particle.index, actualCount)
     return {
       success: false,
       errorCode: 'TOO_MANY_ELEMENTS',
