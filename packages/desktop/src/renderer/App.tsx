@@ -9,6 +9,7 @@ declare global {
     electronAPI: {
       openFile: () => Promise<string | null>
       saveFile: (defaultPath?: string) => Promise<string | null>
+      confirmFileChange: () => Promise<'save' | 'discard' | 'cancel'>
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       writeFile: (filePath: string, data: string) => Promise<{ success: boolean; error?: string }>
       parseDocument: (
@@ -45,6 +46,7 @@ type Screen = 'home' | 'xml-editor' | 'batch-validator'
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
+  const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
   const isMac = navigator.platform.includes('Mac')
@@ -53,6 +55,7 @@ export default function App() {
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
       if (currentScreen !== 'home') return
+      setBatchInitialFilePaths(null)
       setCurrentScreen('xml-editor')
       setFilePath(path)
       await loadDocument(path)
@@ -61,14 +64,23 @@ export default function App() {
   }, [currentScreen, setFilePath, loadDocument])
 
   const handleNavigateToHome = () => {
+    setBatchInitialFilePaths(null)
     setCurrentScreen('home')
   }
 
-  const handleNavigateToXmlEditor = () => {
+  const handleOpenXmlFromHome = async () => {
+    const path = await window.electronAPI.openFile()
+    if (!path) return
+    setBatchInitialFilePaths(null)
     setCurrentScreen('xml-editor')
+    setFilePath(path)
+    await loadDocument(path)
   }
 
-  const handleNavigateToBatchValidator = () => {
+  const handleOpenBatchFromHome = async () => {
+    const filePaths = await window.electronAPI.openFiles()
+    if (!filePaths || filePaths.length === 0) return
+    setBatchInitialFilePaths(filePaths)
     setCurrentScreen('batch-validator')
   }
 
@@ -76,8 +88,8 @@ export default function App() {
     <div className={`app${isMac ? ' app--mac' : ''}`}>
       {currentScreen === 'home' && (
         <HomeScreen
-          onNavigateToXmlEditor={handleNavigateToXmlEditor}
-          onNavigateToBatchValidator={handleNavigateToBatchValidator}
+          onOpenXmlFromHome={handleOpenXmlFromHome}
+          onOpenBatchFromHome={handleOpenBatchFromHome}
         />
       )}
 
@@ -86,7 +98,10 @@ export default function App() {
       )}
 
       {currentScreen === 'batch-validator' && (
-        <BatchValidator onClose={handleNavigateToHome} />
+        <BatchValidator
+          onClose={handleNavigateToHome}
+          initialFilePaths={batchInitialFilePaths}
+        />
       )}
     </div>
   )
