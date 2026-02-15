@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDocumentStore } from '../stores/document'
 import { DocumentTree } from '../components/DocumentTree'
 import { XmlEditor } from '../components/XmlEditor'
@@ -33,22 +33,55 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
 
   const isDirty = modifiedContent !== null && modifiedContent !== partContent
 
+  const confirmFileChangeIfNeeded = useCallback(async () => {
+    if (!isDirty) return true
+
+    const choice = await window.electronAPI.confirmFileChange()
+    if (choice === 'cancel') return false
+    if (choice === 'discard') return true
+    if (!filePath) return false
+
+    return saveDocument(filePath)
+  }, [filePath, isDirty, saveDocument])
+
+  const loadFileAtPath = useCallback(
+    async (path: string) => {
+      setFilePath(path)
+      await loadDocument(path)
+    },
+    [setFilePath, loadDocument]
+  )
+
+  const handleChangeFile = useCallback(
+    async (nextPath?: string) => {
+      const canChangeFile = await confirmFileChangeIfNeeded()
+      if (!canChangeFile) return
+
+      const path = nextPath ?? (await window.electronAPI.openFile())
+      if (!path) return
+
+      await loadFileAtPath(path)
+    },
+    [confirmFileChangeIfNeeded, loadFileAtPath]
+  )
+
   // Handle file open from menu
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
-      setFilePath(path)
-      await loadDocument(path)
+      await handleChangeFile(path)
     })
     return cleanup
-  }, [setFilePath, loadDocument])
+  }, [handleChangeFile])
 
   // Handle save from menu
   useEffect(() => {
     const cleanup = window.electronAPI.onMenuSave(async () => {
       if (filePath) {
-        await saveDocument(filePath)
-        await validate()
-        setShowValidation(true)
+        const saved = await saveDocument(filePath)
+        if (saved) {
+          await validate()
+          setShowValidation(true)
+        }
       }
     })
     return cleanup
@@ -59,9 +92,11 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
     const cleanup = window.electronAPI.onMenuSaveAs(async () => {
       const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
       if (newPath) {
-        await saveDocumentAs(newPath)
-        await validate()
-        setShowValidation(true)
+        const saved = await saveDocumentAs(newPath)
+        if (saved) {
+          await validate()
+          setShowValidation(true)
+        }
       }
     })
     return cleanup
@@ -76,27 +111,23 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
     return cleanup
   }, [validate])
 
-  const handleOpenFile = async () => {
-    const path = await window.electronAPI.openFile()
-    if (path) {
-      setFilePath(path)
-      await loadDocument(path)
-    }
-  }
-
   const handleSave = async () => {
     if (!filePath) return
-    await saveDocument(filePath)
-    await validate()
-    setShowValidation(true)
+    const saved = await saveDocument(filePath)
+    if (saved) {
+      await validate()
+      setShowValidation(true)
+    }
   }
 
   const handleSaveAs = async () => {
     const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
     if (newPath) {
-      await saveDocumentAs(newPath)
-      await validate()
-      setShowValidation(true)
+      const saved = await saveDocumentAs(newPath)
+      if (saved) {
+        await validate()
+        setShowValidation(true)
+      }
     }
   }
 
@@ -116,7 +147,8 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
   return (
     <>
       <Toolbar
-        onOpenFile={handleOpenFile}
+        onOpenFile={() => void handleChangeFile()}
+        openLabel={documentData ? 'Change File' : 'Open File'}
         onSave={handleSave}
         onSaveAs={handleSaveAs}
         onValidate={handleValidate}
@@ -138,7 +170,7 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
           <div className="welcome">
             <h1>OOXML Validator</h1>
             <p>Open an Office document (xlsx, docx, pptx) to start</p>
-            <button onClick={handleOpenFile}>Open File</button>
+            <button onClick={() => void handleChangeFile()}>Open File</button>
           </div>
         ) : (
           <>

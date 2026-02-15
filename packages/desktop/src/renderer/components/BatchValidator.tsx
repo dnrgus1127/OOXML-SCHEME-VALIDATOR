@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ValidationResultTree } from './ValidationResultTree'
 
 interface FileValidationResult {
@@ -32,15 +32,17 @@ interface FileValidationResult {
 
 interface BatchValidatorProps {
   onClose?: () => void
+  initialFilePaths?: string[] | null
 }
 
-export function BatchValidator({ onClose }: BatchValidatorProps) {
+export function BatchValidator({ onClose, initialFilePaths }: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const hasValidatedInitialFiles = useRef(false)
 
   // Listen for batch progress updates
   useEffect(() => {
@@ -105,6 +107,14 @@ export function BatchValidator({ onClose }: BatchValidatorProps) {
     return cleanup
   }, [validateFiles])
 
+  useEffect(() => {
+    if (hasValidatedInitialFiles.current) return
+    if (!initialFilePaths || initialFilePaths.length === 0) return
+
+    hasValidatedInitialFiles.current = true
+    void validateFiles(initialFilePaths, false)
+  }, [initialFilePaths, validateFiles])
+
   const handleSelectFiles = async () => {
     const filePaths = await window.electronAPI.openFiles()
     if (!filePaths || filePaths.length === 0) return
@@ -160,7 +170,7 @@ export function BatchValidator({ onClose }: BatchValidatorProps) {
 
       <div className="batch-toolbar">
         <button onClick={handleSelectFiles} disabled={isValidating}>
-          {isValidating ? 'Validating...' : 'Select Files'}
+          {isValidating ? 'Validating...' : results.length > 0 ? 'Change Files' : 'Select Files'}
         </button>
 
         {results.length > 0 && (

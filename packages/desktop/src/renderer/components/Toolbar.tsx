@@ -3,6 +3,7 @@ interface ToolbarProps {
   onSave: () => void
   onSaveAs: () => void
   onValidate: () => void
+  openLabel?: string
   hasDocument: boolean
   filePath: string | null
   isDirty: boolean
@@ -14,6 +15,7 @@ export function Toolbar({
   onSave,
   onSaveAs,
   onValidate,
+  openLabel = 'Open',
   hasDocument,
   filePath,
   isDirty,
@@ -30,7 +32,7 @@ export function Toolbar({
           </button>
         )}
         <button onClick={onOpenFile} className="toolbar-btn">
-          📂 Open
+          📂 {openLabel}
         </button>
         <button
           onClick={onSave}

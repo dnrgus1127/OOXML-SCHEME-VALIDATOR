@@ -52,8 +52,8 @@ interface DocumentState {
   loadDocument: (path: string) => Promise<void>
   selectPart: (partPath: string) => Promise<void>
   updatePartContent: (content: string) => void
-  saveDocument: (path: string) => Promise<void>
-  saveDocumentAs: (path: string) => Promise<void>
+  saveDocument: (path: string) => Promise<boolean>
+  saveDocumentAs: (path: string) => Promise<boolean>
   validate: () => Promise<void>
   clearError: () => void
   reset: () => void
@@ -154,7 +154,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   saveDocument: async (path) => {
     const { fileData, modifiedContent, selectedPart } = get()
-    if (!fileData) return
+    if (!fileData) return false
 
     set({ error: null })
 
@@ -183,16 +183,18 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         fileData: currentFileData,
         modifiedContent: null,
       })
+      return true
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
       })
+      return false
     }
   },
 
   saveDocumentAs: async (path) => {
     const { fileData, modifiedContent, selectedPart } = get()
-    if (!fileData) return
+    if (!fileData) return false
 
     set({ error: null })
 
@@ -220,10 +222,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         fileData: currentFileData,
         modifiedContent: null,
       })
+      return true
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
       })
+      return false
     }
   },
 

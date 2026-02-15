@@ -161,6 +161,22 @@ function setupIpcHandlers(): void {
     return result.filePath
   })
 
+  ipcMain.handle('dialog:confirmFileChange', async () => {
+    const result = await dialog.showMessageBox(mainWindow!, {
+      type: 'warning',
+      buttons: ['Save', 'Discard', 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+      message: 'You have unsaved changes.',
+      detail: 'Save changes before opening another file?',
+    })
+
+    if (result.response === 0) return 'save'
+    if (result.response === 1) return 'discard'
+    return 'cancel'
+  })
+
   // Read file
   ipcMain.handle('fs:readFile', async (_, filePath: string) => {
     try {
