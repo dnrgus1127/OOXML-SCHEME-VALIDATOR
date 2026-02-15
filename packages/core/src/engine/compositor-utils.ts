@@ -133,13 +133,17 @@ export function flattenParticles(
           ...group.compositor,
           occurs: particle.occurs,
         }
+        const groupedAllowedNames = buildAllowedNames(groupedParticle, registry, resolver)
+        if (groupedAllowedNames && groupedAllowedNames.size === 0) {
+          continue
+        }
 
         flattened.push({
           index,
           particle: groupedParticle,
           minOccurs: particle.occurs.minOccurs,
           maxOccurs: particle.occurs.maxOccurs,
-          allowedNames: buildAllowedNames(groupedParticle, registry, resolver),
+          allowedNames: groupedAllowedNames,
         })
         index += 1
         continue
@@ -147,6 +151,9 @@ export function flattenParticles(
     }
 
     const allowedNames = buildAllowedNames(particle, registry, resolver)
+    if (isNestedCompositor(particle) && allowedNames && allowedNames.size === 0) {
+      continue
+    }
     const occurs = getParticleOccurs(particle)
 
     flattened.push({
