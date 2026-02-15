@@ -133,6 +133,7 @@ interface ParsedElement {
   name: string
   ref?: string
   type?: string
+  substitutionGroup?: string
   minOccurs: number
   maxOccurs: number | 'unbounded'
   default?: string
@@ -517,6 +518,7 @@ function parseElement(elNode: any): ParsedElement {
     name: attr(elNode, 'name') || '',
     ref: attr(elNode, 'ref') || undefined,
     type: attr(elNode, 'type') || undefined,
+    substitutionGroup: attr(elNode, 'substitutionGroup') || undefined,
     minOccurs: parseInt(attr(elNode, 'minOccurs') || '1', 10),
     maxOccurs:
       attr(elNode, 'maxOccurs') === 'unbounded'
@@ -804,6 +806,7 @@ function generateElement(el: ParsedElement): string {
     `name: "${el.name}"`,
     el.ref ? `ref: ${makeTypeRef(el.ref)}` : undefined,
     el.type ? `typeRef: ${makeTypeRef(el.type)}` : undefined,
+    el.substitutionGroup ? `substitutionGroup: ${makeTypeRef(el.substitutionGroup)}` : undefined,
     `occurs: ${generateOccurs(el.minOccurs, el.maxOccurs)}`,
     el.nillable ? `nillable: true` : undefined,
     el.default ? `default: { value: "${escapeString(el.default)}", fixed: false }` : undefined,

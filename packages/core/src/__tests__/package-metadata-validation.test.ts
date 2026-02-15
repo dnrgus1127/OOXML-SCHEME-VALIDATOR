@@ -9,6 +9,7 @@ const CONTENT_TYPES_NS = 'http://schemas.openxmlformats.org/package/2006/content
 const CONTENT_TYPES_STRICT_NS = 'http://purl.oclc.org/ooxml/package/content-types'
 const DC_NS = 'http://purl.org/dc/elements/1.1/'
 const DCTERMS_NS = 'http://purl.org/dc/terms/'
+const XML_NS = 'http://www.w3.org/XML/1998/namespace'
 
 function attrs(values: Record<string, string>): XmlAttribute[] {
   return Object.entries(values).map(([name, value]) => ({
@@ -118,6 +119,85 @@ describe('package metadata schema validation', () => {
     ])
 
     expect(result.valid).toBe(true)
+  })
+
+  it('rejects nested elements inside dcterms:created', () => {
+    const root = el(
+      'cp:coreProperties',
+      'coreProperties',
+      CORE_PROPS_NS,
+      [],
+      new Map([
+        ['cp', CORE_PROPS_NS],
+        ['dc', DC_NS],
+        ['dcterms', DCTERMS_NS],
+      ])
+    )
+    const createdEl = el('dcterms:created', 'created', DCTERMS_NS)
+    const nestedTitleEl = el('dc:title', 'title', DC_NS)
+
+    const result = validate([
+      { type: 'startDocument' },
+      { type: 'startElement', element: root },
+      { type: 'startElement', element: createdEl },
+      { type: 'startElement', element: nestedTitleEl },
+      { type: 'text', text: 'Nested title' },
+      { type: 'endElement', element: nestedTitleEl },
+      { type: 'endElement', element: createdEl },
+      { type: 'endElement', element: root },
+      { type: 'endDocument' },
+    ])
+
+    expect(result.valid).toBe(false)
+    expect(
+      result.errors.some((err) => ['INVALID_CONTENT', 'TOO_MANY_ELEMENTS', 'INVALID_ELEMENT'].includes(err.code))
+    ).toBe(true)
+  })
+
+  it('accepts xml:lang on cp:keywords and cp:value', () => {
+    const root = el(
+      'cp:coreProperties',
+      'coreProperties',
+      CORE_PROPS_NS,
+      [],
+      new Map([
+        ['cp', CORE_PROPS_NS],
+        ['dc', DC_NS],
+        ['dcterms', DCTERMS_NS],
+        ['xml', XML_NS],
+      ])
+    )
+    const keywordsEl = el('cp:keywords', 'keywords', CORE_PROPS_NS, [
+      {
+        name: 'xml:lang',
+        localName: 'lang',
+        namespaceUri: XML_NS,
+        value: 'en-US',
+      },
+    ])
+    const valueEl = el('cp:value', 'value', CORE_PROPS_NS, [
+      {
+        name: 'xml:lang',
+        localName: 'lang',
+        namespaceUri: XML_NS,
+        value: 'en-US',
+      },
+    ])
+
+    const result = validate([
+      { type: 'startDocument' },
+      { type: 'startElement', element: root },
+      { type: 'startElement', element: keywordsEl },
+      { type: 'startElement', element: valueEl },
+      { type: 'text', text: 'alpha, beta' },
+      { type: 'endElement', element: valueEl },
+      { type: 'endElement', element: keywordsEl },
+      { type: 'endElement', element: root },
+      { type: 'endDocument' },
+    ])
+
+    expect(result.valid).toBe(true)
+    expect(result.errors.some((err) => err.code === 'INVALID_ATTRIBUTE')).toBe(false)
   })
 
   it('validates core.xml with strict package namespace alias', () => {
