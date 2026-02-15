@@ -7,9 +7,15 @@ import { Toolbar } from '../components/Toolbar'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
+  onRecentRecord?: () => Promise<void> | void
 }
 
-export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
+function getFileName(filePath: string): string {
+  const segments = filePath.split(/[\\/]/)
+  return segments[segments.length - 1] || filePath
+}
+
+export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScreenProps) {
   const {
     filePath,
     documentData,
@@ -47,9 +53,20 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
   const loadFileAtPath = useCallback(
     async (path: string) => {
       setFilePath(path)
-      await loadDocument(path)
+      const loaded = await loadDocument(path)
+
+      if (loaded) {
+        await window.electronAPI.addRecentFile({
+          filePath: path,
+          fileName: getFileName(path),
+          lastTool: 'xml-editor',
+        })
+        await onRecentRecord?.()
+      }
+
+      return loaded
     },
-    [setFilePath, loadDocument]
+    [setFilePath, loadDocument, onRecentRecord]
   )
 
   const handleChangeFile = useCallback(
