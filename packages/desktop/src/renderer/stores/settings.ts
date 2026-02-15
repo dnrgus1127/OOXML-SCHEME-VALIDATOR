@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 
 export interface XmlEditorSettings {
   validateOnOpen: boolean
+  revalidateShortcut: string
 }
 
 export interface GeneralSettings {
@@ -30,6 +31,7 @@ const defaultSettings: SettingsData = {
   },
   xmlEditor: {
     validateOnOpen: true,
+    revalidateShortcut: 'CmdOrCtrl+Shift+V',
   },
   batchValidator: {
     autoExpandResults: true,
@@ -59,6 +61,25 @@ export const useSettingsStore = create<SettingsState>()(
         xmlEditor: state.xmlEditor,
         batchValidator: state.batchValidator,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState as Partial<SettingsData>) ?? {}
+        return {
+          ...currentState,
+          ...persisted,
+          general: {
+            ...currentState.general,
+            ...persisted.general,
+          },
+          xmlEditor: {
+            ...currentState.xmlEditor,
+            ...persisted.xmlEditor,
+          },
+          batchValidator: {
+            ...currentState.batchValidator,
+            ...persisted.batchValidator,
+          },
+        }
+      },
     }
   )
 )

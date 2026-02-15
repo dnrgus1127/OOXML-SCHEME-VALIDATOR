@@ -1133,6 +1133,10 @@ body {
   background: var(--bg-secondary);
 }
 
+.settings-input-label {
+  font-size: 13px;
+}
+
 .settings-toggle-label {
   display: flex;
   align-items: center;
@@ -1144,6 +1148,26 @@ body {
 
 .settings-help-text {
   color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.settings-input--error {
+  border-color: var(--error);
+}
+
+.settings-error-text {
+  color: var(--error);
   font-size: 12px;
 }
 

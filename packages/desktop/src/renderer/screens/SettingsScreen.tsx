@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSettingsStore } from '../stores/settings'
+import { normalizeShortcut } from '../utils/shortcuts'
 
 interface SettingsScreenProps {
   onClose: () => void
@@ -10,6 +11,8 @@ type SettingsSection = 'general' | 'xml-editor' | 'batch-validator'
 export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const { xmlEditor, updateXmlEditorSettings } = useSettingsStore()
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
+  const [shortcutInput, setShortcutInput] = useState(xmlEditor.revalidateShortcut)
+  const [shortcutError, setShortcutError] = useState<string | null>(null)
 
   const sections = useMemo(
     () => [
@@ -19,6 +22,25 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
     ],
     []
   )
+
+  useEffect(() => {
+    setShortcutInput(xmlEditor.revalidateShortcut)
+  }, [xmlEditor.revalidateShortcut])
+
+  const handleShortcutInputChange = (value: string) => {
+    setShortcutInput(value)
+
+    const normalized = normalizeShortcut(value)
+    if (!normalized) {
+      setShortcutError(
+        '유효한 형식이 아닙니다. 예: CmdOrCtrl+Shift+V, CmdOrCtrl+R, Shift+F8'
+      )
+      return
+    }
+
+    setShortcutError(null)
+    updateXmlEditorSettings({ revalidateShortcut: normalized })
+  }
 
   return (
     <div className="settings-screen">
@@ -75,6 +97,26 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
                 <p className="settings-help-text">
                   파일을 열자마자 문서 검증을 자동으로 실행합니다.
                 </p>
+              </div>
+
+              <div className="settings-field-row">
+                <label htmlFor="revalidate-shortcut" className="settings-input-label">
+                  현재 파일 재검증 단축키
+                </label>
+                <input
+                  id="revalidate-shortcut"
+                  className={`settings-input${shortcutError ? ' settings-input--error' : ''}`}
+                  type="text"
+                  value={shortcutInput}
+                  onChange={(event) => handleShortcutInputChange(event.target.value)}
+                  placeholder="CmdOrCtrl+Shift+V"
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                <p className="settings-help-text">
+                  XML Editor 화면에서만 동작합니다. 입력 즉시 유효성 검사를 수행합니다.
+                </p>
+                {shortcutError && <p className="settings-error-text">{shortcutError}</p>}
               </div>
             </section>
           )}

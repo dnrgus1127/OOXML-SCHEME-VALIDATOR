@@ -5,6 +5,7 @@ import { XmlEditor } from '../components/XmlEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { Toolbar } from '../components/Toolbar'
 import { useSettingsStore } from '../stores/settings'
+import { matchesShortcut } from '../utils/shortcuts'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
@@ -31,6 +32,7 @@ export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScr
     clearError,
   } = useDocumentStore()
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
+  const revalidateShortcut = useSettingsStore((state) => state.xmlEditor.revalidateShortcut)
 
   const [showValidation, setShowValidation] = useState(true)
 
@@ -117,6 +119,23 @@ export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScr
     })
     return cleanup
   }, [validate])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!documentData) return
+      if (event.repeat) return
+      if (!matchesShortcut(event, revalidateShortcut)) return
+
+      event.preventDefault()
+      void (async () => {
+        await validate()
+        setShowValidation(true)
+      })()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [documentData, revalidateShortcut, validate])
 
   const handleSave = async () => {
     if (!filePath) return
