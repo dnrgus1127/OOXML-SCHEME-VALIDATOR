@@ -6,7 +6,7 @@
 
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { basename, join } from 'path'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readFile as readFileAsync } from 'fs/promises'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
@@ -16,6 +16,13 @@ import {
   type ValidationError,
   type SchemaRegistry,
 } from '@ooxml/core'
+import {
+  addRecentFile,
+  clearRecentFiles,
+  listRecentFiles,
+  removeRecentFile,
+} from './recent-files-store'
+import type { OpenTool } from '../shared/recent-files'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -180,6 +187,42 @@ function setupIpcHandlers(): void {
     } catch (error) {
       return { success: false, error: String(error) }
     }
+  })
+
+  // Check file existence
+  ipcMain.handle('fs:exists', async (_, filePath: string) => {
+    try {
+      return existsSync(filePath)
+    } catch {
+      return false
+    }
+  })
+
+  // Recent files
+  ipcMain.handle('recent-files:list', async () => {
+    return listRecentFiles()
+  })
+
+  ipcMain.handle(
+    'recent-files:add',
+    async (_, input: { filePath: string; fileName?: string; lastTool: OpenTool }) => {
+      if (!input || typeof input.filePath !== 'string' || !input.filePath) {
+        return listRecentFiles()
+      }
+      if (input.lastTool !== 'xml-editor' && input.lastTool !== 'batch-validator') {
+        return listRecentFiles()
+      }
+      return addRecentFile(input)
+    }
+  )
+
+  ipcMain.handle('recent-files:remove', async (_, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath) return listRecentFiles()
+    return removeRecentFile(filePath)
+  })
+
+  ipcMain.handle('recent-files:clear', async () => {
+    return clearRecentFiles()
   })
 
   // Parse OOXML document
@@ -719,15 +762,23 @@ function generateHTML(data: any): string {
     <div class="file-header ${isValid ? 'valid' : 'invalid'}">
       <div class="file-title">${escapeHtml(file.fileName)}</div>
       <div class="file-stats">
-        ${file.success ? `
+        ${
+          file.success
+            ? `
           <span class="${isValid ? 'valid-badge' : 'invalid-badge'}">${isValid ? '✓ VALID' : '✗ INVALID'}</span>
-          ${file.validation ? `
+          ${
+            file.validation
+              ? `
             | Parts: ${file.validation.summary.totalParts}
             | Valid: ${file.validation.summary.validParts}
             | Invalid: ${file.validation.summary.invalidParts}
             | Errors: ${file.validation.summary.totalErrors}
-          ` : ''}
-        ` : `<span class="invalid-badge">✗ ERROR: ${escapeHtml(file.error ?? 'Unknown error')}</span>`}
+          `
+              : ''
+          }
+        `
+            : `<span class="invalid-badge">✗ ERROR: ${escapeHtml(file.error ?? 'Unknown error')}</span>`
+        }
       </div>
     </div>
 `

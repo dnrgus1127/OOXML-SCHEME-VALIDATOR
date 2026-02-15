@@ -7,9 +7,15 @@ import { Toolbar } from '../components/Toolbar'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
+  onRecentRecord?: () => Promise<void> | void
 }
 
-export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
+function getFileName(filePath: string): string {
+  const segments = filePath.split(/[\\/]/)
+  return segments[segments.length - 1] || filePath
+}
+
+export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScreenProps) {
   const {
     filePath,
     documentData,
@@ -37,10 +43,18 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
       setFilePath(path)
-      await loadDocument(path)
+      const loaded = await loadDocument(path)
+      if (loaded) {
+        await window.electronAPI.addRecentFile({
+          filePath: path,
+          fileName: getFileName(path),
+          lastTool: 'xml-editor',
+        })
+        await onRecentRecord?.()
+      }
     })
     return cleanup
-  }, [setFilePath, loadDocument])
+  }, [setFilePath, loadDocument, onRecentRecord])
 
   // Handle save from menu
   useEffect(() => {
@@ -80,7 +94,15 @@ export function XmlEditorScreen({ onNavigateHome }: XmlEditorScreenProps) {
     const path = await window.electronAPI.openFile()
     if (path) {
       setFilePath(path)
-      await loadDocument(path)
+      const loaded = await loadDocument(path)
+      if (loaded) {
+        await window.electronAPI.addRecentFile({
+          filePath: path,
+          fileName: getFileName(path),
+          lastTool: 'xml-editor',
+        })
+        await onRecentRecord?.()
+      }
     }
   }
 

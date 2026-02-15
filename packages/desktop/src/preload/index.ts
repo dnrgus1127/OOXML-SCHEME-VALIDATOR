@@ -5,6 +5,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
+import type { OpenTool } from '../shared/recent-files'
 
 // API exposed to renderer
 const api = {
@@ -15,6 +16,14 @@ const api = {
   // File system
   readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
   writeFile: (filePath: string, data: string) => ipcRenderer.invoke('fs:writeFile', filePath, data),
+  fileExists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
+
+  // Recent files
+  getRecentFiles: () => ipcRenderer.invoke('recent-files:list'),
+  addRecentFile: (input: { filePath: string; fileName?: string; lastTool: OpenTool }) =>
+    ipcRenderer.invoke('recent-files:add', input),
+  removeRecentFile: (filePath: string) => ipcRenderer.invoke('recent-files:remove', filePath),
+  clearRecentFiles: () => ipcRenderer.invoke('recent-files:clear'),
 
   // OOXML operations
   parseDocument: (base64Data: string) => ipcRenderer.invoke('ooxml:parse', base64Data),
@@ -26,8 +35,7 @@ const api = {
 
   // Batch operations
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
-  batchValidate: (filePaths: string[]) =>
-    ipcRenderer.invoke('ooxml:batchValidate', filePaths),
+  batchValidate: (filePaths: string[]) => ipcRenderer.invoke('ooxml:batchValidate', filePaths),
   exportResults: (format: 'json' | 'csv' | 'html' | 'pdf', data: any) =>
     ipcRenderer.invoke('export:results', format, data),
   onBatchProgress: (callback: (progress: { current: number; total: number }) => void) => {
