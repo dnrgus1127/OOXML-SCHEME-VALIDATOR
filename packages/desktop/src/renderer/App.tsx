@@ -47,6 +47,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
+  const isMac = navigator.platform.includes('Mac')
 
   // Keep the global Open menu path working when app starts on the home screen.
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app${isMac ? ' app--mac' : ''}`}>
       {currentScreen === 'home' && (
         <HomeScreen
           onNavigateToXmlEditor={handleNavigateToXmlEditor}
