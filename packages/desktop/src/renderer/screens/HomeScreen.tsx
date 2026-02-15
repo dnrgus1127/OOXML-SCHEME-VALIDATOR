@@ -107,6 +107,7 @@ export function HomeScreen({
                 tabIndex={0}
                 onClick={() => onOpenRecent(entry)}
                 onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
                     onOpenRecent(entry)
@@ -127,6 +128,12 @@ export function HomeScreen({
                   <button
                     className="home-recent-remove-btn"
                     onClick={(event) => {
+                      event.stopPropagation()
+                      onRemoveRecent(entry.filePath)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
                       event.stopPropagation()
                       onRemoveRecent(entry.filePath)
                     }}

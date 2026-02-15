@@ -110,36 +110,50 @@ export function listRecentFiles(): RecentFileEntry[] {
   return readStore().items
 }
 
-export function addRecentFile(input: AddRecentFileInput): RecentFileEntry[] {
-  const current = readStore()
-  const now = new Date().toISOString()
-
-  const previous = current.items.find((item) => item.filePath === input.filePath)
-  const nextEntry: RecentFileEntry = {
+function normalizeInput(input: AddRecentFileInput): AddRecentFileInput {
+  return {
     filePath: input.filePath,
     fileName: input.fileName ?? (basename(input.filePath) || input.filePath),
     lastTool: input.lastTool,
-    lastOpenedAt: now,
-    openCount: (previous?.openCount ?? 0) + 1,
+  }
+}
+
+export function addRecentFiles(inputs: AddRecentFileInput[]): RecentFileEntry[] {
+  if (inputs.length === 0) return listRecentFiles()
+
+  const current = readStore()
+  const mergedByPath = new Map(current.items.map((item) => [item.filePath, item]))
+  const dedupedInputs = new Map<string, AddRecentFileInput>()
+
+  for (const rawInput of inputs) {
+    const input = normalizeInput(rawInput)
+    dedupedInputs.set(input.filePath, input)
   }
 
-  const nextItems = sortByRecent(
-    [nextEntry, ...current.items.filter((item) => item.filePath !== input.filePath)].slice(
-      0,
-      MAX_RECENT_FILES
-    )
-  )
+  for (const input of dedupedInputs.values()) {
+    const previous = mergedByPath.get(input.filePath)
+    const fileName = input.fileName ?? (basename(input.filePath) || input.filePath)
+    mergedByPath.set(input.filePath, {
+      filePath: input.filePath,
+      fileName,
+      lastTool: input.lastTool,
+      lastOpenedAt: new Date().toISOString(),
+      openCount: (previous?.openCount ?? 0) + 1,
+    })
+  }
 
+  const nextItems = sortByRecent(Array.from(mergedByPath.values())).slice(0, MAX_RECENT_FILES)
   const nextStore: RecentFilesStoreData = {
     version: RECENT_FILES_STORE_VERSION,
     items: nextItems,
   }
 
-  if (!writeStore(nextStore)) {
-    return current.items
-  }
-
+  if (!writeStore(nextStore)) return current.items
   return nextItems
+}
+
+export function addRecentFile(input: AddRecentFileInput): RecentFileEntry[] {
+  return addRecentFiles([input])
 }
 
 export function removeRecentFile(filePath: string): RecentFileEntry[] {

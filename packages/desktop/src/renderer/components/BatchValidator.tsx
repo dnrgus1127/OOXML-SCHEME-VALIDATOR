@@ -63,14 +63,12 @@ export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: Ba
       const succeeded = fileResults.filter((item) => item.success)
       if (succeeded.length === 0) return
 
-      await Promise.all(
-        succeeded.map((item) =>
-          window.electronAPI.addRecentFile({
-            filePath: item.filePath,
-            fileName: item.fileName || getFileName(item.filePath),
-            lastTool: 'batch-validator',
-          })
-        )
+      await window.electronAPI.addRecentFiles(
+        succeeded.map((item) => ({
+          filePath: item.filePath,
+          fileName: item.fileName || getFileName(item.filePath),
+          lastTool: 'batch-validator' as const,
+        }))
       )
       await onRecentRecord?.()
     },

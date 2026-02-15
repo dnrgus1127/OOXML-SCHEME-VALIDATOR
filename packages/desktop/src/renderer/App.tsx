@@ -20,6 +20,13 @@ declare global {
         fileName?: string
         lastTool: OpenTool
       }) => Promise<RecentFileEntry[]>
+      addRecentFiles: (
+        inputs: Array<{
+          filePath: string
+          fileName?: string
+          lastTool: OpenTool
+        }>
+      ) => Promise<RecentFileEntry[]>
       removeRecentFile: (filePath: string) => Promise<RecentFileEntry[]>
       clearRecentFiles: () => Promise<RecentFileEntry[]>
       parseDocument: (

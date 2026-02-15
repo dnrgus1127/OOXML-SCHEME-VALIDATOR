@@ -18,6 +18,7 @@ import {
 } from '@ooxml/core'
 import {
   addRecentFile,
+  addRecentFiles,
   clearRecentFiles,
   listRecentFiles,
   removeRecentFile,
@@ -219,18 +220,34 @@ function setupIpcHandlers(): void {
     return listRecentFiles()
   })
 
+  const isValidRecentFileInput = (
+    input: unknown
+  ): input is {
+    filePath: string
+    fileName?: string
+    lastTool: OpenTool
+  } => {
+    if (!input || typeof input !== 'object') return false
+    const value = input as { filePath?: unknown; fileName?: unknown; lastTool?: unknown }
+    if (typeof value.filePath !== 'string' || value.filePath.length === 0) return false
+    if (value.fileName != null && typeof value.fileName !== 'string') return false
+    return value.lastTool === 'xml-editor' || value.lastTool === 'batch-validator'
+  }
+
   ipcMain.handle(
     'recent-files:add',
     async (_, input: { filePath: string; fileName?: string; lastTool: OpenTool }) => {
-      if (!input || typeof input.filePath !== 'string' || !input.filePath) {
-        return listRecentFiles()
-      }
-      if (input.lastTool !== 'xml-editor' && input.lastTool !== 'batch-validator') {
-        return listRecentFiles()
-      }
+      if (!isValidRecentFileInput(input)) return listRecentFiles()
       return addRecentFile(input)
     }
   )
+
+  ipcMain.handle('recent-files:add-many', async (_, inputs: unknown[]) => {
+    if (!Array.isArray(inputs) || inputs.length === 0) return listRecentFiles()
+    const validInputs = inputs.filter(isValidRecentFileInput)
+    if (validInputs.length === 0) return listRecentFiles()
+    return addRecentFiles(validInputs)
+  })
 
   ipcMain.handle('recent-files:remove', async (_, filePath: string) => {
     if (typeof filePath !== 'string' || !filePath) return listRecentFiles()

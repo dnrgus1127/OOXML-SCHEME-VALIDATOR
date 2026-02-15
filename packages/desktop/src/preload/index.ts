@@ -23,6 +23,8 @@ const api = {
   getRecentFiles: () => ipcRenderer.invoke('recent-files:list'),
   addRecentFile: (input: { filePath: string; fileName?: string; lastTool: OpenTool }) =>
     ipcRenderer.invoke('recent-files:add', input),
+  addRecentFiles: (inputs: Array<{ filePath: string; fileName?: string; lastTool: OpenTool }>) =>
+    ipcRenderer.invoke('recent-files:add-many', inputs),
   removeRecentFile: (filePath: string) => ipcRenderer.invoke('recent-files:remove', filePath),
   clearRecentFiles: () => ipcRenderer.invoke('recent-files:clear'),
 
