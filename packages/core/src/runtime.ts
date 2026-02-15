@@ -141,9 +141,9 @@ const TRANSITIONAL_TO_STRICT_NS: Record<string, string> = {
   'http://schemas.openxmlformats.org/officeDocument/2006/characteristics':
     'http://purl.oclc.org/ooxml/officeDocument/characteristics',
   'http://schemas.openxmlformats.org/officeDocument/2006/custom-properties':
-    'http://purl.oclc.org/ooxml/officeDocument/custom-properties',
+    'http://purl.oclc.org/ooxml/officeDocument/customProperties',
   'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties':
-    'http://purl.oclc.org/ooxml/officeDocument/extended-properties',
+    'http://purl.oclc.org/ooxml/officeDocument/extendedProperties',
   'http://schemas.openxmlformats.org/officeDocument/2006/customXml':
     'http://purl.oclc.org/ooxml/officeDocument/customXml',
   'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes':
