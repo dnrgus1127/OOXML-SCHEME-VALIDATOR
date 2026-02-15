@@ -104,7 +104,12 @@ interface ParsedComplexType {
   name: string
   mixed: boolean
   abstract: boolean
-  content?: { type: 'sequence' | 'choice' | 'all'; particles: ParsedParticle[] }
+  content?: {
+    type: 'sequence' | 'choice' | 'all'
+    particles: ParsedParticle[]
+    minOccurs: number
+    maxOccurs: number | 'unbounded'
+  }
   simpleContent?: ParsedSimpleContent
   complexContent?: ParsedComplexContent
   attributes: ParsedAttribute[]
@@ -374,11 +379,35 @@ function parseComplexType(ctNode: any): ParsedComplexType {
   const complexContent = findFirstByTag(children, 'complexContent')
 
   if (sequence) {
-    result.content = { type: 'sequence', particles: parseParticles(sequence) }
+    result.content = {
+      type: 'sequence',
+      particles: parseParticles(sequence),
+      minOccurs: parseInt(attr(sequence, 'minOccurs') || '1', 10),
+      maxOccurs:
+        attr(sequence, 'maxOccurs') === 'unbounded'
+          ? 'unbounded'
+          : parseInt(attr(sequence, 'maxOccurs') || '1', 10),
+    }
   } else if (choice) {
-    result.content = { type: 'choice', particles: parseParticles(choice) }
+    result.content = {
+      type: 'choice',
+      particles: parseParticles(choice),
+      minOccurs: parseInt(attr(choice, 'minOccurs') || '1', 10),
+      maxOccurs:
+        attr(choice, 'maxOccurs') === 'unbounded'
+          ? 'unbounded'
+          : parseInt(attr(choice, 'maxOccurs') || '1', 10),
+    }
   } else if (all) {
-    result.content = { type: 'all', particles: parseParticles(all) }
+    result.content = {
+      type: 'all',
+      particles: parseParticles(all),
+      minOccurs: parseInt(attr(all, 'minOccurs') || '1', 10),
+      maxOccurs:
+        attr(all, 'maxOccurs') === 'unbounded'
+          ? 'unbounded'
+          : parseInt(attr(all, 'maxOccurs') || '1', 10),
+    }
   } else if (simpleContent) {
     result.simpleContent = parseSimpleContent(simpleContent)
   } else if (complexContent) {
@@ -739,7 +768,7 @@ function generateComplexType(ct: ParsedComplexType): string {
   let content: string
 
   if (ct.content) {
-    const compositor = `{ kind: "${ct.content.type}", ${ct.content.type === 'all' ? 'elements' : 'particles'}: [${ct.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
+    const compositor = `{ kind: "${ct.content.type}", ${ct.content.type === 'all' ? 'elements' : 'particles'}: [${ct.content.particles.map(generateParticle).join(', ')}], occurs: ${generateOccurs(ct.content.minOccurs, ct.content.maxOccurs)} }`
     content = `{ kind: "${ct.mixed ? 'mixed' : 'elementOnly'}", compositor: ${compositor} }`
   } else if (ct.simpleContent) {
     const scAttrs = ct.simpleContent.attributes.map(generateAttribute).join(', ')

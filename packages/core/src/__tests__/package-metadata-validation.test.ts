@@ -45,11 +45,22 @@ describe('package metadata schema validation', () => {
         ContentType: 'application/vnd.openxmlformats-package.relationships+xml',
       })
     )
+    const overrideEl = el(
+      'Override',
+      'Override',
+      CONTENT_TYPES_NS,
+      attrs({
+        PartName: '/docProps/core.xml',
+        ContentType: 'application/vnd.openxmlformats-package.core-properties+xml',
+      })
+    )
     const result = validate([
       { type: 'startDocument' },
       { type: 'startElement', element: root },
       { type: 'startElement', element: defaultEl },
       { type: 'endElement', element: defaultEl },
+      { type: 'startElement', element: overrideEl },
+      { type: 'endElement', element: overrideEl },
       { type: 'endElement', element: root },
       { type: 'endDocument' },
     ])
@@ -153,12 +164,24 @@ describe('package metadata schema validation', () => {
         ContentType: 'application/xml',
       })
     )
+    const overrideEl = el(
+      'Override',
+      'Override',
+      CONTENT_TYPES_STRICT_NS,
+      attrs({
+        PartName: '/word/document.xml',
+        ContentType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
+      })
+    )
 
     const result = validate([
       { type: 'startDocument' },
       { type: 'startElement', element: root },
       { type: 'startElement', element: defaultEl },
       { type: 'endElement', element: defaultEl },
+      { type: 'startElement', element: overrideEl },
+      { type: 'endElement', element: overrideEl },
       { type: 'endElement', element: root },
       { type: 'endDocument' },
     ])
