@@ -10,6 +10,7 @@ declare global {
     electronAPI: {
       openFile: () => Promise<string | null>
       saveFile: (defaultPath?: string) => Promise<string | null>
+      confirmFileChange: () => Promise<'save' | 'discard' | 'cancel'>
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       writeFile: (filePath: string, data: string) => Promise<{ success: boolean; error?: string }>
       fileExists: (filePath: string) => Promise<boolean>
@@ -64,10 +65,10 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
   const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([])
   const [recentError, setRecentError] = useState<string | null>(null)
-  const [batchInitialFiles, setBatchInitialFiles] = useState<string[]>([])
-  const [batchInitialRequestToken, setBatchInitialRequestToken] = useState(0)
+  const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
+  const isMac = navigator.platform.includes('Mac')
 
   const refreshRecentFiles = useCallback(async () => {
     try {
@@ -99,6 +100,7 @@ export default function App() {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
       if (currentScreen !== 'home') return
       setRecentError(null)
+      setBatchInitialFilePaths(null)
       setCurrentScreen('xml-editor')
       setFilePath(path)
       const loaded = await loadDocument(path)
@@ -121,6 +123,7 @@ export default function App() {
       }
 
       if (entry.lastTool === 'xml-editor') {
+        setBatchInitialFilePaths(null)
         setCurrentScreen('xml-editor')
         setFilePath(entry.filePath)
         const loaded = await loadDocument(entry.filePath)
@@ -130,9 +133,8 @@ export default function App() {
         return
       }
 
+      setBatchInitialFilePaths([entry.filePath])
       setCurrentScreen('batch-validator')
-      setBatchInitialFiles([entry.filePath])
-      setBatchInitialRequestToken((token) => token + 1)
     },
     [loadDocument, recordRecentFile, refreshRecentFiles, setFilePath]
   )
@@ -151,27 +153,40 @@ export default function App() {
   }, [])
 
   const handleNavigateToHome = () => {
+    setBatchInitialFilePaths(null)
     setCurrentScreen('home')
     void refreshRecentFiles()
   }
 
-  const handleNavigateToXmlEditor = () => {
+  const handleOpenXmlFromHome = async () => {
+    const path = await window.electronAPI.openFile()
+    if (!path) return
+
     setRecentError(null)
+    setBatchInitialFilePaths(null)
     setCurrentScreen('xml-editor')
+    setFilePath(path)
+    const loaded = await loadDocument(path)
+    if (loaded) {
+      await recordRecentFile(path, 'xml-editor')
+    }
   }
 
-  const handleNavigateToBatchValidator = () => {
+  const handleOpenBatchFromHome = async () => {
+    const filePaths = await window.electronAPI.openFiles()
+    if (!filePaths || filePaths.length === 0) return
+
     setRecentError(null)
-    setBatchInitialFiles([])
+    setBatchInitialFilePaths(filePaths)
     setCurrentScreen('batch-validator')
   }
 
   return (
-    <div className="app">
+    <div className={`app${isMac ? ' app--mac' : ''}`}>
       {currentScreen === 'home' && (
         <HomeScreen
-          onNavigateToXmlEditor={handleNavigateToXmlEditor}
-          onNavigateToBatchValidator={handleNavigateToBatchValidator}
+          onOpenXmlFromHome={handleOpenXmlFromHome}
+          onOpenBatchFromHome={handleOpenBatchFromHome}
           recentFiles={recentFiles}
           recentError={recentError}
           onDismissRecentError={() => setRecentError(null)}
@@ -191,9 +206,7 @@ export default function App() {
       {currentScreen === 'batch-validator' && (
         <BatchValidator
           onClose={handleNavigateToHome}
-          initialFiles={batchInitialFiles}
-          initialRequestToken={batchInitialRequestToken}
-          onInitialFilesHandled={() => setBatchInitialFiles([])}
+          initialFilePaths={batchInitialFilePaths}
           onRecentRecord={refreshRecentFiles}
         />
       )}

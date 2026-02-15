@@ -32,9 +32,7 @@ interface FileValidationResult {
 
 interface BatchValidatorProps {
   onClose?: () => void
-  initialFiles?: string[]
-  initialRequestToken?: number
-  onInitialFilesHandled?: () => void
+  initialFilePaths?: string[] | null
   onRecentRecord?: () => Promise<void> | void
 }
 
@@ -43,20 +41,14 @@ function getFileName(filePath: string): string {
   return segments[segments.length - 1] || filePath
 }
 
-export function BatchValidator({
-  onClose,
-  initialFiles,
-  initialRequestToken,
-  onInitialFilesHandled,
-  onRecentRecord,
-}: BatchValidatorProps) {
+export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
-  const lastHandledInitialRequestRef = useRef<number | null>(null)
+  const lastInitialFilesKeyRef = useRef<string | null>(null)
 
   // Listen for batch progress updates
   useEffect(() => {
@@ -149,18 +141,14 @@ export function BatchValidator({
   }, [validateFiles])
 
   useEffect(() => {
-    if (!initialFiles || initialFiles.length === 0) return
-    if (typeof initialRequestToken !== 'number') return
-    if (lastHandledInitialRequestRef.current === initialRequestToken) return
-    lastHandledInitialRequestRef.current = initialRequestToken
+    if (!initialFilePaths || initialFilePaths.length === 0) return
 
-    const run = async () => {
-      await validateFiles(initialFiles, false)
-      onInitialFilesHandled?.()
-    }
+    const key = initialFilePaths.join('\u0000')
+    if (lastInitialFilesKeyRef.current === key) return
+    lastInitialFilesKeyRef.current = key
 
-    void run()
-  }, [initialFiles, initialRequestToken, onInitialFilesHandled, validateFiles])
+    void validateFiles(initialFilePaths, false)
+  }, [initialFilePaths, validateFiles])
 
   const handleSelectFiles = async () => {
     const filePaths = await window.electronAPI.openFiles()
@@ -214,7 +202,7 @@ export function BatchValidator({
 
       <div className="batch-toolbar">
         <button onClick={handleSelectFiles} disabled={isValidating}>
-          {isValidating ? 'Validating...' : 'Select Files'}
+          {isValidating ? 'Validating...' : results.length > 0 ? 'Change Files' : 'Select Files'}
         </button>
 
         {results.length > 0 && (

@@ -114,7 +114,11 @@ describe('sequence compositor skip-ahead recovery', () => {
   it('should skip ahead and report precise missing required errors', () => {
     const schema = createSerLikeSchema()
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
-    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
 
     const nsDecl = new Map([['', TEST_NS]])
     engine.startDocument()
@@ -134,6 +138,8 @@ describe('sequence compositor skip-ahead recovery', () => {
     expect(missingErrors).toHaveLength(2)
     expect(missingErrors[0]!.message).toContain('idx')
     expect(missingErrors[1]!.message).toContain('order')
+    expect(missingErrors[0]!.message).toContain("필수 요소 'idx'가 누락되었습니다")
+    expect(missingErrors[1]!.message).toContain("필수 요소 'order'가 누락되었습니다")
 
     // No "허용되지 않는 요소" errors for tx, cat, val
     const invalidErrors = result.errors.filter((e) => e.message.includes('허용되지 않는 요소'))
@@ -165,7 +171,11 @@ describe('sequence compositor skip-ahead recovery', () => {
   it('should still fail for truly invalid elements', () => {
     const schema = createSerLikeSchema()
     const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
-    const engine = new ValidationEngine(registry, { maxErrors: 100, allowWhitespace: true })
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
 
     const nsDecl = new Map([['', TEST_NS]])
     engine.startDocument()
@@ -177,9 +187,43 @@ describe('sequence compositor skip-ahead recovery', () => {
     const result = engine.endDocument()
 
     // Should still get MISSING_REQUIRED_ELEMENT for idx (no skip-ahead match)
-    expect(result.errors.length).toBeGreaterThan(0)
-    const hasNotAllowed = result.errors.some((e) => e.message.includes('허용되지 않는 요소'))
-    expect(hasNotAllowed).toBe(true)
+    const missingErrors = result.errors.filter((e) => e.code === 'MISSING_REQUIRED_ELEMENT')
+    expect(missingErrors.length).toBeGreaterThan(0)
+    const hasMissingRequiredMessage = missingErrors.some((e) =>
+      e.message.includes("필수 요소 'idx'가 누락되었습니다")
+    )
+    expect(hasMissingRequiredMessage).toBe(true)
+  })
+
+  it('should increase actual occurrence count for repeated maxOccurs violations', () => {
+    const schema = createSerLikeSchema()
+    const registry = createTestRegistry(new Map([[TEST_NS, schema]]))
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      locale: 'ko',
+    })
+
+    const nsDecl = new Map([['', TEST_NS]])
+    engine.startDocument()
+    engine.startElement(makeElement('root', TEST_NS, [], nsDecl))
+    engine.startElement(makeElement('idx'))
+    engine.endElement(makeElement('idx'))
+    engine.startElement(makeElement('order'))
+    engine.endElement(makeElement('order'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.startElement(makeElement('tx'))
+    engine.endElement(makeElement('tx'))
+    engine.endElement(makeElement('root', TEST_NS, [], nsDecl))
+    const result = engine.endDocument()
+
+    const tooManyErrors = result.errors.filter((e) => e.code === 'TOO_MANY_ELEMENTS')
+    expect(tooManyErrors).toHaveLength(2)
+    expect(tooManyErrors[0]!.message).toContain('실제 2개')
+    expect(tooManyErrors[1]!.message).toContain('실제 3개')
   })
 
   it('should not affect normal sequence validation', () => {

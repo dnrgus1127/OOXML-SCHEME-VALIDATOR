@@ -5,7 +5,7 @@ interface ToolCardProps {
   title: string
   description: string
   actionLabel: string
-  onAction: () => void
+  onAction: () => void | Promise<void>
 }
 
 function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardProps) {
@@ -28,8 +28,8 @@ function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardP
 }
 
 interface HomeScreenProps {
-  onNavigateToXmlEditor: () => void
-  onNavigateToBatchValidator: () => void
+  onOpenXmlFromHome: () => void | Promise<void>
+  onOpenBatchFromHome: () => void | Promise<void>
   recentFiles: RecentFileEntry[]
   recentError: string | null
   onDismissRecentError: () => void
@@ -58,8 +58,8 @@ function formatRelativeTime(isoString: string): string {
 }
 
 export function HomeScreen({
-  onNavigateToXmlEditor,
-  onNavigateToBatchValidator,
+  onOpenXmlFromHome,
+  onOpenBatchFromHome,
   recentFiles,
   recentError,
   onDismissRecentError,
@@ -153,7 +153,7 @@ export function HomeScreen({
             title="XML Editor"
             description="단일 OOXML 파일을 열어 XML 파트를 편집하고 검증합니다"
             actionLabel="Open File"
-            onAction={onNavigateToXmlEditor}
+            onAction={onOpenXmlFromHome}
           />
 
           <ToolCard
@@ -161,7 +161,7 @@ export function HomeScreen({
             title="Batch Validator"
             description="여러 파일을 한번에 검증하고 결과를 보고서로 내보냅니다"
             actionLabel="Select Files"
-            onAction={onNavigateToBatchValidator}
+            onAction={onOpenBatchFromHome}
           />
         </div>
       </div>

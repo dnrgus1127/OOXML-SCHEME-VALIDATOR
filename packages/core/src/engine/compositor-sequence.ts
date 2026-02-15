@@ -1,6 +1,10 @@
 import type { SchemaRegistry } from '../types'
 import { CompositorState, FlattenedParticle, makeQualifiedName } from '../runtime'
-import type { NamespaceResolver, CompositorValidationResult } from './compositor-types'
+import type {
+  NamespaceResolver,
+  CompositorValidationResult,
+  OccurrenceViolation,
+} from './compositor-types'
 import {
   getOrCreateNestedState,
   isNestedCompositor,
@@ -8,6 +12,20 @@ import {
   particleDescription,
   resetNestedState,
 } from './compositor-utils'
+
+function createOccurrenceViolation(
+  particle: FlattenedParticle,
+  actualCount: number,
+  kind: 'tooMany' | 'tooFew'
+): OccurrenceViolation {
+  return {
+    elementName: particleDescription(particle),
+    minOccurs: particle.minOccurs,
+    maxOccurs: particle.maxOccurs,
+    actualCount,
+    kind,
+  }
+}
 
 /**
  * 필수 요소가 블로킹할 때, 시퀀스의 후속 파티클에서 매칭을 시도합니다.
@@ -71,16 +89,18 @@ function trySkipAhead(
 
     if (matched) {
       const skippedRequired: string[] = []
+      const skippedRequiredDetails: OccurrenceViolation[] = []
       for (let k = blockingIndex; k < j; k += 1) {
         const skipped = state.flattenedParticles[k]
         if (!skipped) continue
         const skippedCount = state.occurrenceCounts.get(k) ?? 0
         if (skippedCount < skipped.minOccurs) {
           skippedRequired.push(particleDescription(skipped))
+          skippedRequiredDetails.push(createOccurrenceViolation(skipped, skippedCount, 'tooFew'))
           state.occurrenceCounts.set(k, skipped.minOccurs)
         }
       }
-      return { success: true, matchedParticle, skippedRequired }
+      return { success: true, matchedParticle, skippedRequired, skippedRequiredDetails }
     }
   }
 
@@ -114,6 +134,29 @@ export function validateSequenceChild(
   ) => CompositorValidationResult
 ): CompositorValidationResult {
   const qualifiedName = makeQualifiedName(childNamespaceUri, childLocalName)
+  const findExhaustedParticle = (): FlattenedParticle | undefined =>
+    state.flattenedParticles.find((particle) => {
+      if (particle.maxOccurs === 'unbounded') {
+        return false
+      }
+
+      const count = state.occurrenceCounts.get(particle.index) ?? 0
+      return (
+        count >= particle.maxOccurs &&
+        particleAllows(qualifiedName, particle, state, registry, resolver)
+      )
+    })
+
+  const createTooManyResult = (particle: FlattenedParticle): CompositorValidationResult => {
+    const actualCount = (state.occurrenceCounts.get(particle.index) ?? 0) + 1
+    state.occurrenceCounts.set(particle.index, actualCount)
+    return {
+      success: false,
+      errorCode: 'TOO_MANY_ELEMENTS',
+      matchedParticle: particle,
+      occurrenceViolation: createOccurrenceViolation(particle, actualCount, 'tooMany'),
+    }
+  }
 
   for (let i = state.currentIndex; i < state.flattenedParticles.length; i += 1) {
     const particle = state.flattenedParticles[i]
@@ -173,7 +216,15 @@ export function validateSequenceChild(
           validateCompositorChild
         )
         if (skipResult) return skipResult
-        return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' }
+        const exhaustedParticle = findExhaustedParticle()
+        if (exhaustedParticle) {
+          return createTooManyResult(exhaustedParticle)
+        }
+        return {
+          success: false,
+          errorCode: 'MISSING_REQUIRED_ELEMENT',
+          occurrenceViolation: createOccurrenceViolation(particle, count, 'tooFew'),
+        }
       }
       continue
     }
@@ -184,7 +235,12 @@ export function validateSequenceChild(
       const count = (state.occurrenceCounts.get(i) ?? 0) + 1
       state.occurrenceCounts.set(i, count)
       if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
-        return { success: false, errorCode: 'TOO_MANY_ELEMENTS' }
+        return {
+          success: false,
+          errorCode: 'TOO_MANY_ELEMENTS',
+          matchedParticle: particle,
+          occurrenceViolation: createOccurrenceViolation(particle, count, 'tooMany'),
+        }
       }
 
       if (particle.maxOccurs !== 'unbounded' && count === particle.maxOccurs) {
@@ -209,8 +265,21 @@ export function validateSequenceChild(
         validateCompositorChild
       )
       if (skipResult) return skipResult
-      return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' }
+      const exhaustedParticle = findExhaustedParticle()
+      if (exhaustedParticle) {
+        return createTooManyResult(exhaustedParticle)
+      }
+      return {
+        success: false,
+        errorCode: 'MISSING_REQUIRED_ELEMENT',
+        occurrenceViolation: createOccurrenceViolation(particle, count, 'tooFew'),
+      }
     }
+  }
+
+  const exhaustedParticle = findExhaustedParticle()
+  if (exhaustedParticle) {
+    return createTooManyResult(exhaustedParticle)
   }
 
   return { success: false, errorCode: 'INVALID_ELEMENT' }

@@ -1,13 +1,32 @@
 import type { SchemaRegistry } from '../types'
 import { isAll, isChoice, isSequence } from '../types'
 import { CompositorState, FlattenedParticle, makeQualifiedName } from '../runtime'
-import type { NamespaceResolver, CompositorValidationResult } from './compositor-types'
+import type {
+  NamespaceResolver,
+  CompositorValidationResult,
+  OccurrenceViolation,
+} from './compositor-types'
 import {
   getOrCreateNestedState,
   isNestedCompositor,
+  particleDescription,
   particleAllows,
   resetNestedState,
 } from './compositor-utils'
+
+function createOccurrenceViolation(
+  particle: FlattenedParticle,
+  actualCount: number,
+  kind: 'tooMany' | 'tooFew'
+): OccurrenceViolation {
+  return {
+    elementName: particleDescription(particle),
+    minOccurs: particle.minOccurs,
+    maxOccurs: particle.maxOccurs,
+    actualCount,
+    kind,
+  }
+}
 
 /**
  * Try to match a child element against a particle.
@@ -113,7 +132,12 @@ export function validateChoiceChild(
           const count = (state.occurrenceCounts.get(state.selectedBranch) ?? 0) + 1
           state.occurrenceCounts.set(state.selectedBranch, count)
           if (particle.maxOccurs !== 'unbounded' && count > particle.maxOccurs) {
-            return { success: false, errorCode: 'TOO_MANY_ELEMENTS' }
+            return {
+              success: false,
+              errorCode: 'TOO_MANY_ELEMENTS',
+              matchedParticle: matchResult,
+              occurrenceViolation: createOccurrenceViolation(particle, count, 'tooMany'),
+            }
           }
         }
         return { success: true, matchedParticle: matchResult }
@@ -121,7 +145,11 @@ export function validateChoiceChild(
 
       const count = state.occurrenceCounts.get(particle.index) ?? 0
       if (count < particle.minOccurs) {
-        return { success: false, errorCode: 'MISSING_REQUIRED_ELEMENT' }
+        return {
+          success: false,
+          errorCode: 'MISSING_REQUIRED_ELEMENT',
+          occurrenceViolation: createOccurrenceViolation(particle, count, 'tooFew'),
+        }
       }
     }
 

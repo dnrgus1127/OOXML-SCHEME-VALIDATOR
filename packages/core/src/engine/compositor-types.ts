@@ -36,9 +36,30 @@ export interface CompositorValidationResult {
   matchedParticle?: FlattenedParticle
 
   /**
+   * Occurrence(min/maxOccurs) 제약 위반 상세 정보
+   */
+  occurrenceViolation?: OccurrenceViolation
+
+  /**
    * Skip-ahead 복구 시 스킵된 필수 요소 이름 목록
    * Sequence compositor에서 필수 요소가 블로킹할 때 후속 매칭을 시도하여
    * 성공한 경우, 건너뛴 필수 요소들의 이름을 보고합니다.
    */
   skippedRequired?: string[]
+
+  /**
+   * Skip-ahead 복구 시 스킵된 필수 요소들의 occurrence 위반 상세 정보
+   */
+  skippedRequiredDetails?: OccurrenceViolation[]
+}
+
+/**
+ * 요소 occurrence(min/maxOccurs) 위반 정보
+ */
+export interface OccurrenceViolation {
+  elementName: string
+  minOccurs: number
+  maxOccurs: number | 'unbounded'
+  actualCount: number
+  kind: 'tooMany' | 'tooFew'
 }

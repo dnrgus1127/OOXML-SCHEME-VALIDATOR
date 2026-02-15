@@ -12,6 +12,7 @@ const api = {
   // Dialog
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: (defaultPath?: string) => ipcRenderer.invoke('dialog:saveFile', defaultPath),
+  confirmFileChange: () => ipcRenderer.invoke('dialog:confirmFileChange'),
 
   // File system
   readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),

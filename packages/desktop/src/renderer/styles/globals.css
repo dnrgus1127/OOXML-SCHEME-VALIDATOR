@@ -18,6 +18,7 @@
   --success: #4ec9b0;
   --error: #f14c4c;
   --warning: #dcdcaa;
+  --mac-window-controls-gutter: 88px;
   --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
@@ -39,6 +40,19 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+/* Prevent hiddenInset traffic lights from overlapping app controls on macOS. */
+.app--mac .toolbar-left {
+  padding-left: var(--mac-window-controls-gutter);
+}
+
+.app--mac .batch-header {
+  padding-left: calc(16px + var(--mac-window-controls-gutter));
+}
+
+.app--mac .batch-toolbar {
+  padding-left: calc(16px + var(--mac-window-controls-gutter));
 }
 
 /* Toolbar */
