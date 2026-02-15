@@ -333,6 +333,10 @@ export class ValidationEngine {
       )
     }
 
+    if (violation.minOccurs === 1 && violation.maxOccurs === 1) {
+      return formatMessage('ELEMENT.MISSING_REQUIRED', violation.elementName)
+    }
+
     return formatMessage(
       'ELEMENT.COUNT_SHORTAGE',
       violation.elementName,

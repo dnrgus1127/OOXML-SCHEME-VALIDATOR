@@ -138,10 +138,8 @@ describe('sequence compositor skip-ahead recovery', () => {
     expect(missingErrors).toHaveLength(2)
     expect(missingErrors[0]!.message).toContain('idx')
     expect(missingErrors[1]!.message).toContain('order')
-    expect(missingErrors[0]!.message).toContain('허용되는 개수인 1개보다 1개 적습니다')
-    expect(missingErrors[0]!.message).toContain('실제 0개')
-    expect(missingErrors[1]!.message).toContain('허용되는 개수인 1개보다 1개 적습니다')
-    expect(missingErrors[1]!.message).toContain('실제 0개')
+    expect(missingErrors[0]!.message).toContain("필수 요소 'idx'가 누락되었습니다")
+    expect(missingErrors[1]!.message).toContain("필수 요소 'order'가 누락되었습니다")
 
     // No "허용되지 않는 요소" errors for tx, cat, val
     const invalidErrors = result.errors.filter((e) => e.message.includes('허용되지 않는 요소'))
@@ -191,10 +189,10 @@ describe('sequence compositor skip-ahead recovery', () => {
     // Should still get MISSING_REQUIRED_ELEMENT for idx (no skip-ahead match)
     const missingErrors = result.errors.filter((e) => e.code === 'MISSING_REQUIRED_ELEMENT')
     expect(missingErrors.length).toBeGreaterThan(0)
-    const hasShortageMessage = missingErrors.some((e) =>
-      e.message.includes('허용되는 개수인 1개보다 1개 적습니다')
+    const hasMissingRequiredMessage = missingErrors.some((e) =>
+      e.message.includes("필수 요소 'idx'가 누락되었습니다")
     )
-    expect(hasShortageMessage).toBe(true)
+    expect(hasMissingRequiredMessage).toBe(true)
   })
 
   it('should not affect normal sequence validation', () => {
