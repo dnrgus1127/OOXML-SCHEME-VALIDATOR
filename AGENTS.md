@@ -10,6 +10,13 @@ This repository is a `pnpm` + Turborepo monorepo for OOXML validation tooling.
 - `packages/desktop`: Electron + React desktop app (`src/main`, `src/preload`, `src/renderer`).
 - `tools/xsd-converter`: converts XSD files to runtime schema data.
 - `schemas/`: OOXML XSD sources; `docs/`: design and integration docs.
+- `agent/`: AI agent playbooks and mandatory working guides.
+
+## Mandatory Read For Desktop UI/UX Work
+
+- Required doc: `agent/desktop-ui-ux-agent-guide.md`
+- If a task touches `@ooxml/desktop` UI/UX (layout, components, styles, accessibility, interaction flow, visual design), agents must read this file before planning or implementing changes.
+- Apply the guide as the default quality gate for desktop design decisions.
 
 ## Build, Test, and Development Commands
 

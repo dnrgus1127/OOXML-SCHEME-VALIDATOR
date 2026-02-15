@@ -16,10 +16,17 @@ OOXML Schema Validator — a monorepo toolkit for validating XLSX, DOCX, and PPT
 - `packages/parser` — OOXML document parsing, ZIP handling, XML streaming/conversion
 - `tools/xsd-converter` — Build tool that converts XSD files to JSON schemas
 - `schemas/` — OOXML XSD source files (sml, wml, pml, dml, shared)
+- `agent/` — AI agent playbooks and mandatory task guides
 
 ### Future Development
 
 - `packages/mcp` — MCP server exposing validation tools (lower priority)
+
+## Mandatory Read For Desktop UI/UX Work
+
+- Required doc: `agent/desktop-ui-ux-agent-guide.md`
+- Any AI agent working on `packages/desktop` UI/UX must read this document before making design, layout, interaction, accessibility, or styling changes.
+- Treat it as the default implementation and review checklist for desktop UX tasks.
 
 ## Common Commands
 
