@@ -123,12 +123,17 @@ export function checkMissingRequiredElementDetails(
   state: CompositorState,
   registry: SchemaRegistry,
   resolver: NamespaceResolver,
-  checkMissingRequiredElementDetailsRecursive: (
+  checkMissingRequiredElementDetailsRecursive?: (
     state: CompositorState,
     registry: SchemaRegistry,
     resolver: NamespaceResolver
   ) => OccurrenceViolation[]
 ): OccurrenceViolation[] {
+  const recurse =
+    checkMissingRequiredElementDetailsRecursive ??
+    ((nestedState: CompositorState, nestedRegistry: SchemaRegistry, nestedResolver: NamespaceResolver) =>
+      checkMissingRequiredElementDetails(nestedState, nestedRegistry, nestedResolver))
+
   const missing: OccurrenceViolation[] = []
 
   if (state.kind === 'choice') {
@@ -151,9 +156,7 @@ export function checkMissingRequiredElementDetails(
 
       const nestedState = state.nestedStates.get(particle.index)
       if (nestedState) {
-        missing.push(
-          ...checkMissingRequiredElementDetailsRecursive(nestedState, registry, resolver)
-        )
+        missing.push(...recurse(nestedState, registry, resolver))
       }
     }
 
@@ -175,7 +178,7 @@ export function checkMissingRequiredElementDetails(
 
     const nestedState = state.nestedStates.get(particle.index)
     if (nestedState) {
-      missing.push(...checkMissingRequiredElementDetailsRecursive(nestedState, registry, resolver))
+      missing.push(...recurse(nestedState, registry, resolver))
     }
   }
 
