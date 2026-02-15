@@ -5,8 +5,9 @@
  */
 
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
+import { readFile as readFileAsync } from 'fs/promises'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
   ValidationEngine,
@@ -243,6 +244,239 @@ function setupIpcHandlers(): void {
     }
   )
 
+  // Open multiple files dialog
+  ipcMain.handle('dialog:openFiles', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    })
+
+    if (result.canceled) return null
+    return result.filePaths
+  })
+
+  // Batch validate multiple files
+  ipcMain.handle('ooxml:batchValidate', async (_, filePaths: string[]) => {
+    try {
+      const fileResults: Array<{
+        filePath: string
+        fileName: string
+        success: boolean
+        documentType?: string
+        validation?: {
+          valid: boolean
+          results: Array<{
+            path: string
+            valid: boolean
+            errors?: Array<{
+              code: string
+              message: string
+              path: string
+              value?: string
+              line?: number
+              column?: number
+            }>
+          }>
+          summary: {
+            totalParts: number
+            validParts: number
+            invalidParts: number
+            totalErrors: number
+          }
+        }
+        error?: string
+      }> = []
+
+      for (let i = 0; i < filePaths.length; i++) {
+        const filePath = filePaths[i]
+        if (!filePath) continue
+
+        // Send progress update
+        mainWindow?.webContents.send('batch:progress', { current: i + 1, total: filePaths.length })
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        try {
+          const buffer = await readFileAsync(filePath)
+          const doc = await OoxmlParser.fromBuffer(buffer)
+          const documentType = doc.documentType as OoxmlDocumentType
+
+          let registry: SchemaRegistry
+          try {
+            registry = loadSchemaRegistry(documentType)
+          } catch (schemaError) {
+            fileResults.push({
+              filePath,
+              fileName: basename(filePath) || filePath,
+              success: false,
+              error: `Schema loading failed: ${String(schemaError)}`,
+            })
+            continue
+          }
+
+          const results: {
+            path: string
+            valid: boolean
+            errors?: Array<{
+              code: string
+              message: string
+              path: string
+              value?: string
+              line?: number
+              column?: number
+            }>
+          }[] = []
+
+          for (const [path, part] of doc.parts) {
+            if (!part.contentType.includes('xml')) continue
+            if (path.includes('_rels/')) continue
+            if (path === '[Content_Types].xml') continue
+            if (path.startsWith('docProps/')) continue
+            if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
+
+            try {
+              const xmlContent = part.content.toString('utf-8')
+              const events = parseXmlToEventArray(xmlContent)
+              const engine = new ValidationEngine(registry, {
+                maxErrors: 100,
+                allowWhitespace: true,
+              })
+
+              for (const event of events) {
+                switch (event.type) {
+                  case 'startDocument':
+                    engine.startDocument()
+                    break
+                  case 'startElement':
+                    engine.startElement(event.element)
+                    break
+                  case 'text':
+                    engine.text(event.text)
+                    break
+                  case 'endElement':
+                    engine.endElement(event.element)
+                    break
+                  case 'endDocument':
+                    const result = engine.endDocument()
+                    if (result.valid) {
+                      results.push({ path, valid: true })
+                    } else {
+                      results.push({
+                        path,
+                        valid: false,
+                        errors: result.errors.map((err) => ({
+                          code: err.code,
+                          message: err.message,
+                          path: err.path,
+                          value: err.value,
+                          line: err.line,
+                          column: err.column,
+                        })),
+                      })
+                    }
+                    break
+                }
+              }
+            } catch (err) {
+              results.push({
+                path,
+                valid: false,
+                errors: [
+                  {
+                    code: 'XML_PARSE_ERROR',
+                    message: String(err),
+                    path: '/',
+                  },
+                ],
+              })
+            }
+          }
+
+          const valid = results.every((r) => r.valid)
+          const totalErrors = results.reduce((sum, r) => sum + (r.errors?.length || 0), 0)
+
+          fileResults.push({
+            filePath,
+            fileName: basename(filePath) || filePath,
+            success: true,
+            documentType,
+            validation: {
+              valid,
+              results,
+              summary: {
+                totalParts: results.length,
+                validParts: results.filter((r) => r.valid).length,
+                invalidParts: results.filter((r) => !r.valid).length,
+                totalErrors,
+              },
+            },
+          })
+        } catch (error) {
+          fileResults.push({
+            filePath,
+            fileName: basename(filePath) || filePath,
+            success: false,
+            error: String(error),
+          })
+        }
+      }
+
+      return { success: true, data: fileResults }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
+  })
+
+  // Export validation results
+  ipcMain.handle(
+    'export:results',
+    async (_, format: 'json' | 'csv' | 'html' | 'pdf', data: any) => {
+      try {
+        const result = await dialog.showSaveDialog(mainWindow!, {
+          defaultPath: `validation-results.${format}`,
+          filters: [
+            format === 'json' && { name: 'JSON', extensions: ['json'] },
+            format === 'csv' && { name: 'CSV', extensions: ['csv'] },
+            format === 'html' && { name: 'HTML', extensions: ['html'] },
+            format === 'pdf' && { name: 'PDF', extensions: ['pdf'] },
+          ].filter(Boolean) as any,
+        })
+
+        if (result.canceled || !result.filePath) {
+          return { success: false, error: 'Export cancelled' }
+        }
+
+        let content = ''
+
+        switch (format) {
+          case 'json':
+            content = JSON.stringify(data, null, 2)
+            break
+
+          case 'csv':
+            content = generateCSV(data)
+            break
+
+          case 'html':
+            content = generateHTML(data)
+            break
+
+          case 'pdf':
+            return { success: false, error: 'PDF export not yet implemented' }
+
+          default:
+            return { success: false, error: 'Unknown export format' }
+        }
+
+        writeFileSync(result.filePath, content, 'utf-8')
+        return { success: true, filePath: result.filePath }
+      } catch (error) {
+        return { success: false, error: String(error) }
+      }
+    }
+  )
+
   // Validate document with XSD schema validation
   ipcMain.handle('ooxml:validate', async (_, base64Data: string) => {
     try {
@@ -369,6 +603,167 @@ function setupIpcHandlers(): void {
       return { success: false, error: String(error) }
     }
   })
+}
+
+/**
+ * Generate CSV from validation results
+ */
+function generateCSV(data: any): string {
+  const lines: string[] = []
+  lines.push(
+    buildCsvRow(['File', 'Part', 'Status', 'Error Code', 'Error Message', 'Path', 'Line', 'Column'])
+  )
+
+  for (const file of data) {
+    if (!file.success) {
+      lines.push(buildCsvRow([file.fileName, '', 'ERROR', '', file.error, '', '', '']))
+      continue
+    }
+
+    if (!file.validation) continue
+
+    for (const part of file.validation.results) {
+      if (part.valid) {
+        lines.push(buildCsvRow([file.fileName, part.path, 'VALID', '', '', '', '', '']))
+      } else if (part.errors) {
+        for (const error of part.errors) {
+          lines.push(
+            buildCsvRow([
+              file.fileName,
+              part.path,
+              'INVALID',
+              error.code,
+              error.message,
+              error.path,
+              error.line ?? '',
+              error.column ?? '',
+            ])
+          )
+        }
+      }
+    }
+  }
+
+  // Add UTF-8 BOM for Excel compatibility
+  return '\uFEFF' + lines.join('\n')
+}
+
+function buildCsvRow(values: unknown[]): string {
+  return values.map(escapeCsvValue).join(',')
+}
+
+function escapeCsvValue(value: unknown): string {
+  const raw = value == null ? '' : String(value)
+  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const formulaSafe = /^[\s]*[=+\-@]/.test(normalized) ? `'${normalized}` : normalized
+  return `"${formulaSafe.replace(/"/g, '""')}"`
+}
+
+/**
+ * Escape HTML special characters to prevent XSS
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+/**
+ * Generate HTML report from validation results
+ */
+function generateHTML(data: any): string {
+  let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OOXML Validation Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    .summary { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .file { margin-bottom: 30px; border: 1px solid #ddd; border-radius: 5px; }
+    .file-header { background: #f9f9f9; padding: 15px; border-bottom: 1px solid #ddd; }
+    .file-header.valid { background: #e8f5e9; }
+    .file-header.invalid { background: #ffebee; }
+    .file-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+    .file-stats { font-size: 14px; color: #666; }
+    .parts { padding: 15px; }
+    .part { margin-bottom: 15px; }
+    .part-header { font-weight: bold; margin-bottom: 5px; }
+    .error { background: #fff3e0; padding: 10px; margin: 5px 0; border-left: 3px solid #ff9800; border-radius: 3px; }
+    .error-code { font-weight: bold; color: #e65100; }
+    .error-message { margin: 5px 0; }
+    .error-path { font-size: 12px; color: #666; font-family: monospace; }
+    .valid-badge { color: #4caf50; }
+    .invalid-badge { color: #f44336; }
+  </style>
+</head>
+<body>
+  <h1>OOXML Validation Report</h1>
+  <div class="summary">
+    <div><strong>Total Files:</strong> ${data.length}</div>
+    <div><strong>Valid Files:</strong> ${data.filter((f: any) => f.success && f.validation?.valid).length}</div>
+    <div><strong>Invalid Files:</strong> ${data.filter((f: any) => !f.success || !f.validation?.valid).length}</div>
+    <div><strong>Total Errors:</strong> ${data.reduce((sum: number, f: any) => sum + (f.validation?.summary?.totalErrors || 0), 0)}</div>
+  </div>
+`
+
+  for (const file of data) {
+    const isValid = file.success && file.validation?.valid
+    html += `
+  <div class="file">
+    <div class="file-header ${isValid ? 'valid' : 'invalid'}">
+      <div class="file-title">${escapeHtml(file.fileName)}</div>
+      <div class="file-stats">
+        ${file.success ? `
+          <span class="${isValid ? 'valid-badge' : 'invalid-badge'}">${isValid ? '✓ VALID' : '✗ INVALID'}</span>
+          ${file.validation ? `
+            | Parts: ${file.validation.summary.totalParts}
+            | Valid: ${file.validation.summary.validParts}
+            | Invalid: ${file.validation.summary.invalidParts}
+            | Errors: ${file.validation.summary.totalErrors}
+          ` : ''}
+        ` : `<span class="invalid-badge">✗ ERROR: ${escapeHtml(file.error ?? 'Unknown error')}</span>`}
+      </div>
+    </div>
+`
+
+    if (file.success && file.validation) {
+      const invalidParts = file.validation.results.filter((p: any) => !p.valid)
+      if (invalidParts.length > 0) {
+        html += `    <div class="parts">\n`
+        for (const part of invalidParts) {
+          html += `      <div class="part">
+        <div class="part-header">${escapeHtml(part.path)}</div>
+`
+          if (part.errors) {
+            for (const error of part.errors) {
+              html += `        <div class="error">
+          <div class="error-code">${escapeHtml(error.code)}</div>
+          <div class="error-message">${escapeHtml(error.message)}</div>
+          <div class="error-path">Path: ${escapeHtml(error.path)}${error.line ? ` | Line: ${error.line}` : ''}${error.column ? `, Col: ${error.column}` : ''}</div>
+        </div>
+`
+            }
+          }
+          html += `      </div>\n`
+        }
+        html += `    </div>\n`
+      }
+    }
+
+    html += `  </div>\n`
+  }
+
+  html += `
+</body>
+</html>`
+
+  return html
 }
 
 /**

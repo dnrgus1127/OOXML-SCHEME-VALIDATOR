@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
+import { HomeScreen } from './screens/HomeScreen'
+import { XmlEditorScreen } from './screens/XmlEditorScreen'
+import { BatchValidator } from './components/BatchValidator'
 import { useDocumentStore } from './stores/document'
-import { DocumentTree } from './components/DocumentTree'
-import { XmlEditor } from './components/XmlEditor'
-import { ValidationPanel } from './components/ValidationPanel'
-import { Toolbar } from './components/Toolbar'
 
 declare global {
   interface Window {
@@ -25,6 +24,15 @@ declare global {
         content: string
       ) => Promise<{ success: boolean; data?: string; error?: string }>
       validate: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
+      openFiles: () => Promise<string[] | null>
+      batchValidate: (
+        filePaths: string[]
+      ) => Promise<{ success: boolean; data?: any; error?: string }>
+      exportResults: (
+        format: 'json' | 'csv' | 'html' | 'pdf',
+        data: any
+      ) => Promise<{ success: boolean; filePath?: string; error?: string }>
+      onBatchProgress: (callback: (progress: { current: number; total: number }) => void) => () => void
       onFileOpened: (callback: (filePath: string) => void) => () => void
       onMenuSave: (callback: () => void) => () => void
       onMenuSaveAs: (callback: () => void) => () => void
@@ -33,174 +41,52 @@ declare global {
   }
 }
 
+type Screen = 'home' | 'xml-editor' | 'batch-validator'
+
 export default function App() {
-  const {
-    filePath,
-    documentData,
-    selectedPart,
-    partContent,
-    validationResults,
-    isLoading,
-    error,
-    setFilePath,
-    loadDocument,
-    selectPart,
-    updatePartContent,
-    modifiedContent,
-    saveDocument,
-    saveDocumentAs,
-    validate,
-    clearError,
-  } = useDocumentStore()
+  const [currentScreen, setCurrentScreen] = useState<Screen>('home')
+  const setFilePath = useDocumentStore((state) => state.setFilePath)
+  const loadDocument = useDocumentStore((state) => state.loadDocument)
 
-  const [showValidation, setShowValidation] = useState(true)
-
-  const isDirty = modifiedContent !== null && modifiedContent !== partContent
-
-  // Handle file open from menu
+  // Keep the global Open menu path working when app starts on the home screen.
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
+      if (currentScreen !== 'home') return
+      setCurrentScreen('xml-editor')
       setFilePath(path)
       await loadDocument(path)
     })
     return cleanup
-  }, [])
+  }, [currentScreen, setFilePath, loadDocument])
 
-  // Handle save from menu
-  useEffect(() => {
-    const cleanup = window.electronAPI.onMenuSave(async () => {
-      if (filePath) {
-        await saveDocument(filePath)
-        await validate()
-        setShowValidation(true)
-      }
-    })
-    return cleanup
-  }, [filePath])
-
-  // Handle save-as from menu
-  useEffect(() => {
-    const cleanup = window.electronAPI.onMenuSaveAs(async () => {
-      const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
-      if (newPath) {
-        await saveDocumentAs(newPath)
-        await validate()
-        setShowValidation(true)
-      }
-    })
-    return cleanup
-  }, [filePath, saveDocumentAs])
-
-  // Handle validate from menu
-  useEffect(() => {
-    const cleanup = window.electronAPI.onMenuValidate(async () => {
-      await validate()
-      setShowValidation(true)
-    })
-    return cleanup
-  }, [])
-
-  const handleOpenFile = async () => {
-    const path = await window.electronAPI.openFile()
-    if (path) {
-      setFilePath(path)
-      await loadDocument(path)
-    }
+  const handleNavigateToHome = () => {
+    setCurrentScreen('home')
   }
 
-  const handleSave = async () => {
-    if (!filePath) return
-    await saveDocument(filePath)
-    await validate()
-    setShowValidation(true)
+  const handleNavigateToXmlEditor = () => {
+    setCurrentScreen('xml-editor')
   }
 
-  const handleSaveAs = async () => {
-    const newPath = await window.electronAPI.saveFile(filePath ?? undefined)
-    if (newPath) {
-      await saveDocumentAs(newPath)
-      await validate()
-      setShowValidation(true)
-    }
-  }
-
-  const handleSelectPart = async (partPath: string) => {
-    await selectPart(partPath)
-  }
-
-  const handleContentChange = (content: string) => {
-    updatePartContent(content)
-  }
-
-  const handleValidate = async () => {
-    await validate()
-    setShowValidation(true)
+  const handleNavigateToBatchValidator = () => {
+    setCurrentScreen('batch-validator')
   }
 
   return (
     <div className="app">
-      <Toolbar
-        onOpenFile={handleOpenFile}
-        onSave={handleSave}
-        onSaveAs={handleSaveAs}
-        onValidate={handleValidate}
-        hasDocument={!!documentData}
-        filePath={filePath}
-        isDirty={isDirty}
-      />
-
-      {error && (
-        <div className="error-banner">
-          <span>{error}</span>
-          <button onClick={clearError}>×</button>
-        </div>
+      {currentScreen === 'home' && (
+        <HomeScreen
+          onNavigateToXmlEditor={handleNavigateToXmlEditor}
+          onNavigateToBatchValidator={handleNavigateToBatchValidator}
+        />
       )}
 
-      <div className="main-content">
-        {!documentData ? (
-          <div className="welcome">
-            <h1>OOXML Validator</h1>
-            <p>Open an Office document (xlsx, docx, pptx) to start</p>
-            <button onClick={handleOpenFile}>Open File</button>
-          </div>
-        ) : (
-          <>
-            <aside className="sidebar">
-              <DocumentTree
-                documentType={documentData.documentType}
-                parts={documentData.parts}
-                selectedPart={selectedPart}
-                onSelectPart={handleSelectPart}
-              />
-            </aside>
+      {currentScreen === 'xml-editor' && (
+        <XmlEditorScreen onNavigateHome={handleNavigateToHome} />
+      )}
 
-            <main className="editor-container">
-              {selectedPart && partContent !== null ? (
-                <XmlEditor
-                  content={partContent}
-                  partPath={selectedPart}
-                  onChange={handleContentChange}
-                />
-              ) : isLoading ? (
-                <div className="loading">Loading...</div>
-              ) : (
-                <div className="placeholder">Select a part from the tree to view its content</div>
-              )}
-            </main>
-
-            {showValidation && (
-              <aside className="validation-panel">
-                <ValidationPanel
-                  results={validationResults}
-                  onClose={() => setShowValidation(false)}
-                  onNavigate={handleSelectPart}
-                  onRevalidate={handleValidate}
-                />
-              </aside>
-            )}
-          </>
-        )}
-      </div>
+      {currentScreen === 'batch-validator' && (
+        <BatchValidator onClose={handleNavigateToHome} />
+      )}
     </div>
   )
 }

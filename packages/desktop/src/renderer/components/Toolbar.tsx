@@ -6,6 +6,7 @@ interface ToolbarProps {
   hasDocument: boolean
   filePath: string | null
   isDirty: boolean
+  onNavigateHome?: () => void
 }
 
 export function Toolbar({
@@ -16,12 +17,18 @@ export function Toolbar({
   hasDocument,
   filePath,
   isDirty,
+  onNavigateHome,
 }: ToolbarProps) {
-  const fileName = filePath ? filePath.split('/').pop() : null
+  const fileName = filePath ? filePath.split(/[\\/]/).pop() : null
 
   return (
     <header className="toolbar">
       <div className="toolbar-left">
+        {onNavigateHome && (
+          <button onClick={onNavigateHome} className="toolbar-btn">
+            🏠 Home
+          </button>
+        )}
         <button onClick={onOpenFile} className="toolbar-btn">
           📂 Open
         </button>

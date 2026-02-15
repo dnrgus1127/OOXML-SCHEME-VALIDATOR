@@ -24,22 +24,39 @@ const api = {
     ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content),
   validate: (base64Data: string) => ipcRenderer.invoke('ooxml:validate', base64Data),
 
+  // Batch operations
+  openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
+  batchValidate: (filePaths: string[]) =>
+    ipcRenderer.invoke('ooxml:batchValidate', filePaths),
+  exportResults: (format: 'json' | 'csv' | 'html' | 'pdf', data: any) =>
+    ipcRenderer.invoke('export:results', format, data),
+  onBatchProgress: (callback: (progress: { current: number; total: number }) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, progress: { current: number; total: number }) =>
+      callback(progress)
+    ipcRenderer.on('batch:progress', listener)
+    return () => ipcRenderer.removeListener('batch:progress', listener)
+  },
+
   // Menu events
   onFileOpened: (callback: (filePath: string) => void) => {
-    ipcRenderer.on('file:opened', (_, filePath) => callback(filePath))
-    return () => ipcRenderer.removeAllListeners('file:opened')
+    const listener = (_: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
+    ipcRenderer.on('file:opened', listener)
+    return () => ipcRenderer.removeListener('file:opened', listener)
   },
   onMenuSave: (callback: () => void) => {
-    ipcRenderer.on('menu:save', () => callback())
-    return () => ipcRenderer.removeAllListeners('menu:save')
+    const listener = () => callback()
+    ipcRenderer.on('menu:save', listener)
+    return () => ipcRenderer.removeListener('menu:save', listener)
   },
   onMenuSaveAs: (callback: () => void) => {
-    ipcRenderer.on('menu:save-as', () => callback())
-    return () => ipcRenderer.removeAllListeners('menu:save-as')
+    const listener = () => callback()
+    ipcRenderer.on('menu:save-as', listener)
+    return () => ipcRenderer.removeListener('menu:save-as', listener)
   },
   onMenuValidate: (callback: () => void) => {
-    ipcRenderer.on('menu:validate', () => callback())
-    return () => ipcRenderer.removeAllListeners('menu:validate')
+    const listener = () => callback()
+    ipcRenderer.on('menu:validate', listener)
+    return () => ipcRenderer.removeListener('menu:validate', listener)
   },
 }
 
