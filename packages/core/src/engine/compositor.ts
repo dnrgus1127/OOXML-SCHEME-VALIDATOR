@@ -18,12 +18,17 @@
 
 import type { SchemaRegistry } from '../types'
 import { CompositorState } from '../runtime'
-import type { NamespaceResolver, CompositorValidationResult } from './compositor-types'
+import type {
+  NamespaceResolver,
+  CompositorValidationResult,
+  OccurrenceViolation,
+} from './compositor-types'
 import { validateSequenceChild } from './compositor-sequence'
 import { validateChoiceChild } from './compositor-choice'
 import {
   validateAllChild,
   checkMissingRequiredElements as checkMissingAllElements,
+  checkMissingRequiredElementDetails as checkMissingAllElementDetails,
 } from './compositor-all'
 import {
   initCompositorState as initCompositorStateFromInit,
@@ -104,4 +109,15 @@ export function checkMissingRequiredElements(
   resolver: NamespaceResolver
 ): string[] {
   return checkMissingAllElements(state, registry, resolver, checkMissingRequiredElements)
+}
+
+/**
+ * Compositor 상태에서 필수 요소의 occurrence(minOccurs) 부족 상세 정보를 반환합니다.
+ */
+export function checkMissingRequiredElementDetails(
+  state: CompositorState,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver
+): OccurrenceViolation[] {
+  return checkMissingAllElementDetails(state, registry, resolver, checkMissingRequiredElementDetails)
 }
