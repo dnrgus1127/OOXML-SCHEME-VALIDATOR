@@ -4,6 +4,7 @@ import { DocumentTree } from '../components/DocumentTree'
 import { XmlEditor } from '../components/XmlEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { Toolbar } from '../components/Toolbar'
+import { useSettingsStore } from '../stores/settings'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
@@ -29,6 +30,7 @@ export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScr
     validate,
     clearError,
   } = useDocumentStore()
+  const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
 
   const [showValidation, setShowValidation] = useState(true)
 
@@ -49,8 +51,12 @@ export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScr
     async (path: string) => {
       setFilePath(path)
       await loadDocument(path)
+      if (validateOnOpen) {
+        await validate()
+        setShowValidation(true)
+      }
     },
-    [setFilePath, loadDocument]
+    [loadDocument, setFilePath, validate, validateOnOpen]
   )
 
   const handleChangeFile = useCallback(

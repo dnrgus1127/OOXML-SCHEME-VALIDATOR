@@ -4,6 +4,7 @@ import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { useDocumentStore } from './stores/document'
+import { useSettingsStore } from './stores/settings'
 
 declare global {
   interface Window {
@@ -52,6 +53,8 @@ export default function App() {
   const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
+  const validateDocument = useDocumentStore((state) => state.validate)
+  const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const isMac = navigator.platform.includes('Mac')
 
   // Keep the global Open menu path working when app starts on the home screen.
@@ -62,9 +65,12 @@ export default function App() {
       setCurrentScreen('xml-editor')
       setFilePath(path)
       await loadDocument(path)
+      if (validateOnOpen) {
+        await validateDocument()
+      }
     })
     return cleanup
-  }, [currentScreen, setFilePath, loadDocument])
+  }, [currentScreen, loadDocument, setFilePath, validateDocument, validateOnOpen])
 
   const handleNavigateToHome = () => {
     setBatchInitialFilePaths(null)
@@ -87,6 +93,9 @@ export default function App() {
     setCurrentScreen('xml-editor')
     setFilePath(path)
     await loadDocument(path)
+    if (validateOnOpen) {
+      await validateDocument()
+    }
   }
 
   const handleOpenBatchFromHome = async () => {
