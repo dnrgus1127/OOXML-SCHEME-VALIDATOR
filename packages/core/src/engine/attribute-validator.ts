@@ -5,7 +5,7 @@ import type {
   XsdAnyAttribute,
   XsdComplexType,
 } from '../types'
-import { hasComplexContent, isSimpleType } from '../types'
+import { hasComplexContent, hasSimpleContent, isSimpleType } from '../types'
 import type { XmlAttribute, ElementStackFrame } from '../runtime'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
@@ -72,6 +72,15 @@ function collectAllAttributes(
     }
   }
 
+  if (hasSimpleContent(schemaType.content)) {
+    const derivation = schemaType.content.content
+    attributes.push(...derivation.attributes)
+    attributeGroups.push(...derivation.attributeGroups)
+    if (derivation.anyAttribute) {
+      anyAttribute = anyAttribute ?? derivation.anyAttribute
+    }
+  }
+
   return { attributes, attributeGroups, anyAttribute }
 }
 
@@ -116,6 +125,103 @@ function validateAttributeValue(
   }
 }
 
+function parseAttributeLocalName(name: string): string {
+  const colonIndex = name.indexOf(':')
+  return colonIndex >= 0 ? name.slice(colonIndex + 1) : name
+}
+
+function getAttributeDisplayName(attr: XsdAttribute): string {
+  if (attr.name) {
+    return attr.name
+  }
+  if (!attr.ref) {
+    return ''
+  }
+  if (!attr.ref.namespacePrefix) {
+    return attr.ref.name
+  }
+  return `${attr.ref.namespacePrefix}:${attr.ref.name}`
+}
+
+function getSchemaAttributeKey(
+  attr: XsdAttribute,
+  namespaceContext: Map<string, string>,
+  registry: SchemaRegistry,
+  fallbackNamespaceUri: string
+): string | undefined {
+  if (attr.ref) {
+    const namespaceUri = resolveNamespaceWithFallback(
+      namespaceContext,
+      attr.ref.namespacePrefix,
+      registry,
+      fallbackNamespaceUri
+    )
+    let resolvedNamespaceUri = namespaceUri || (!attr.ref.namespacePrefix ? fallbackNamespaceUri : '')
+    if (!resolvedNamespaceUri && attr.ref.namespacePrefix === 'xml') {
+      resolvedNamespaceUri = 'http://www.w3.org/XML/1998/namespace'
+    }
+    return `${resolvedNamespaceUri}:${attr.ref.name}`
+  }
+
+  if (attr.name) {
+    return `:${attr.name}`
+  }
+
+  return undefined
+}
+
+function getXmlAttributeKey(attr: XmlAttribute): string {
+  let namespaceUri = attr.namespaceUri ?? ''
+  if (!namespaceUri && attr.name.startsWith('xml:')) {
+    namespaceUri = 'http://www.w3.org/XML/1998/namespace'
+  }
+  const localName = attr.localName || parseAttributeLocalName(attr.name)
+  return `${namespaceUri}:${localName}`
+}
+
+function buildAllowedAttributes(
+  collected: {
+    attributes: XsdAttribute[]
+    attributeGroups: XsdAttributeGroup[]
+    anyAttribute?: XsdAnyAttribute
+  },
+  namespaceContext: Map<string, string>,
+  registry: SchemaRegistry,
+  fallbackNamespaceUri: string
+): Map<string, XsdAttribute> {
+  const allowedAttributes = new Map<string, XsdAttribute>()
+
+  const addAttribute = (attr: XsdAttribute) => {
+    const key = getSchemaAttributeKey(attr, namespaceContext, registry, fallbackNamespaceUri)
+    if (key) {
+      allowedAttributes.set(key, attr)
+    }
+  }
+
+  for (const attr of collected.attributes) {
+    addAttribute(attr)
+  }
+
+  for (const group of collected.attributeGroups) {
+    if (group.ref) {
+      const namespaceUri = resolveNamespaceWithFallback(
+        namespaceContext,
+        group.ref.namespacePrefix,
+        registry,
+        fallbackNamespaceUri
+      )
+      const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
+      if (resolved?.attributes) {
+        for (const attr of resolved.attributes) {
+          addAttribute(attr)
+        }
+      }
+    }
+  }
+
+  return allowedAttributes
+}
+
 export function validateAttributes(
   attributes: XmlAttribute[],
   schemaType: XsdComplexType,
@@ -130,32 +236,12 @@ export function validateAttributes(
     registry,
     fallbackNamespaceUri
   )
-  const allowedAttributes = new Map<string, XsdAttribute>()
-
-  for (const attr of collected.attributes) {
-    if (attr.name) {
-      allowedAttributes.set(attr.name, attr)
-    }
-  }
-
-  for (const group of collected.attributeGroups) {
-    if (group.ref) {
-      const namespaceUri = resolveNamespaceWithFallback(
-        namespaceContext,
-        group.ref.namespacePrefix,
-        registry,
-        fallbackNamespaceUri
-      )
-      const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
-      if (resolved?.attributes) {
-        for (const attr of resolved.attributes) {
-          if (attr.name) {
-            allowedAttributes.set(attr.name, attr)
-          }
-        }
-      }
-    }
-  }
+  const allowedAttributes = buildAllowedAttributes(
+    collected,
+    namespaceContext,
+    registry,
+    fallbackNamespaceUri
+  )
 
   const validated = new Set<string>()
 
@@ -164,8 +250,8 @@ export function validateAttributes(
       continue
     }
 
-    const attrName = xmlAttr.localName ?? xmlAttr.name
-    const schemaDef = allowedAttributes.get(attrName)
+    const attrKey = getXmlAttributeKey(xmlAttr)
+    const schemaDef = allowedAttributes.get(attrKey)
     if (!schemaDef) {
       if (collected.anyAttribute) {
         continue
@@ -182,12 +268,15 @@ export function validateAttributes(
       errorHandler,
       fallbackNamespaceUri
     )
-    validated.add(attrName)
+    validated.add(attrKey)
   }
 
-  for (const attr of allowedAttributes.values()) {
-    if (attr.use === 'prohibited' && validated.has(attr.name ?? '')) {
-      errorHandler.pushError('INVALID_ATTRIBUTE', formatMessage('ATTRIBUTE.PROHIBITED', attr.name!))
+  for (const [attrKey, attr] of allowedAttributes.entries()) {
+    if (attr.use === 'prohibited' && validated.has(attrKey)) {
+      errorHandler.pushError(
+        'INVALID_ATTRIBUTE',
+        formatMessage('ATTRIBUTE.PROHIBITED', getAttributeDisplayName(attr))
+      )
     }
   }
 
@@ -208,29 +297,19 @@ export function checkRequiredAttributes(
     registry,
     fallbackNamespaceUri
   )
+  const allowedAttributes = buildAllowedAttributes(
+    collected,
+    namespaceContext,
+    registry,
+    fallbackNamespaceUri
+  )
 
-  for (const attr of collected.attributes) {
-    if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
-      errorHandler.pushError('MISSING_REQUIRED_ATTR', formatMessage('ATTRIBUTE.MISSING_REQUIRED', attr.name!))
-    }
-  }
-
-  for (const group of collected.attributeGroups) {
-    if (group.ref) {
-      const namespaceUri = resolveNamespaceWithFallback(
-        namespaceContext,
-        group.ref.namespacePrefix,
-        registry,
-        fallbackNamespaceUri
+  for (const [attrKey, attr] of allowedAttributes.entries()) {
+    if (attr.use === 'required' && !frame.validatedAttributes.has(attrKey)) {
+      errorHandler.pushError(
+        'MISSING_REQUIRED_ATTR',
+        formatMessage('ATTRIBUTE.MISSING_REQUIRED', getAttributeDisplayName(attr))
       )
-      const resolved = registry.resolveAttributeGroup(namespaceUri, group.ref.name)
-      if (resolved?.attributes) {
-        for (const attr of resolved.attributes) {
-          if (attr.use === 'required' && attr.name && !frame.validatedAttributes.has(attr.name)) {
-            errorHandler.pushError('MISSING_REQUIRED_ATTR', formatMessage('ATTRIBUTE.MISSING_REQUIRED', attr.name!))
-          }
-        }
-      }
     }
   }
 }

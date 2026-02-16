@@ -12,6 +12,29 @@ import { CompositorState } from '../runtime'
 import type { NamespaceResolver } from './compositor-types'
 import { flattenParticles, resolveGroupCompositor } from './compositor-utils'
 
+function hasNonDefaultOccurs(compositor: XsdSequence | XsdChoice | XsdAll): boolean {
+  return compositor.occurs.minOccurs !== 1 || compositor.occurs.maxOccurs !== 1
+}
+
+function createRootCompositorState(
+  compositor: XsdSequence | XsdChoice | XsdAll,
+  registry: SchemaRegistry,
+  resolver: NamespaceResolver
+): CompositorState {
+  // Root compositor repetition (e.g. CT_Types choice maxOccurs="unbounded")
+  // must be modeled by a parent sequence so re-occurrence can select a new branch.
+  if (hasNonDefaultOccurs(compositor)) {
+    const wrapped: XsdSequence = {
+      kind: 'sequence',
+      particles: [compositor],
+      occurs: { minOccurs: 1, maxOccurs: 1 },
+    }
+    return createCompositorState(wrapped, registry, resolver)
+  }
+
+  return createCompositorState(compositor, registry, resolver)
+}
+
 /**
  * Compositor로부터 상태 객체를 생성합니다.
  *
@@ -66,7 +89,7 @@ export function initCompositorState(
     if (!compositor) {
       return null
     }
-    return createCompositorState(compositor, registry, resolver)
+    return createRootCompositorState(compositor, registry, resolver)
   }
 
   if (hasComplexContent(schemaType.content)) {
@@ -94,7 +117,7 @@ function initComplexContentCompositorState(
     if (!extensionCompositor) {
       return null
     }
-    return createCompositorState(extensionCompositor, registry, resolver)
+    return createRootCompositorState(extensionCompositor, registry, resolver)
   }
 
   return mergeCompositors(baseResult.compositor, extensionCompositor, registry, resolver)

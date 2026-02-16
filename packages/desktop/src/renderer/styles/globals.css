@@ -615,19 +615,192 @@ body {
 /* Home Screen */
 .home-screen {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  gap: 24px;
   flex: 1;
-  padding: 40px;
+  min-height: 0;
+  padding: 24px;
+}
+
+.home-recent-panel {
+  width: 360px;
+  min-width: 320px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.home-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.home-recent-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.recent-clear-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recent-clear-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.recent-clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.home-recent-error {
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(241, 76, 76, 0.35);
+  background: rgba(241, 76, 76, 0.12);
+  border-radius: 6px;
+  color: #ffb3b3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.home-recent-error button {
+  border: none;
+  background: transparent;
+  color: #ffb3b3;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.home-recent-empty {
+  padding: 18px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.home-recent-list {
+  list-style: none;
+  padding: 8px 12px 12px;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-recent-item {
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-recent-item:hover {
+  background: var(--bg-hover);
+  border-color: rgba(0, 120, 212, 0.6);
+}
+
+.home-recent-item:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.home-recent-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.home-recent-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-recent-item-path {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-recent-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.home-tool-badge {
+  border: 1px solid rgba(0, 120, 212, 0.45);
+  background: rgba(0, 120, 212, 0.15);
+  color: #9ad1ff;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.home-recent-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.home-recent-remove-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.home-recent-remove-btn:hover {
+  color: var(--error);
+}
+
+.home-main {
   position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .home-settings-btn {
   position: absolute;
-  top: 14px;
-  right: 16px;
+  top: 0;
+  right: 0;
   width: 28px;
   height: 28px;
   display: inline-flex;
@@ -671,7 +844,6 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 280px);
   gap: 24px;
-  margin-bottom: 48px;
 }
 
 .tool-card {
@@ -728,6 +900,31 @@ body {
 
 .tool-action:hover {
   opacity: 0.9;
+}
+
+@media (max-width: 1120px) {
+  .home-screen {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .home-recent-panel {
+    width: 100%;
+    min-width: 0;
+    max-height: 280px;
+  }
+
+  .home-main {
+    justify-content: flex-start;
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .tools-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
+    justify-content: center;
+    width: 100%;
+  }
 }
 
 /* Batch Validator */

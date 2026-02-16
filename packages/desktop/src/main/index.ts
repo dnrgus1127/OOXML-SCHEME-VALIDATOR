@@ -6,7 +6,7 @@
 
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { basename, join } from 'path'
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readFile as readFileAsync } from 'fs/promises'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
@@ -16,6 +16,15 @@ import {
   type ValidationError,
   type SchemaRegistry,
 } from '@ooxml/core'
+import { shouldValidateXmlPart } from './part-validation-filter'
+import {
+  addRecentFile,
+  addRecentFiles,
+  clearRecentFiles,
+  listRecentFiles,
+  removeRecentFile,
+} from './recent-files-store'
+import type { OpenTool } from '../shared/recent-files'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -198,6 +207,58 @@ function setupIpcHandlers(): void {
     }
   })
 
+  // Check file existence
+  ipcMain.handle('fs:exists', async (_, filePath: string) => {
+    try {
+      return existsSync(filePath)
+    } catch {
+      return false
+    }
+  })
+
+  // Recent files
+  ipcMain.handle('recent-files:list', async () => {
+    return listRecentFiles()
+  })
+
+  const isValidRecentFileInput = (
+    input: unknown
+  ): input is {
+    filePath: string
+    fileName?: string
+    lastTool: OpenTool
+  } => {
+    if (!input || typeof input !== 'object') return false
+    const value = input as { filePath?: unknown; fileName?: unknown; lastTool?: unknown }
+    if (typeof value.filePath !== 'string' || value.filePath.length === 0) return false
+    if (value.fileName != null && typeof value.fileName !== 'string') return false
+    return value.lastTool === 'xml-editor' || value.lastTool === 'batch-validator'
+  }
+
+  ipcMain.handle(
+    'recent-files:add',
+    async (_, input: { filePath: string; fileName?: string; lastTool: OpenTool }) => {
+      if (!isValidRecentFileInput(input)) return listRecentFiles()
+      return addRecentFile(input)
+    }
+  )
+
+  ipcMain.handle('recent-files:add-many', async (_, inputs: unknown[]) => {
+    if (!Array.isArray(inputs) || inputs.length === 0) return listRecentFiles()
+    const validInputs = inputs.filter(isValidRecentFileInput)
+    if (validInputs.length === 0) return listRecentFiles()
+    return addRecentFiles(validInputs)
+  })
+
+  ipcMain.handle('recent-files:remove', async (_, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath) return listRecentFiles()
+    return removeRecentFile(filePath)
+  })
+
+  ipcMain.handle('recent-files:clear', async () => {
+    return clearRecentFiles()
+  })
+
   // Parse OOXML document
   ipcMain.handle('ooxml:parse', async (_, base64Data: string) => {
     try {
@@ -345,11 +406,7 @@ function setupIpcHandlers(): void {
           }[] = []
 
           for (const [path, part] of doc.parts) {
-            if (!part.contentType.includes('xml')) continue
-            if (path.includes('_rels/')) continue
-            if (path === '[Content_Types].xml') continue
-            if (path.startsWith('docProps/')) continue
-            if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
+            if (!shouldValidateXmlPart(path, part.contentType)) continue
 
             try {
               const xmlContent = part.content.toString('utf-8')
@@ -525,16 +582,7 @@ function setupIpcHandlers(): void {
       }[] = []
 
       for (const [path, part] of doc.parts) {
-        // Skip non-XML parts
-        if (!part.contentType.includes('xml')) continue
-        // Skip relationship parts
-        if (path.includes('_rels/')) continue
-        // Skip content types
-        if (path === '[Content_Types].xml') continue
-        // Skip docProps - uses Dublin Core and extended properties namespaces not in our schema set
-        if (path.startsWith('docProps/')) continue
-        // Skip customXml root - custom XML data isn't validated against OOXML schemas
-        if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
+        if (!shouldValidateXmlPart(path, part.contentType)) continue
 
         try {
           const xmlContent = part.content.toString('utf-8')
@@ -735,15 +783,23 @@ function generateHTML(data: any): string {
     <div class="file-header ${isValid ? 'valid' : 'invalid'}">
       <div class="file-title">${escapeHtml(file.fileName)}</div>
       <div class="file-stats">
-        ${file.success ? `
+        ${
+          file.success
+            ? `
           <span class="${isValid ? 'valid-badge' : 'invalid-badge'}">${isValid ? '✓ VALID' : '✗ INVALID'}</span>
-          ${file.validation ? `
+          ${
+            file.validation
+              ? `
             | Parts: ${file.validation.summary.totalParts}
             | Valid: ${file.validation.summary.validParts}
             | Invalid: ${file.validation.summary.invalidParts}
             | Errors: ${file.validation.summary.totalErrors}
-          ` : ''}
-        ` : `<span class="invalid-badge">✗ ERROR: ${escapeHtml(file.error ?? 'Unknown error')}</span>`}
+          `
+              : ''
+          }
+        `
+            : `<span class="invalid-badge">✗ ERROR: ${escapeHtml(file.error ?? 'Unknown error')}</span>`
+        }
       </div>
     </div>
 `
@@ -789,11 +845,7 @@ async function basicValidation(doc: Awaited<ReturnType<typeof OoxmlParser.fromBu
   const results: { path: string; valid: boolean; error?: string }[] = []
 
   for (const [path, part] of doc.parts) {
-    if (!part.contentType.includes('xml')) continue
-    if (path.includes('_rels/')) continue
-    if (path === '[Content_Types].xml') continue
-    if (path.startsWith('docProps/')) continue
-    if (path.startsWith('customXml/') && !path.includes('itemProps')) continue
+    if (!shouldValidateXmlPart(path, part.contentType)) continue
 
     try {
       const xmlContent = part.content.toString('utf-8')

@@ -23,7 +23,14 @@ export function validateSimpleTypeValue(
 ): void {
   const content = simpleType.content
   if (content.kind === 'restriction') {
-    validateRestriction(value, content, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
+    validateRestriction(
+      value,
+      content,
+      namespaceContext,
+      registry,
+      errorHandler,
+      fallbackNamespaceUri
+    )
     return
   }
 
@@ -166,7 +173,14 @@ export function validateBuiltinOrReferencedType(
     return false
   }
 
-  validateSimpleTypeValue(value, resolved, namespaceContext, registry, errorHandler, fallbackNamespaceUri)
+  validateSimpleTypeValue(
+    value,
+    resolved,
+    namespaceContext,
+    registry,
+    errorHandler,
+    fallbackNamespaceUri
+  )
   return true
 }
 
@@ -197,19 +211,31 @@ export function validateFacet(value: string, facet: Facet): boolean {
   switch (facet.type) {
     case 'enumeration':
       return facet.values.includes(value)
-    case 'pattern':
-      return facet.patterns.some((pattern) => {
-        const regex = new RegExp(`^${pattern}$`)
+    case 'pattern': // XML Schema regex syntax is richer than JavaScript regex (e.g. class subtraction),
+    // so we validate with the subset JS can compile and ignore unsupported patterns.
+    {
+      let hasCompilablePattern = false
+
+      for (const pattern of facet.patterns) {
+        let regex: RegExp
+        try {
+          regex = new RegExp(`^${pattern}$`)
+          hasCompilablePattern = true
+        } catch {
+          continue
+        }
+
         if (regex.test(value)) {
           return true
         }
 
-        if (pattern.includes('%') && /^\d+$/.test(value)) {
-          return regex.test(`${value}%`)
+        if (pattern.includes('%') && /^\d+$/.test(value) && regex.test(`${value}%`)) {
+          return true
         }
+      }
 
-        return false
-      })
+      return hasCompilablePattern ? false : true
+    }
     case 'minLength':
       return value.length >= facet.value
     case 'maxLength':

@@ -355,6 +355,7 @@ export class ValidationEngine {
         typeRef?: TypeReference
         inlineComplexType?: XsdComplexType
         inlineSimpleType?: XsdSimpleType
+        substitutionGroup?: TypeReference
       }
     | undefined {
     const p = particle.particle
@@ -374,6 +375,7 @@ export class ValidationEngine {
         typeRef: p.typeRef,
         inlineComplexType: p.inlineComplexType,
         inlineSimpleType: p.inlineSimpleType,
+        substitutionGroup: p.substitutionGroup,
       }
     }
 

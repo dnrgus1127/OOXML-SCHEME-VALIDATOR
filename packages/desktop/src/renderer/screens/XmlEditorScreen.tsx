@@ -10,9 +10,19 @@ import { matchesShortcut } from '../utils/shortcuts'
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
   onOpenSettings: () => void
+  onRecentRecord?: () => Promise<void> | void
 }
 
-export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScreenProps) {
+function getFileName(filePath: string): string {
+  const segments = filePath.split(/[\\/]/)
+  return segments[segments.length - 1] || filePath
+}
+
+export function XmlEditorScreen({
+  onNavigateHome,
+  onOpenSettings,
+  onRecentRecord,
+}: XmlEditorScreenProps) {
   const {
     filePath,
     documentData,
@@ -52,13 +62,24 @@ export function XmlEditorScreen({ onNavigateHome, onOpenSettings }: XmlEditorScr
   const loadFileAtPath = useCallback(
     async (path: string) => {
       setFilePath(path)
-      await loadDocument(path)
+      const loaded = await loadDocument(path)
+      if (!loaded) return false
+
+      await window.electronAPI.addRecentFile({
+        filePath: path,
+        fileName: getFileName(path),
+        lastTool: 'xml-editor',
+      })
+      await onRecentRecord?.()
+
       if (validateOnOpen) {
         await validate()
         setShowValidation(true)
       }
+
+      return true
     },
-    [loadDocument, setFilePath, validate, validateOnOpen]
+    [loadDocument, onRecentRecord, setFilePath, validate, validateOnOpen]
   )
 
   const handleChangeFile = useCallback(
