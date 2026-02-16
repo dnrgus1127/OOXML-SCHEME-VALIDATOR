@@ -32,6 +32,16 @@ export function HomeScreen({
 }: HomeScreenProps) {
   return (
     <div className="home-screen">
+      <button
+        type="button"
+        className="home-settings-btn"
+        onClick={onOpenSettingsFromHome}
+        aria-label="Open settings"
+        title="Settings"
+      >
+        ⚙
+      </button>
+
       <div className="home-header">
         <h1 className="home-title">OOXML Validator</h1>
         <p className="home-subtitle">Choose a tool to get started</p>
@@ -52,14 +62,6 @@ export function HomeScreen({
           description="여러 파일을 한번에 검증하고 결과를 보고서로 내보냅니다"
           actionLabel="Select Files"
           onAction={onOpenBatchFromHome}
-        />
-
-        <ToolCard
-          icon="⚙️"
-          title="Settings"
-          description="앱 기본 설정과 툴별 설정을 관리합니다"
-          actionLabel="Open Settings"
-          onAction={onOpenSettingsFromHome}
         />
       </div>
     </div>

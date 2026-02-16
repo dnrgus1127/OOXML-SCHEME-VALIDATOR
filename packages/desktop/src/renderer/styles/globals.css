@@ -621,6 +621,34 @@ body {
   flex: 1;
   padding: 40px;
   overflow-y: auto;
+  position: relative;
+}
+
+.home-settings-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.home-settings-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.home-settings-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .home-header {
@@ -641,8 +669,7 @@ body {
 
 .tools-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
-  justify-content: center;
+  grid-template-columns: repeat(2, 280px);
   gap: 24px;
   margin-bottom: 48px;
 }
