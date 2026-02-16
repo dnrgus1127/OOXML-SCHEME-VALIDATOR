@@ -10,6 +10,7 @@ export function resolveSchemaElementType(
         typeRef?: TypeReference
         inlineComplexType?: XsdComplexType
         inlineSimpleType?: XsdSimpleType
+        substitutionGroup?: TypeReference
       }
     | undefined,
   namespaceContext: Map<string, string>,
@@ -37,6 +38,77 @@ export function resolveSchemaElementType(
       registry,
       onError,
       element.namespaceUri
+    )
+  }
+
+  if (schemaElement.substitutionGroup) {
+    return resolveElementTypeFromSubstitutionGroup(
+      schemaElement.substitutionGroup,
+      namespaceContext,
+      registry,
+      onError,
+      element.namespaceUri,
+      new Set()
+    )
+  }
+
+  return null
+}
+
+function resolveElementTypeFromSubstitutionGroup(
+  substitutionGroup: TypeReference,
+  namespaceContext: Map<string, string>,
+  registry: SchemaRegistry,
+  onError: ErrorCallback,
+  fallbackNamespaceUri: string,
+  visited: Set<string>
+): XsdComplexType | XsdSimpleType | null {
+  const namespaceUri = resolveNamespaceWithFallback(
+    namespaceContext,
+    substitutionGroup.namespacePrefix,
+    registry,
+    fallbackNamespaceUri
+  )
+  const resolvedNamespaceUri =
+    namespaceUri || (!substitutionGroup.namespacePrefix ? fallbackNamespaceUri : '')
+
+  const visitedKey = `${resolvedNamespaceUri}:${substitutionGroup.name}`
+  if (visited.has(visitedKey)) {
+    return null
+  }
+  visited.add(visitedKey)
+
+  const headElement = registry.resolveElement(resolvedNamespaceUri, substitutionGroup.name)
+  if (!headElement) {
+    return null
+  }
+
+  if (headElement.inlineComplexType) {
+    return headElement.inlineComplexType
+  }
+
+  if (headElement.inlineSimpleType) {
+    return headElement.inlineSimpleType
+  }
+
+  if (headElement.typeRef) {
+    return resolveTypeReference(
+      headElement.typeRef,
+      namespaceContext,
+      registry,
+      onError,
+      resolvedNamespaceUri
+    )
+  }
+
+  if (headElement.substitutionGroup) {
+    return resolveElementTypeFromSubstitutionGroup(
+      headElement.substitutionGroup,
+      namespaceContext,
+      registry,
+      onError,
+      resolvedNamespaceUri,
+      visited
     )
   }
 

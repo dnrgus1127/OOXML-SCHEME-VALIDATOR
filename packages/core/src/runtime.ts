@@ -105,7 +105,12 @@ export function resolveNamespaceUri(context: Map<string, string>, prefix?: strin
 }
 
 /**
- * Namespace mapping: Transitional (used in most Office files) -> Strict (used in XSD schemas)
+ * Namespace normalization aliases.
+ *
+ * Most OOXML schemas in this project use Strict namespaces (purl.oclc.org),
+ * while some package metadata schemas use Transitional namespaces
+ * (schemas.openxmlformats.org). These aliases normalize both forms to the
+ * namespace URI actually loaded in the registry.
  */
 const TRANSITIONAL_TO_STRICT_NS: Record<string, string> = {
   'http://schemas.openxmlformats.org/spreadsheetml/2006/main':
@@ -148,6 +153,15 @@ const TRANSITIONAL_TO_STRICT_NS: Record<string, string> = {
     'http://purl.oclc.org/ooxml/officeDocument/customXml',
   'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes':
     'http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes',
+  // Package metadata aliases (normalize strict-like URIs to loaded OPC schemas)
+  'http://purl.oclc.org/ooxml/package/metadata/core-properties':
+    'http://schemas.openxmlformats.org/package/2006/metadata/core-properties',
+  'http://purl.oclc.org/ooxml/package/content-types':
+    'http://schemas.openxmlformats.org/package/2006/content-types',
+  'http://purl.oclc.org/ooxml/package/relationships':
+    'http://schemas.openxmlformats.org/package/2006/relationships',
+  'http://purl.oclc.org/ooxml/package/digital-signature':
+    'http://schemas.openxmlformats.org/package/2006/digital-signature',
 }
 
 /** Normalize namespace URI: Convert Transitional to Strict if applicable */

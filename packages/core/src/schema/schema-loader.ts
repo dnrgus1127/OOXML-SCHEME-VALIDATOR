@@ -28,6 +28,14 @@ import { dmlPictureSchema } from '../schemas/dml-picture'
 import { dmlSpreadsheetDrawingSchema } from '../schemas/dml-spreadsheetDrawing'
 import { dmlWordprocessingDrawingSchema } from '../schemas/dml-wordprocessingDrawing'
 import { dmlLockedCanvasSchema } from '../schemas/dml-lockedCanvas'
+import { opcCorePropertiesSchema } from '../schemas/opc-coreProperties'
+import { opcContentTypesSchema } from '../schemas/opc-contentTypes'
+import { opcRelationshipsSchema } from '../schemas/opc-relationships'
+import { opcDigSigSchema } from '../schemas/opc-digSig'
+import { dcSchema } from '../schemas/dc'
+import { dctermsSchema } from '../schemas/dcterms'
+import { dcmitypeSchema } from '../schemas/dcmitype'
+import { xmlSchema } from '../schemas/xml'
 import { sharedCommonSimpleTypesSchema } from '../schemas/shared-commonSimpleTypes'
 import { sharedRelationshipReferenceSchema } from '../schemas/shared-relationshipReference'
 import { sharedMathSchema } from '../schemas/shared-math'
@@ -60,6 +68,16 @@ const ALL_SCHEMAS: XsdSchema[] = [
   dmlSpreadsheetDrawingSchema,
   dmlWordprocessingDrawingSchema,
   dmlLockedCanvasSchema,
+  // OPC package schemas
+  opcCorePropertiesSchema,
+  opcContentTypesSchema,
+  opcRelationshipsSchema,
+  opcDigSigSchema,
+  // Dublin Core dependencies for core properties
+  dcSchema,
+  dctermsSchema,
+  dcmitypeSchema,
+  xmlSchema,
   // Shared schemas
   sharedCommonSimpleTypesSchema,
   sharedRelationshipReferenceSchema,
@@ -77,6 +95,14 @@ const ALL_SCHEMAS: XsdSchema[] = [
  * Shared schemas that are common to all document types
  */
 const SHARED_SCHEMAS: XsdSchema[] = [
+  opcCorePropertiesSchema,
+  opcContentTypesSchema,
+  opcRelationshipsSchema,
+  opcDigSigSchema,
+  dcSchema,
+  dctermsSchema,
+  dcmitypeSchema,
+  xmlSchema,
   sharedCommonSimpleTypesSchema,
   sharedRelationshipReferenceSchema,
   sharedMathSchema,
