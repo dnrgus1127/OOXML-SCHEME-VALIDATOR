@@ -43,9 +43,14 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   }
 
   return (
-    <div className="settings-screen">
+    <div
+      className="settings-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
       <header className="settings-header">
-        <h1>Settings</h1>
+        <h1 id="settings-title">Settings</h1>
         <button onClick={onClose} className="toolbar-btn">
           Close
         </button>

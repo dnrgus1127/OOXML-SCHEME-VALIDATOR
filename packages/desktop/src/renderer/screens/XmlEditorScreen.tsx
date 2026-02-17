@@ -10,6 +10,7 @@ import { matchesShortcut } from '../utils/shortcuts'
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
   onOpenSettings: () => void
+  isSettingsOpen: boolean
   onRecentRecord?: () => Promise<void> | void
 }
 
@@ -21,6 +22,7 @@ function getFileName(filePath: string): string {
 export function XmlEditorScreen({
   onNavigateHome,
   onOpenSettings,
+  isSettingsOpen,
   onRecentRecord,
 }: XmlEditorScreenProps) {
   const {
@@ -144,6 +146,7 @@ export function XmlEditorScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!documentData) return
+      if (isSettingsOpen) return
       if (event.repeat) return
       if (!matchesShortcut(event, revalidateShortcut)) return
 
@@ -156,7 +159,7 @@ export function XmlEditorScreen({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [documentData, revalidateShortcut, validate])
+  }, [documentData, isSettingsOpen, revalidateShortcut, validate])
 
   const handleSave = async () => {
     if (!filePath) return

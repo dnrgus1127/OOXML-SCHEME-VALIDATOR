@@ -1266,11 +1266,34 @@ body {
   border-radius: 3px;
 }
 
+/* Settings Modal */
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.settings-modal {
+  width: min(980px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
 /* Settings Screen */
 .settings-screen {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
 }
 
 .settings-header {
@@ -1398,4 +1421,16 @@ body {
 .settings-placeholder {
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .settings-modal-backdrop {
+    padding: 12px;
+  }
+
+  .settings-modal {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    border-radius: 8px;
+  }
 }

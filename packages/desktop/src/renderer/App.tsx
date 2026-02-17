@@ -63,8 +63,7 @@ declare global {
   }
 }
 
-type Screen = 'home' | 'xml-editor' | 'batch-validator' | 'settings'
-type ReturnScreen = Exclude<Screen, 'settings'>
+type Screen = 'home' | 'xml-editor' | 'batch-validator'
 
 function getFileName(filePath: string): string {
   const segments = filePath.split(/[\\/]/)
@@ -73,7 +72,7 @@ function getFileName(filePath: string): string {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
-  const [settingsReturnScreen, setSettingsReturnScreen] = useState<ReturnScreen>('home')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([])
   const [recentError, setRecentError] = useState<string | null>(null)
   const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
@@ -83,6 +82,14 @@ export default function App() {
   const validateDocument = useDocumentStore((state) => state.validate)
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const isMac = navigator.platform.includes('Mac')
+
+  const openSettings = useCallback(() => {
+    setIsSettingsOpen(true)
+  }, [])
+
+  const closeSettings = useCallback(() => {
+    setIsSettingsOpen(false)
+  }, [])
 
   const refreshRecentFiles = useCallback(async () => {
     try {
@@ -112,6 +119,9 @@ export default function App() {
   // Keep the global Open menu path working when app starts on the home screen.
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
+      if (isSettingsOpen) {
+        closeSettings()
+      }
       if (currentScreen !== 'home') return
 
       setRecentError(null)
@@ -131,6 +141,8 @@ export default function App() {
     return cleanup
   }, [
     currentScreen,
+    closeSettings,
+    isSettingsOpen,
     loadDocument,
     recordRecentFile,
     setFilePath,
@@ -196,14 +208,18 @@ export default function App() {
     void refreshRecentFiles()
   }
 
-  const openSettings = (returnScreen: ReturnScreen) => {
-    setSettingsReturnScreen(returnScreen)
-    setCurrentScreen('settings')
-  }
+  useEffect(() => {
+    if (!isSettingsOpen) return
 
-  const closeSettings = () => {
-    setCurrentScreen(settingsReturnScreen)
-  }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeSettings()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [closeSettings, isSettingsOpen])
 
   const handleOpenXmlFromHome = async () => {
     const path = await window.electronAPI.openFile()
@@ -238,7 +254,7 @@ export default function App() {
         <HomeScreen
           onOpenXmlFromHome={handleOpenXmlFromHome}
           onOpenBatchFromHome={handleOpenBatchFromHome}
-          onOpenSettingsFromHome={() => openSettings('home')}
+          onOpenSettingsFromHome={openSettings}
           recentFiles={recentFiles}
           recentError={recentError}
           onDismissRecentError={() => setRecentError(null)}
@@ -251,7 +267,8 @@ export default function App() {
       {currentScreen === 'xml-editor' && (
         <XmlEditorScreen
           onNavigateHome={handleNavigateToHome}
-          onOpenSettings={() => openSettings('xml-editor')}
+          onOpenSettings={openSettings}
+          isSettingsOpen={isSettingsOpen}
           onRecentRecord={refreshRecentFiles}
         />
       )}
@@ -260,12 +277,18 @@ export default function App() {
         <BatchValidator
           onClose={handleNavigateToHome}
           initialFilePaths={batchInitialFilePaths}
-          onOpenSettings={() => openSettings('batch-validator')}
+          onOpenSettings={openSettings}
           onRecentRecord={refreshRecentFiles}
         />
       )}
 
-      {currentScreen === 'settings' && <SettingsScreen onClose={closeSettings} />}
+      {isSettingsOpen && (
+        <div className="settings-modal-backdrop" onClick={closeSettings}>
+          <div className="settings-modal" onClick={(event) => event.stopPropagation()}>
+            <SettingsScreen onClose={closeSettings} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
