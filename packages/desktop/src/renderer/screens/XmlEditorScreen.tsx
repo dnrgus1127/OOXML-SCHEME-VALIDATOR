@@ -4,9 +4,13 @@ import { DocumentTree } from '../components/DocumentTree'
 import { XmlEditor } from '../components/XmlEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { Toolbar } from '../components/Toolbar'
+import { useSettingsStore } from '../stores/settings'
+import { matchesShortcut } from '../utils/shortcuts'
 
 interface XmlEditorScreenProps {
   onNavigateHome: () => void
+  onOpenSettings: () => void
+  isSettingsOpen: boolean
   onRecentRecord?: () => Promise<void> | void
 }
 
@@ -15,7 +19,12 @@ function getFileName(filePath: string): string {
   return segments[segments.length - 1] || filePath
 }
 
-export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScreenProps) {
+export function XmlEditorScreen({
+  onNavigateHome,
+  onOpenSettings,
+  isSettingsOpen,
+  onRecentRecord,
+}: XmlEditorScreenProps) {
   const {
     filePath,
     documentData,
@@ -34,6 +43,8 @@ export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScr
     validate,
     clearError,
   } = useDocumentStore()
+  const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
+  const revalidateShortcut = useSettingsStore((state) => state.xmlEditor.revalidateShortcut)
 
   const [showValidation, setShowValidation] = useState(true)
 
@@ -54,19 +65,23 @@ export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScr
     async (path: string) => {
       setFilePath(path)
       const loaded = await loadDocument(path)
+      if (!loaded) return false
 
-      if (loaded) {
-        await window.electronAPI.addRecentFile({
-          filePath: path,
-          fileName: getFileName(path),
-          lastTool: 'xml-editor',
-        })
-        await onRecentRecord?.()
+      await window.electronAPI.addRecentFile({
+        filePath: path,
+        fileName: getFileName(path),
+        lastTool: 'xml-editor',
+      })
+      await onRecentRecord?.()
+
+      if (validateOnOpen) {
+        await validate()
+        setShowValidation(true)
       }
 
-      return loaded
+      return true
     },
-    [setFilePath, loadDocument, onRecentRecord]
+    [loadDocument, onRecentRecord, setFilePath, validate, validateOnOpen]
   )
 
   const handleChangeFile = useCallback(
@@ -128,6 +143,24 @@ export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScr
     return cleanup
   }, [validate])
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!documentData) return
+      if (isSettingsOpen) return
+      if (event.repeat) return
+      if (!matchesShortcut(event, revalidateShortcut)) return
+
+      event.preventDefault()
+      void (async () => {
+        await validate()
+        setShowValidation(true)
+      })()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [documentData, isSettingsOpen, revalidateShortcut, validate])
+
   const handleSave = async () => {
     if (!filePath) return
     const saved = await saveDocument(filePath)
@@ -169,6 +202,7 @@ export function XmlEditorScreen({ onNavigateHome, onRecentRecord }: XmlEditorScr
         onSave={handleSave}
         onSaveAs={handleSaveAs}
         onValidate={handleValidate}
+        onOpenSettings={onOpenSettings}
         hasDocument={!!documentData}
         filePath={filePath}
         isDirty={isDirty}

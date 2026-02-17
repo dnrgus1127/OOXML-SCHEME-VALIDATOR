@@ -33,6 +33,7 @@ interface FileValidationResult {
 interface BatchValidatorProps {
   onClose?: () => void
   initialFilePaths?: string[] | null
+  onOpenSettings?: () => void
   onRecentRecord?: () => Promise<void> | void
 }
 
@@ -41,7 +42,12 @@ function getFileName(filePath: string): string {
   return segments[segments.length - 1] || filePath
 }
 
-export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: BatchValidatorProps) {
+export function BatchValidator({
+  onClose,
+  initialFilePaths,
+  onOpenSettings,
+  onRecentRecord,
+}: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
@@ -119,6 +125,7 @@ export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: Ba
           setResults(newResults)
           setExpandedFiles(new Set(newResults.map((item) => item.filePath)))
         }
+
         await persistRecentFiles(newResults)
         return true
       } catch (error) {
@@ -191,11 +198,18 @@ export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: Ba
     <div className="batch-validator">
       <div className="batch-header">
         <h2>Batch Validation</h2>
-        {onClose && (
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
-        )}
+        <div className="batch-header-actions">
+          {onOpenSettings && (
+            <button className="toolbar-btn" onClick={onOpenSettings}>
+              ⚙ Settings
+            </button>
+          )}
+          {onClose && (
+            <button className="close-btn" onClick={onClose}>
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="batch-toolbar">

@@ -30,6 +30,7 @@ function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardP
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
   onOpenBatchFromHome: () => void | Promise<void>
+  onOpenSettingsFromHome: () => void | Promise<void>
   recentFiles: RecentFileEntry[]
   recentError: string | null
   onDismissRecentError: () => void
@@ -60,6 +61,7 @@ function formatRelativeTime(isoString: string): string {
 export function HomeScreen({
   onOpenXmlFromHome,
   onOpenBatchFromHome,
+  onOpenSettingsFromHome,
   recentFiles,
   recentError,
   onDismissRecentError,
@@ -149,6 +151,16 @@ export function HomeScreen({
       </aside>
 
       <div className="home-main">
+        <button
+          type="button"
+          className="home-settings-btn"
+          onClick={onOpenSettingsFromHome}
+          aria-label="Open settings"
+          title="Settings"
+        >
+          ⚙
+        </button>
+
         <div className="home-header">
           <h1 className="home-title">OOXML Validator</h1>
           <p className="home-subtitle">Choose a tool to get started</p>
