@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ValidationResultTree } from './ValidationResultTree'
+import { WindowTopBar } from './layout/WindowTopBar'
 
 interface FileValidationResult {
   filePath: string
@@ -196,21 +197,24 @@ export function BatchValidator({
 
   return (
     <div className="batch-validator">
-      <div className="batch-header">
-        <h2>Batch Validation</h2>
-        <div className="batch-header-actions">
-          {onOpenSettings && (
-            <button className="toolbar-btn" onClick={onOpenSettings}>
-              ⚙ Settings
-            </button>
-          )}
-          {onClose && (
-            <button className="close-btn" onClick={onClose}>
-              ×
-            </button>
-          )}
-        </div>
-      </div>
+      <WindowTopBar
+        className="batch-header"
+        leading={<h2>Batch Validation</h2>}
+        trailing={
+          <div className="batch-header-actions">
+            {onOpenSettings && (
+              <button className="toolbar-btn" onClick={onOpenSettings}>
+                ⚙ Settings
+              </button>
+            )}
+            {onClose && (
+              <button className="close-btn" onClick={onClose}>
+                ×
+              </button>
+            )}
+          </div>
+        }
+      />
 
       <div className="batch-toolbar">
         <button onClick={handleSelectFiles} disabled={isValidating}>
