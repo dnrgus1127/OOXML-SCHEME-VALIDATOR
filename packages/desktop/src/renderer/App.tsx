@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { HomeScreen } from './screens/HomeScreen'
 import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
+import { SettingsScreen } from './screens/SettingsScreen'
 import { useDocumentStore } from './stores/document'
+import { useSettingsStore } from './stores/settings'
 import type { OpenTool, RecentFileEntry } from '../shared/recent-files'
 
 declare global {
@@ -70,12 +72,24 @@ function getFileName(filePath: string): string {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([])
   const [recentError, setRecentError] = useState<string | null>(null)
   const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
+
   const setFilePath = useDocumentStore((state) => state.setFilePath)
   const loadDocument = useDocumentStore((state) => state.loadDocument)
+  const validateDocument = useDocumentStore((state) => state.validate)
+  const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const isMac = navigator.platform.includes('Mac')
+
+  const openSettings = useCallback(() => {
+    setIsSettingsOpen(true)
+  }, [])
+
+  const closeSettings = useCallback(() => {
+    setIsSettingsOpen(false)
+  }, [])
 
   const refreshRecentFiles = useCallback(async () => {
     try {
@@ -105,18 +119,36 @@ export default function App() {
   // Keep the global Open menu path working when app starts on the home screen.
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
+      if (isSettingsOpen) {
+        closeSettings()
+      }
       if (currentScreen !== 'home') return
+
       setRecentError(null)
       setBatchInitialFilePaths(null)
       setCurrentScreen('xml-editor')
       setFilePath(path)
+
       const loaded = await loadDocument(path)
-      if (loaded) {
-        await recordRecentFile(path, 'xml-editor')
+      if (!loaded) return
+
+      if (validateOnOpen) {
+        await validateDocument()
       }
+      await recordRecentFile(path, 'xml-editor')
     })
+
     return cleanup
-  }, [currentScreen, setFilePath, loadDocument, recordRecentFile])
+  }, [
+    currentScreen,
+    closeSettings,
+    isSettingsOpen,
+    loadDocument,
+    recordRecentFile,
+    setFilePath,
+    validateDocument,
+    validateOnOpen,
+  ])
 
   const handleOpenRecent = useCallback(
     async (entry: RecentFileEntry) => {
@@ -133,17 +165,28 @@ export default function App() {
         setBatchInitialFilePaths(null)
         setCurrentScreen('xml-editor')
         setFilePath(entry.filePath)
+
         const loaded = await loadDocument(entry.filePath)
-        if (loaded) {
-          await recordRecentFile(entry.filePath, 'xml-editor')
+        if (!loaded) return
+
+        if (validateOnOpen) {
+          await validateDocument()
         }
+        await recordRecentFile(entry.filePath, 'xml-editor')
         return
       }
 
       setBatchInitialFilePaths([entry.filePath])
       setCurrentScreen('batch-validator')
     },
-    [loadDocument, recordRecentFile, refreshRecentFiles, setFilePath]
+    [
+      loadDocument,
+      recordRecentFile,
+      refreshRecentFiles,
+      setFilePath,
+      validateDocument,
+      validateOnOpen,
+    ]
   )
 
   const handleRemoveRecent = useCallback(
@@ -165,6 +208,19 @@ export default function App() {
     void refreshRecentFiles()
   }
 
+  useEffect(() => {
+    if (!isSettingsOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeSettings()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [closeSettings, isSettingsOpen])
+
   const handleOpenXmlFromHome = async () => {
     const path = await window.electronAPI.openFile()
     if (!path) return
@@ -173,10 +229,14 @@ export default function App() {
     setBatchInitialFilePaths(null)
     setCurrentScreen('xml-editor')
     setFilePath(path)
+
     const loaded = await loadDocument(path)
-    if (loaded) {
-      await recordRecentFile(path, 'xml-editor')
+    if (!loaded) return
+
+    if (validateOnOpen) {
+      await validateDocument()
     }
+    await recordRecentFile(path, 'xml-editor')
   }
 
   const handleOpenBatchFromHome = async () => {
@@ -194,6 +254,7 @@ export default function App() {
         <HomeScreen
           onOpenXmlFromHome={handleOpenXmlFromHome}
           onOpenBatchFromHome={handleOpenBatchFromHome}
+          onOpenSettingsFromHome={openSettings}
           recentFiles={recentFiles}
           recentError={recentError}
           onDismissRecentError={() => setRecentError(null)}
@@ -206,6 +267,8 @@ export default function App() {
       {currentScreen === 'xml-editor' && (
         <XmlEditorScreen
           onNavigateHome={handleNavigateToHome}
+          onOpenSettings={openSettings}
+          isSettingsOpen={isSettingsOpen}
           onRecentRecord={refreshRecentFiles}
         />
       )}
@@ -214,8 +277,17 @@ export default function App() {
         <BatchValidator
           onNavigateHome={handleNavigateToHome}
           initialFilePaths={batchInitialFilePaths}
+          onOpenSettings={openSettings}
           onRecentRecord={refreshRecentFiles}
         />
+      )}
+
+      {isSettingsOpen && (
+        <div className="settings-modal-backdrop" onClick={closeSettings}>
+          <div className="settings-modal" onClick={(event) => event.stopPropagation()}>
+            <SettingsScreen onClose={closeSettings} />
+          </div>
+        </div>
       )}
     </div>
   )

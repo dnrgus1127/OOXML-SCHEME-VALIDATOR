@@ -1,4 +1,5 @@
 import type { RecentFileEntry } from '../../shared/recent-files'
+import { RecentFilesPanel } from './home/RecentFilesPanel'
 
 interface ToolCardProps {
   icon: string
@@ -30,6 +31,7 @@ function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardP
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
   onOpenBatchFromHome: () => void | Promise<void>
+  onOpenSettingsFromHome: () => void | Promise<void>
   recentFiles: RecentFileEntry[]
   recentError: string | null
   onDismissRecentError: () => void
@@ -38,28 +40,10 @@ interface HomeScreenProps {
   onClearRecent: () => void
 }
 
-function toolLabel(lastTool: RecentFileEntry['lastTool']): string {
-  return lastTool === 'xml-editor' ? 'XML Editor' : 'Batch Validator'
-}
-
-function formatRelativeTime(isoString: string): string {
-  const timestamp = Date.parse(isoString)
-  if (Number.isNaN(timestamp)) return 'Unknown'
-  const diffMs = Date.now() - timestamp
-  const absSeconds = Math.floor(Math.abs(diffMs) / 1000)
-
-  if (absSeconds < 60) return 'Just now'
-  const absMinutes = Math.floor(absSeconds / 60)
-  if (absMinutes < 60) return `${absMinutes}m ago`
-  const absHours = Math.floor(absMinutes / 60)
-  if (absHours < 24) return `${absHours}h ago`
-  const absDays = Math.floor(absHours / 24)
-  return `${absDays}d ago`
-}
-
 export function HomeScreen({
   onOpenXmlFromHome,
   onOpenBatchFromHome,
+  onOpenSettingsFromHome,
   recentFiles,
   recentError,
   onDismissRecentError,
@@ -69,86 +53,26 @@ export function HomeScreen({
 }: HomeScreenProps) {
   return (
     <div className="home-screen">
-      <aside className="home-recent-panel">
-        <div className="home-recent-header">
-          <h2>Recent Files</h2>
-          <button
-            onClick={onClearRecent}
-            disabled={recentFiles.length === 0}
-            className="recent-clear-btn"
-          >
-            Clear
-          </button>
-        </div>
-
-        {recentError && (
-          <div className="home-recent-error">
-            <span>{recentError}</span>
-            <button onClick={onDismissRecentError} aria-label="Dismiss recent error">
-              ×
-            </button>
-          </div>
-        )}
-
-        {recentFiles.length === 0 && (
-          <div className="home-recent-empty">
-            <p>No recently opened files</p>
-            <p>Files you open in XML Editor or Batch Validator appear here.</p>
-          </div>
-        )}
-
-        {recentFiles.length > 0 && (
-          <ul className="home-recent-list">
-            {recentFiles.map((entry) => (
-              <li
-                key={entry.filePath}
-                className="home-recent-item"
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpenRecent(entry)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    onOpenRecent(entry)
-                  }
-                }}
-              >
-                <div className="home-recent-item-main">
-                  <div className="home-recent-item-name" title={entry.filePath}>
-                    {entry.fileName}
-                  </div>
-                  <div className="home-recent-item-path" title={entry.filePath}>
-                    {entry.filePath}
-                  </div>
-                </div>
-                <div className="home-recent-item-meta">
-                  <span className="home-tool-badge">{toolLabel(entry.lastTool)}</span>
-                  <span className="home-recent-time">{formatRelativeTime(entry.lastOpenedAt)}</span>
-                  <button
-                    className="home-recent-remove-btn"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onRemoveRecent(entry.filePath)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      onRemoveRecent(entry.filePath)
-                    }}
-                    aria-label={`Remove ${entry.fileName} from recent files`}
-                  >
-                    ×
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
+      <RecentFilesPanel
+        recentFiles={recentFiles}
+        recentError={recentError}
+        onDismissRecentError={onDismissRecentError}
+        onOpenRecent={onOpenRecent}
+        onRemoveRecent={onRemoveRecent}
+        onClearRecent={onClearRecent}
+      />
 
       <div className="home-main">
+        <button
+          type="button"
+          className="home-settings-btn"
+          onClick={onOpenSettingsFromHome}
+          aria-label="Open settings"
+          title="Settings"
+        >
+          ⚙
+        </button>
+
         <div className="home-header">
           <h1 className="home-title">OOXML Validator</h1>
           <p className="home-subtitle">Choose a tool to get started</p>

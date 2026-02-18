@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ValidationResultTree } from './ValidationResultTree'
 import { HomeNavigationButton } from './HomeNavigationButton'
+import { WindowTopBar } from './layout/WindowTopBar'
 
 interface FileValidationResult {
   filePath: string
@@ -34,6 +35,7 @@ interface FileValidationResult {
 interface BatchValidatorProps {
   onNavigateHome?: () => void
   initialFilePaths?: string[] | null
+  onOpenSettings?: () => void
   onRecentRecord?: () => Promise<void> | void
 }
 
@@ -45,6 +47,7 @@ function getFileName(filePath: string): string {
 export function BatchValidator({
   onNavigateHome,
   initialFilePaths,
+  onOpenSettings,
   onRecentRecord,
 }: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
@@ -124,6 +127,7 @@ export function BatchValidator({
           setResults(newResults)
           setExpandedFiles(new Set(newResults.map((item) => item.filePath)))
         }
+
         await persistRecentFiles(newResults)
         return true
       } catch (error) {
@@ -194,12 +198,24 @@ export function BatchValidator({
 
   return (
     <div className="batch-validator">
-      <div className="batch-header">
-        <div className="batch-header-left">
-          {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
-          <h2>Batch Validation</h2>
-        </div>
-      </div>
+      <WindowTopBar
+        className="batch-header"
+        leading={
+          <>
+            {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
+            <h2>Batch Validation</h2>
+          </>
+        }
+        trailing={
+          onOpenSettings && (
+            <div className="batch-header-actions">
+              <button className="toolbar-btn" onClick={onOpenSettings}>
+                ⚙ Settings
+              </button>
+            </div>
+          )
+        }
+      />
 
       <div className="batch-toolbar">
         <button onClick={handleSelectFiles} disabled={isValidating}>
