@@ -1,3 +1,5 @@
+import { HomeNavigationButton } from './HomeNavigationButton'
+
 interface ToolbarProps {
   onOpenFile: () => void
   onSave: () => void
@@ -26,11 +28,7 @@ export function Toolbar({
   return (
     <header className="toolbar">
       <div className="toolbar-left">
-        {onNavigateHome && (
-          <button onClick={onNavigateHome} className="toolbar-btn">
-            🏠 Home
-          </button>
-        )}
+        {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
         <button onClick={onOpenFile} className="toolbar-btn">
           📂 {openLabel}
         </button>

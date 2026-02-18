@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ValidationResultTree } from './ValidationResultTree'
+import { HomeNavigationButton } from './HomeNavigationButton'
 
 interface FileValidationResult {
   filePath: string
@@ -190,12 +191,10 @@ export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: Ba
   return (
     <div className="batch-validator">
       <div className="batch-header">
-        <h2>Batch Validation</h2>
-        {onClose && (
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
-        )}
+        <div className="batch-header-left">
+          {onClose && <HomeNavigationButton onNavigateHome={onClose} />}
+          <h2>Batch Validation</h2>
+        </div>
       </div>
 
       <div className="batch-toolbar">
