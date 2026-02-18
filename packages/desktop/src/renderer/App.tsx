@@ -212,7 +212,7 @@ export default function App() {
 
       {currentScreen === 'batch-validator' && (
         <BatchValidator
-          onClose={handleNavigateToHome}
+          onNavigateHome={handleNavigateToHome}
           initialFilePaths={batchInitialFilePaths}
           onRecentRecord={refreshRecentFiles}
         />

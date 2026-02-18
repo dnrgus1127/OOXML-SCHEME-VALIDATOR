@@ -32,7 +32,7 @@ interface FileValidationResult {
 }
 
 interface BatchValidatorProps {
-  onClose?: () => void
+  onNavigateHome?: () => void
   initialFilePaths?: string[] | null
   onRecentRecord?: () => Promise<void> | void
 }
@@ -42,7 +42,11 @@ function getFileName(filePath: string): string {
   return segments[segments.length - 1] || filePath
 }
 
-export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: BatchValidatorProps) {
+export function BatchValidator({
+  onNavigateHome,
+  initialFilePaths,
+  onRecentRecord,
+}: BatchValidatorProps) {
   const [results, setResults] = useState<FileValidationResult[]>([])
   const [isValidating, setIsValidating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
@@ -192,7 +196,7 @@ export function BatchValidator({ onClose, initialFilePaths, onRecentRecord }: Ba
     <div className="batch-validator">
       <div className="batch-header">
         <div className="batch-header-left">
-          {onClose && <HomeNavigationButton onNavigateHome={onClose} />}
+          {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
           <h2>Batch Validation</h2>
         </div>
       </div>
