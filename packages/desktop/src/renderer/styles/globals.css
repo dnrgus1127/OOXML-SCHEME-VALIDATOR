@@ -650,39 +650,70 @@ body {
 .home-recent-panel {
   width: 360px;
   min-width: 320px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.home-recent-panel.is-collapsed {
+  min-height: auto;
 }
 
 .home-recent-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 10px 0;
 }
 
-.home-recent-header h2 {
+.home-recent-title {
   font-size: 14px;
   font-weight: 600;
 }
 
-.recent-clear-btn {
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+.home-recent-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.recent-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.recent-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
   border-radius: 4px;
+}
+
+.recent-toggle-icon {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.recent-clear-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 0;
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
 }
 
 .recent-clear-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: transparent;
   color: var(--text-primary);
 }
 
@@ -722,7 +753,7 @@ body {
 
 .home-recent-list {
   list-style: none;
-  padding: 8px 12px 12px;
+  padding: 8px 0 12px;
   margin: 0;
   flex: 1;
   min-height: 0;
@@ -733,8 +764,8 @@ body {
 }
 
 .home-recent-item {
-  border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
+  border: none;
+  background: transparent;
   border-radius: 6px;
   padding: 10px;
   cursor: pointer;
@@ -746,7 +777,6 @@ body {
 
 .home-recent-item:hover {
   background: var(--bg-hover);
-  border-color: rgba(0, 120, 212, 0.6);
 }
 
 .home-recent-item:focus {
