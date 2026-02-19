@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs'
 import { OoxmlParser, parseXmlToEventArray } from '@ooxml/parser'
 import type { XmlValidationEvent } from '@ooxml/parser'
+import { loadSchemaRegistry, validateXmlEvents, type ValidationOptions } from '@ooxml/core'
 
 export interface ValidateOoxmlInput {
   /** Path to the OOXML file */
@@ -82,6 +83,13 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
   const xmlParts = doc.getXmlParts()
   const targetParts = input.options?.targetParts
   const maxErrors = input.options?.maxErrors ?? 100
+  const registry = loadSchemaRegistry(doc.documentType)
+  const validationOptions: ValidationOptions = {
+    allowWhitespace: true,
+    strict: input.options?.strict,
+    maxErrors,
+    includeWarnings: true,
+  }
 
   for (const part of xmlParts) {
     // Filter by target parts if specified
@@ -113,9 +121,6 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
     // Count elements
     const elementCount = events.filter((e) => e.type === 'startElement').length
 
-    // Collect validation errors
-    // Note: Full schema validation requires SchemaRegistry from @ooxml/core
-    // For now, we do basic structural validation
     const errors: ValidationError[] = []
 
     if (parseError) {
@@ -127,7 +132,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
       })
     }
 
-    // Basic validation: Check for well-formed XML
+    // Basic structural guard: Check for obvious malformed event sequence
     let depth = 0
     for (const event of events) {
       if (event.type === 'startElement') {
@@ -152,6 +157,22 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
         path: '/',
         partPath: part.path,
       })
+    }
+
+    if (!parseError) {
+      const schemaValidation = validateXmlEvents(registry, events, validationOptions)
+      for (const schemaError of schemaValidation.errors) {
+        errors.push({
+          code: schemaError.code,
+          message: schemaError.message,
+          path: '/',
+          partPath: part.path,
+        })
+      }
+
+      if (schemaValidation.warnings) {
+        totalWarnings += schemaValidation.warnings.length
+      }
     }
 
     totalErrors += errors.length
