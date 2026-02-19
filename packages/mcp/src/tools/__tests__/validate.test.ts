@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { XmlValidationEvent } from '@ooxml/parser'
-
-const fromBufferMock = vi.fn()
-const parseXmlToEventArrayMock = vi.fn()
-const loadSchemaRegistryMock = vi.fn()
-const validateXmlEventsMock = vi.fn()
+const {
+  fromBufferMock,
+  parseXmlToEventArrayMock,
+  loadSchemaRegistryMock,
+  validateXmlEventsMock,
+} = vi.hoisted(() => ({
+  fromBufferMock: vi.fn(),
+  parseXmlToEventArrayMock: vi.fn(),
+  loadSchemaRegistryMock: vi.fn(),
+  validateXmlEventsMock: vi.fn(),
+}))
 
 vi.mock('@ooxml/parser', () => ({
   OoxmlParser: {
@@ -26,7 +31,7 @@ describe('validateOoxml', () => {
   })
 
   it('실제 core XSD 검증 엔진(validateXmlEvents)을 호출해 결과를 반영한다', async () => {
-    const events: XmlValidationEvent[] = [
+    const events = [
       { type: 'startDocument' },
       {
         type: 'startElement',
@@ -67,7 +72,8 @@ describe('validateOoxml', () => {
 
     fromBufferMock.mockResolvedValue(fakeDoc)
     parseXmlToEventArrayMock.mockReturnValue(events)
-    loadSchemaRegistryMock.mockReturnValue({ schemas: new Map() })
+    const fakeRegistry = { schemas: new Map() }
+    loadSchemaRegistryMock.mockReturnValue(fakeRegistry)
     validateXmlEventsMock.mockReturnValue({
       valid: false,
       errors: [{ code: 'INVALID_CONTENT', message: 'schema fail', path: '/w:document' }],
@@ -81,7 +87,7 @@ describe('validateOoxml', () => {
 
     expect(loadSchemaRegistryMock).toHaveBeenCalledWith('document')
     expect(validateXmlEventsMock).toHaveBeenCalledWith(
-      { schemas: new Map() },
+      fakeRegistry,
       events,
       expect.objectContaining({ strict: true, includeWarnings: true, maxErrors: 10 })
     )
