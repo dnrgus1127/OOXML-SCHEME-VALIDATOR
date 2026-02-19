@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ValidationResultTree } from './ValidationResultTree'
+import { HomeNavigationButton } from './HomeNavigationButton'
 import { WindowTopBar } from './layout/WindowTopBar'
 
 interface FileValidationResult {
@@ -32,7 +33,7 @@ interface FileValidationResult {
 }
 
 interface BatchValidatorProps {
-  onClose?: () => void
+  onNavigateHome?: () => void
   initialFilePaths?: string[] | null
   onOpenSettings?: () => void
   onRecentRecord?: () => Promise<void> | void
@@ -44,7 +45,7 @@ function getFileName(filePath: string): string {
 }
 
 export function BatchValidator({
-  onClose,
+  onNavigateHome,
   initialFilePaths,
   onOpenSettings,
   onRecentRecord,
@@ -199,20 +200,20 @@ export function BatchValidator({
     <div className="batch-validator">
       <WindowTopBar
         className="batch-header"
-        leading={<h2>Batch Validation</h2>}
+        leading={
+          <>
+            {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
+            <h2>Batch Validation</h2>
+          </>
+        }
         trailing={
-          <div className="batch-header-actions">
-            {onOpenSettings && (
+          onOpenSettings && (
+            <div className="batch-header-actions">
               <button className="toolbar-btn" onClick={onOpenSettings}>
                 ⚙ Settings
               </button>
-            )}
-            {onClose && (
-              <button className="close-btn" onClick={onClose}>
-                ×
-              </button>
-            )}
-          </div>
+            </div>
+          )
         }
       />
 

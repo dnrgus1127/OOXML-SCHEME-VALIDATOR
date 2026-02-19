@@ -1,3 +1,4 @@
+import { HomeNavigationButton } from './HomeNavigationButton'
 import { WindowTopBar } from './layout/WindowTopBar'
 
 interface ToolbarProps {
@@ -32,11 +33,7 @@ export function Toolbar({
       className="toolbar"
       leading={
         <>
-          {onNavigateHome && (
-            <button onClick={onNavigateHome} className="toolbar-btn">
-              🏠 Home
-            </button>
-          )}
+          {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
           <button onClick={onOpenFile} className="toolbar-btn">
             📂 {openLabel}
           </button>
