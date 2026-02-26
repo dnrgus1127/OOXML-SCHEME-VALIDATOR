@@ -13,6 +13,55 @@ import type { ValidationErrorHandler } from './error-handlers'
 import { resolveTypeReference } from './type-resolver'
 import { formatMessage } from '../i18n/format'
 
+function resolveSimpleTypeNamespace(
+  registry: SchemaRegistry,
+  simpleType: XsdSimpleType
+): string | undefined {
+  if (!simpleType.name) {
+    return undefined
+  }
+
+  for (const [namespaceUri, schema] of registry.schemas.entries()) {
+    if (schema.simpleTypes.get(simpleType.name) === simpleType) {
+      return namespaceUri
+    }
+  }
+
+  return undefined
+}
+
+function createBufferedErrorHandler(base: ValidationErrorHandler): ValidationErrorHandler {
+  return {
+    pushError: () => {
+      // no-op: caller decides whether to surface buffered attempt errors
+    },
+    pushFacetError: () => {
+      // no-op: caller decides whether to surface buffered attempt errors
+    },
+    currentPath: () => base.currentPath(),
+  }
+}
+
+function createTrackingErrorHandler(
+  base: ValidationErrorHandler
+): { handler: ValidationErrorHandler; hasError: () => boolean } {
+  let errored = false
+  return {
+    handler: {
+      pushError: (code: string, message: string, value?: string) => {
+        errored = true
+        base.pushError(code, message, value)
+      },
+      pushFacetError: (facet: Facet, value: string) => {
+        errored = true
+        base.pushFacetError(facet, value)
+      },
+      currentPath: () => base.currentPath(),
+    },
+    hasError: () => errored,
+  }
+}
+
 export function validateSimpleTypeValue(
   value: string,
   simpleType: XsdSimpleType,
@@ -52,13 +101,14 @@ function validateRestriction(
   errorHandler: ValidationErrorHandler,
   fallbackNamespaceUri?: string
 ): void {
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   if (
     !validateBuiltinOrReferencedType(
       value,
       restriction.base,
       namespaceContext,
       registry,
-      errorHandler,
+      bufferedHandler,
       fallbackNamespaceUri
     )
   ) {
@@ -106,6 +156,7 @@ function validateUnion(
   errorHandler: ValidationErrorHandler,
   fallbackNamespaceUri?: string
 ): void {
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   for (const memberType of union.memberTypes) {
     if (
       validateBuiltinOrReferencedType(
@@ -113,7 +164,7 @@ function validateUnion(
         memberType,
         namespaceContext,
         registry,
-        errorHandler,
+        bufferedHandler,
         fallbackNamespaceUri
       )
     ) {
@@ -133,6 +184,7 @@ function validateList(
   fallbackNamespaceUri?: string
 ): void {
   const items = value.split(/\s+/).filter(Boolean)
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   for (const item of items) {
     if (
       !validateBuiltinOrReferencedType(
@@ -140,7 +192,7 @@ function validateList(
         list.itemType,
         namespaceContext,
         registry,
-        errorHandler,
+        bufferedHandler,
         fallbackNamespaceUri
       )
     ) {
@@ -173,15 +225,16 @@ export function validateBuiltinOrReferencedType(
     return false
   }
 
+  const tracking = createTrackingErrorHandler(errorHandler)
   validateSimpleTypeValue(
     value,
     resolved,
     namespaceContext,
     registry,
-    errorHandler,
-    fallbackNamespaceUri
+    tracking.handler,
+    resolveSimpleTypeNamespace(registry, resolved) ?? fallbackNamespaceUri
   )
-  return true
+  return !tracking.hasError()
 }
 
 /**

@@ -8,6 +8,7 @@ dist/
 
 # Generated schemas (built from XSD at build time)
 packages/core/src/schemas/
+packages/core/src/schemas-transitional/
 
 # IDE
 .idea/

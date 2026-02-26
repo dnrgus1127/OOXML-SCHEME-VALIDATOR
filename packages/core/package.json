@@ -29,8 +29,10 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "pnpm run generate:schemas && tsc --noEmit",
-    "clean": "rm -rf dist src/schemas",
-    "generate:schemas": "tsx ../../tools/xsd-converter/src/index.ts"
+    "clean": "rm -rf dist src/schemas src/schemas-transitional",
+    "generate:schemas": "pnpm run generate:schemas:strict && pnpm run generate:schemas:transitional",
+    "generate:schemas:strict": "tsx ../../tools/xsd-converter/src/index.ts --input ../../schemas --output ./src/schemas",
+    "generate:schemas:transitional": "tsx ../../tools/xsd-converter/src/index.ts --input ../../schemas/transitional --output ./src/schemas-transitional"
   },
   "devDependencies": {
     "fast-xml-parser": "^4.3.0",
