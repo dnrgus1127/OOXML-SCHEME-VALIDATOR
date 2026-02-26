@@ -31,6 +31,7 @@ function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardP
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
   onOpenBatchFromHome: () => void | Promise<void>
+  onOpenSchemasFromHome: () => void | Promise<void>
   onOpenSettingsFromHome: () => void | Promise<void>
   recentFiles: RecentFileEntry[]
   recentError: string | null
@@ -43,6 +44,7 @@ interface HomeScreenProps {
 export function HomeScreen({
   onOpenXmlFromHome,
   onOpenBatchFromHome,
+  onOpenSchemasFromHome,
   onOpenSettingsFromHome,
   recentFiles,
   recentError,
@@ -93,6 +95,14 @@ export function HomeScreen({
             description="여러 파일을 한번에 검증하고 결과를 보고서로 내보냅니다"
             actionLabel="Select Files"
             onAction={onOpenBatchFromHome}
+          />
+
+          <ToolCard
+            icon="📚"
+            title="지원 스키마"
+            description="검증 엔진이 지원하는 주요 OOXML 스키마 목록을 확인합니다"
+            actionLabel="View Schemas"
+            onAction={onOpenSchemasFromHome}
           />
         </div>
       </div>
