@@ -57,6 +57,7 @@ export interface RuntimeValidationContext {
   registry: SchemaRegistry
   elementStack: ElementStackFrame[]
   namespaceStack: Map<string, string>[]
+  ignorableNamespaceStack: Set<string>[]
   errors: Array<{ code: string; message: string; path: string; value?: string; expected?: string }>
   warnings: Array<{ code: string; message: string; path: string }>
   idValues: Set<string>
@@ -76,6 +77,7 @@ export function createRuntimeContext(registry: SchemaRegistry): RuntimeValidatio
     registry,
     elementStack: [],
     namespaceStack: [new Map()],
+    ignorableNamespaceStack: [new Set()],
     errors: [],
     warnings: [],
     idValues: new Set(),

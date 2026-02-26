@@ -12,10 +12,13 @@ import {
   ElementStackFrame,
   XmlElementInfo,
   createRuntimeContext,
+  makeQualifiedName,
+  normalizeNamespace,
   resolveNamespaceUri,
   withNamespaceContext,
   isComplexSchemaType,
   FlattenedParticle,
+  CompositorState,
 } from '../runtime'
 import {
   checkMissingRequiredElementDetails,
@@ -28,6 +31,17 @@ import { resolveSchemaElementType } from './type-resolver'
 import { validateSimpleTypeValue, validateBuiltinOrReferencedType } from './simple-type-validator'
 import { validateAttributes, checkRequiredAttributes } from './attribute-validator'
 import { setLocale, formatMessage } from '../i18n/format'
+
+const MC_NAMESPACE = 'http://schemas.openxmlformats.org/markup-compatibility/2006'
+const WORDPROCESSINGML_STRICT_NS = 'http://purl.oclc.org/ooxml/wordprocessingml/main'
+const WORDPROCESSINGML_TRANSITIONAL_NS =
+  'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+const WORDPROCESSINGML_COMPATIBLE_LOCAL_NAMES: Record<string, string[]> = {
+  left: ['start'],
+  right: ['end'],
+  start: ['left'],
+  end: ['right'],
+}
 
 export class ValidationEngine {
   private context
@@ -48,6 +62,18 @@ export class ValidationEngine {
   }
 
   private createResolver(namespaceContext: Map<string, string>, fallbackNamespaceUri?: string) {
+    const resolveSchemaPrefixInFallback = (prefix: string): string | undefined => {
+      if (!fallbackNamespaceUri) {
+        return undefined
+      }
+
+      const normalizedFallback = normalizeNamespace(fallbackNamespaceUri)
+      const schema =
+        this.registry.schemas.get(normalizedFallback) ??
+        this.registry.schemas.get(fallbackNamespaceUri)
+      return schema?.namespaces.find((ns) => ns.prefix === prefix)?.uri
+    }
+
     return {
       resolveNamespaceUri: (prefix?: string): string => {
         if (!prefix) {
@@ -56,6 +82,8 @@ export class ValidationEngine {
 
         const xmlResult = resolveNamespaceUri(namespaceContext, prefix)
         if (xmlResult) return xmlResult
+        const localSchemaResult = resolveSchemaPrefixInFallback(prefix)
+        if (localSchemaResult) return localSchemaResult
         return this.registry.resolveSchemaPrefix(prefix) ?? ''
       },
     }
@@ -81,6 +109,7 @@ export class ValidationEngine {
   startDocument(): void {
     this.context.elementStack = []
     this.context.namespaceStack = [new Map()]
+    this.context.ignorableNamespaceStack = [new Set()]
     this.context.errors = []
     this.context.warnings = []
     this.context.idValues = new Set()
@@ -98,13 +127,20 @@ export class ValidationEngine {
     let matchedParticle: FlattenedParticle | undefined
     const parentFrame = this.context.elementStack[this.context.elementStack.length - 1]
     const resolver = this.createResolver(namespaceContext, parentFrame?.schemaNamespaceUri)
+    const ignorableNamespaces = this.resolveIgnorableNamespaces(element, namespaceContext)
+    this.context.ignorableNamespaceStack.push(ignorableNamespaces)
+    const effectiveLocalName = this.resolveCompatibleLocalName(
+      element.namespaceUri,
+      element.localName,
+      parentFrame?.compositorState
+    )
 
     let shouldResolveSchema = true
 
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
         element.namespaceUri,
-        element.localName,
+        effectiveLocalName,
         parentFrame.compositorState,
         this.registry,
         resolver
@@ -152,8 +188,8 @@ export class ValidationEngine {
             namespaceContext,
             parentFrame?.schemaNamespaceUri
           ) ??
-          this.registry.resolveElement(element.namespaceUri, element.localName))
-        : this.registry.resolveElement(element.namespaceUri, element.localName)
+          this.registry.resolveElement(element.namespaceUri, effectiveLocalName))
+        : this.registry.resolveElement(element.namespaceUri, effectiveLocalName)
 
     const schemaType = !shouldResolveSchema || isWildcardMatch
       ? null
@@ -172,7 +208,8 @@ export class ValidationEngine {
           this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri,
           namespaceContext,
           this.registry,
-          this.errorHandler
+          this.errorHandler,
+          ignorableNamespaces
         )
       : new Set<string>()
 
@@ -259,6 +296,7 @@ export class ValidationEngine {
 
     this.context.elementStack.pop()
     this.context.namespaceStack.pop()
+    this.context.ignorableNamespaceStack.pop()
   }
 
   endDocument(): ValidationResult {
@@ -384,6 +422,69 @@ export class ValidationEngine {
     }
 
     return undefined
+  }
+
+  private resolveIgnorableNamespaces(
+    element: XmlElementInfo,
+    namespaceContext: Map<string, string>
+  ): Set<string> {
+    const parentIgnorable =
+      this.context.ignorableNamespaceStack[this.context.ignorableNamespaceStack.length - 1] ??
+      new Set<string>()
+    const current = new Set(parentIgnorable)
+
+    for (const attr of element.attributes) {
+      const normalizedNs = normalizeNamespace(attr.namespaceUri ?? '')
+      const localName = attr.localName ?? (attr.name.includes(':') ? attr.name.split(':')[1] : attr.name)
+      if (normalizedNs !== MC_NAMESPACE || localName !== 'Ignorable') {
+        continue
+      }
+
+      const prefixes = attr.value.split(/\s+/).filter(Boolean)
+      for (const prefix of prefixes) {
+        const uri = resolveNamespaceUri(namespaceContext, prefix)
+        if (uri) {
+          current.add(normalizeNamespace(uri))
+        }
+      }
+    }
+
+    return current
+  }
+
+  private resolveCompatibleLocalName(
+    namespaceUri: string,
+    localName: string,
+    compositorState: CompositorState | null | undefined
+  ): string {
+    if (!compositorState) {
+      return localName
+    }
+
+    const normalizedNs = normalizeNamespace(namespaceUri)
+    if (
+      normalizedNs !== WORDPROCESSINGML_STRICT_NS &&
+      normalizedNs !== WORDPROCESSINGML_TRANSITIONAL_NS
+    ) {
+      return localName
+    }
+
+    const candidates = WORDPROCESSINGML_COMPATIBLE_LOCAL_NAMES[localName]
+    if (!candidates?.length) {
+      return localName
+    }
+
+    for (const candidate of candidates) {
+      const qualifiedName = makeQualifiedName(namespaceUri, candidate)
+      const canMatch = compositorState.flattenedParticles.some((particle) =>
+        particle.allowedNames?.has(qualifiedName)
+      )
+      if (canMatch) {
+        return candidate
+      }
+    }
+
+    return localName
   }
 }
 

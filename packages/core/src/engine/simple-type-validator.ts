@@ -12,6 +12,65 @@ import type { ErrorCallback } from './error-handlers'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveTypeReference } from './type-resolver'
 import { formatMessage } from '../i18n/format'
+import { normalizeNamespace } from '../runtime'
+
+const WORDPROCESSINGML_STRICT_NS = 'http://purl.oclc.org/ooxml/wordprocessingml/main'
+const WORDPROCESSINGML_ALIGNMENT_ENUM_TYPES = new Set(['ST_Jc', 'ST_JcTable', 'ST_TabJc'])
+const WORDPROCESSINGML_ALIGNMENT_ENUM_VALUE_ALIASES: Record<string, string[]> = {
+  left: ['start'],
+  right: ['end'],
+  start: ['left'],
+  end: ['right'],
+}
+
+function resolveSimpleTypeNamespace(
+  registry: SchemaRegistry,
+  simpleType: XsdSimpleType
+): string | undefined {
+  if (!simpleType.name) {
+    return undefined
+  }
+
+  for (const [namespaceUri, schema] of registry.schemas.entries()) {
+    if (schema.simpleTypes.get(simpleType.name) === simpleType) {
+      return namespaceUri
+    }
+  }
+
+  return undefined
+}
+
+function createBufferedErrorHandler(base: ValidationErrorHandler): ValidationErrorHandler {
+  return {
+    pushError: () => {
+      // no-op: caller decides whether to surface buffered attempt errors
+    },
+    pushFacetError: () => {
+      // no-op: caller decides whether to surface buffered attempt errors
+    },
+    currentPath: () => base.currentPath(),
+  }
+}
+
+function createTrackingErrorHandler(
+  base: ValidationErrorHandler
+): { handler: ValidationErrorHandler; hasError: () => boolean } {
+  let errored = false
+  return {
+    handler: {
+      pushError: (code: string, message: string, value?: string) => {
+        errored = true
+        base.pushError(code, message, value)
+      },
+      pushFacetError: (facet: Facet, value: string) => {
+        errored = true
+        base.pushFacetError(facet, value)
+      },
+      currentPath: () => base.currentPath(),
+    },
+    hasError: () => errored,
+  }
+}
 
 export function validateSimpleTypeValue(
   value: string,
@@ -29,6 +88,7 @@ export function validateSimpleTypeValue(
       namespaceContext,
       registry,
       errorHandler,
+      simpleType.name,
       fallbackNamespaceUri
     )
     return
@@ -50,15 +110,17 @@ function validateRestriction(
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
   errorHandler: ValidationErrorHandler,
+  simpleTypeName?: string,
   fallbackNamespaceUri?: string
 ): void {
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   if (
     !validateBuiltinOrReferencedType(
       value,
       restriction.base,
       namespaceContext,
       registry,
-      errorHandler,
+      bufferedHandler,
       fallbackNamespaceUri
     )
   ) {
@@ -91,7 +153,7 @@ function validateRestriction(
       continue
     }
 
-    if (!validateFacet(value, facet)) {
+    if (!validateFacet(value, facet, simpleTypeName, fallbackNamespaceUri)) {
       errorHandler.pushFacetError(facet, value)
       return
     }
@@ -106,6 +168,7 @@ function validateUnion(
   errorHandler: ValidationErrorHandler,
   fallbackNamespaceUri?: string
 ): void {
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   for (const memberType of union.memberTypes) {
     if (
       validateBuiltinOrReferencedType(
@@ -113,7 +176,7 @@ function validateUnion(
         memberType,
         namespaceContext,
         registry,
-        errorHandler,
+        bufferedHandler,
         fallbackNamespaceUri
       )
     ) {
@@ -133,6 +196,7 @@ function validateList(
   fallbackNamespaceUri?: string
 ): void {
   const items = value.split(/\s+/).filter(Boolean)
+  const bufferedHandler = createBufferedErrorHandler(errorHandler)
   for (const item of items) {
     if (
       !validateBuiltinOrReferencedType(
@@ -140,7 +204,7 @@ function validateList(
         list.itemType,
         namespaceContext,
         registry,
-        errorHandler,
+        bufferedHandler,
         fallbackNamespaceUri
       )
     ) {
@@ -173,15 +237,16 @@ export function validateBuiltinOrReferencedType(
     return false
   }
 
+  const tracking = createTrackingErrorHandler(errorHandler)
   validateSimpleTypeValue(
     value,
     resolved,
     namespaceContext,
     registry,
-    errorHandler,
-    fallbackNamespaceUri
+    tracking.handler,
+    resolveSimpleTypeNamespace(registry, resolved) ?? fallbackNamespaceUri
   )
-  return true
+  return !tracking.hasError()
 }
 
 /**
@@ -207,10 +272,44 @@ export function applyWhitespace(value: string, mode: 'preserve' | 'replace' | 'c
   return result
 }
 
-export function validateFacet(value: string, facet: Facet): boolean {
+function matchesWordprocessingAlignmentAlias(
+  value: string,
+  facet: Facet,
+  simpleTypeName?: string,
+  fallbackNamespaceUri?: string
+): boolean {
+  if (facet.type !== 'enumeration') {
+    return false
+  }
+
+  if (!simpleTypeName || !WORDPROCESSINGML_ALIGNMENT_ENUM_TYPES.has(simpleTypeName)) {
+    return false
+  }
+
+  if (normalizeNamespace(fallbackNamespaceUri ?? '') !== WORDPROCESSINGML_STRICT_NS) {
+    return false
+  }
+
+  const compatibleValues = WORDPROCESSINGML_ALIGNMENT_ENUM_VALUE_ALIASES[value]
+  if (!compatibleValues?.length) {
+    return false
+  }
+
+  return compatibleValues.some((candidate) => facet.values.includes(candidate))
+}
+
+export function validateFacet(
+  value: string,
+  facet: Facet,
+  simpleTypeName?: string,
+  fallbackNamespaceUri?: string
+): boolean {
   switch (facet.type) {
     case 'enumeration':
-      return facet.values.includes(value)
+      return (
+        facet.values.includes(value) ||
+        matchesWordprocessingAlignmentAlias(value, facet, simpleTypeName, fallbackNamespaceUri)
+      )
     case 'pattern': // XML Schema regex syntax is richer than JavaScript regex (e.g. class subtraction),
     // so we validate with the subset JS can compile and ignore unsupported patterns.
     {

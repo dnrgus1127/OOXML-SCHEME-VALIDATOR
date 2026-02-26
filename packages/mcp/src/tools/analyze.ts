@@ -4,14 +4,16 @@
  * Analyzes OOXML document structure and provides part information.
  */
 
-import { readFileSync } from 'fs'
 import { OoxmlParser } from '@ooxml/parser'
+import { resolveFileBuffer } from './file-input'
 
 export interface AnalyzeOoxmlInput {
   /** Path to the OOXML file */
   file_path?: string
   /** Base64 encoded file content */
   file_base64?: string
+  /** Uploaded file reference (alternative to file_path, file_base64) */
+  file_ref?: string
   /** Include content preview for each part */
   include_content_preview?: boolean
   /** Maximum preview length */
@@ -50,19 +52,7 @@ export interface AnalyzeOoxmlOutput {
  */
 export async function analyzeOoxmlStructure(input: AnalyzeOoxmlInput): Promise<AnalyzeOoxmlOutput> {
   // Get file buffer
-  let buffer: Buffer
-
-  if (input.file_path) {
-    try {
-      buffer = readFileSync(input.file_path)
-    } catch (err) {
-      throw new Error(`Failed to read file: ${input.file_path}`)
-    }
-  } else if (input.file_base64) {
-    buffer = Buffer.from(input.file_base64, 'base64')
-  } else {
-    throw new Error('Either file_path or file_base64 must be provided')
-  }
+  const buffer = resolveFileBuffer(input)
 
   // Parse document
   const doc = await OoxmlParser.fromBuffer(buffer)
@@ -184,6 +174,10 @@ export const analyzeOoxmlStructureTool = {
       file_base64: {
         type: 'string',
         description: 'Base64 encoded file content (alternative to file_path)',
+      },
+      file_ref: {
+        type: 'string',
+        description: 'Uploaded file reference (alternative to file_path, file_base64)',
       },
       include_content_preview: {
         type: 'boolean',

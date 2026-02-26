@@ -1,5 +1,5 @@
 import type { SchemaRegistry } from '../types'
-import { resolveNamespaceUri } from '../runtime'
+import { normalizeNamespace, resolveNamespaceUri } from '../runtime'
 
 /**
  * Resolve a namespace URI from XML context with schema prefix fallback.
@@ -19,6 +19,16 @@ export function resolveNamespaceWithFallback(
 
   const xmlResult = resolveNamespaceUri(namespaceContext, prefix)
   if (xmlResult) return xmlResult
+
+  if (fallbackNamespaceUri) {
+    const normalizedFallback = normalizeNamespace(fallbackNamespaceUri)
+    const schema =
+      registry.schemas.get(normalizedFallback) ?? registry.schemas.get(fallbackNamespaceUri)
+    const localSchemaNamespace = schema?.namespaces.find((ns) => ns.prefix === prefix)?.uri
+    if (localSchemaNamespace) {
+      return localSchemaNamespace
+    }
+  }
 
   return registry.resolveSchemaPrefix(prefix) ?? ''
 }

@@ -4,14 +4,26 @@ import type {
   XsdAttributeGroup,
   XsdAnyAttribute,
   XsdComplexType,
+  XsdSimpleType,
 } from '../types'
 import { hasComplexContent, hasSimpleContent, isSimpleType } from '../types'
 import type { XmlAttribute, ElementStackFrame } from '../runtime'
+import { normalizeNamespace } from '../runtime'
 import type { ValidationErrorHandler } from './error-handlers'
 import { resolveNamespaceWithFallback } from './namespace-helpers'
 import { resolveTypeReference } from './type-resolver'
 import { validateSimpleTypeValue } from './simple-type-validator'
 import { formatMessage } from '../i18n/format'
+
+const XSI_NAMESPACE = 'http://www.w3.org/2001/XMLSchema-instance'
+const MC_NAMESPACE = 'http://schemas.openxmlformats.org/markup-compatibility/2006'
+const WORDPROCESSINGML_STRICT_NS = 'http://purl.oclc.org/ooxml/wordprocessingml/main'
+const WORDPROCESSINGML_COMPATIBLE_ATTRIBUTE_LOCAL_NAMES: Record<string, string[]> = {
+  left: ['start'],
+  right: ['end'],
+  start: ['left'],
+  end: ['right'],
+}
 
 function collectAllAttributes(
   schemaType: XsdComplexType,
@@ -92,6 +104,20 @@ function validateAttributeValue(
   errorHandler: ValidationErrorHandler,
   fallbackNamespaceUri: string
 ): void {
+  const resolveSimpleTypeNamespace = (simpleType: XsdSimpleType): string | undefined => {
+    if (!simpleType || simpleType.kind !== 'simpleType' || !simpleType.name) {
+      return undefined
+    }
+
+    for (const [namespaceUri, schema] of registry.schemas.entries()) {
+      if (schema.simpleTypes.get(simpleType.name) === simpleType) {
+        return namespaceUri
+      }
+    }
+
+    return undefined
+  }
+
   if (schemaDef.inlineType) {
     validateSimpleTypeValue(
       value,
@@ -113,13 +139,15 @@ function validateAttributeValue(
       fallbackNamespaceUri
     )
     if (resolved && isSimpleType(resolved)) {
+      const resolvedFallbackNamespace =
+        resolveSimpleTypeNamespace(resolved) ?? fallbackNamespaceUri
       validateSimpleTypeValue(
         value,
         resolved,
         namespaceContext,
         registry,
         errorHandler,
-        fallbackNamespaceUri
+        resolvedFallbackNamespace
       )
     }
   }
@@ -147,7 +175,8 @@ function getSchemaAttributeKey(
   attr: XsdAttribute,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  fallbackNamespaceUri: string
+  fallbackNamespaceUri: string,
+  schemaAttributeFormDefault: 'qualified' | 'unqualified'
 ): string | undefined {
   if (attr.ref) {
     const namespaceUri = resolveNamespaceWithFallback(
@@ -160,10 +189,17 @@ function getSchemaAttributeKey(
     if (!resolvedNamespaceUri && attr.ref.namespacePrefix === 'xml') {
       resolvedNamespaceUri = 'http://www.w3.org/XML/1998/namespace'
     }
+    resolvedNamespaceUri = normalizeNamespace(resolvedNamespaceUri)
     return `${resolvedNamespaceUri}:${attr.ref.name}`
   }
 
   if (attr.name) {
+    const isQualified = attr.form
+      ? attr.form === 'qualified'
+      : schemaAttributeFormDefault === 'qualified'
+    if (isQualified) {
+      return `${normalizeNamespace(fallbackNamespaceUri)}:${attr.name}`
+    }
     return `:${attr.name}`
   }
 
@@ -176,7 +212,32 @@ function getXmlAttributeKey(attr: XmlAttribute): string {
     namespaceUri = 'http://www.w3.org/XML/1998/namespace'
   }
   const localName = attr.localName || parseAttributeLocalName(attr.name)
-  return `${namespaceUri}:${localName}`
+  return `${normalizeNamespace(namespaceUri)}:${localName}`
+}
+
+function getCompatibleXmlAttributeKeys(attr: XmlAttribute): string[] {
+  const namespaceUri = normalizeNamespace(attr.namespaceUri ?? '')
+  if (namespaceUri !== WORDPROCESSINGML_STRICT_NS) {
+    return []
+  }
+
+  const localName = attr.localName || parseAttributeLocalName(attr.name)
+  const compatibleLocalNames = WORDPROCESSINGML_COMPATIBLE_ATTRIBUTE_LOCAL_NAMES[localName]
+  if (!compatibleLocalNames?.length) {
+    return []
+  }
+
+  return compatibleLocalNames.map((name) => `${namespaceUri}:${name}`)
+}
+
+function resolveSchemaAttributeFormDefault(
+  registry: SchemaRegistry,
+  fallbackNamespaceUri: string
+): 'qualified' | 'unqualified' {
+  const schema =
+    registry.schemas.get(normalizeNamespace(fallbackNamespaceUri)) ??
+    registry.schemas.get(fallbackNamespaceUri)
+  return schema?.attributeFormDefault ?? 'unqualified'
 }
 
 function buildAllowedAttributes(
@@ -187,12 +248,19 @@ function buildAllowedAttributes(
   },
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  fallbackNamespaceUri: string
+  fallbackNamespaceUri: string,
+  schemaAttributeFormDefault: 'qualified' | 'unqualified'
 ): Map<string, XsdAttribute> {
   const allowedAttributes = new Map<string, XsdAttribute>()
 
   const addAttribute = (attr: XsdAttribute) => {
-    const key = getSchemaAttributeKey(attr, namespaceContext, registry, fallbackNamespaceUri)
+    const key = getSchemaAttributeKey(
+      attr,
+      namespaceContext,
+      registry,
+      fallbackNamespaceUri,
+      schemaAttributeFormDefault
+    )
     if (key) {
       allowedAttributes.set(key, attr)
     }
@@ -228,7 +296,8 @@ export function validateAttributes(
   fallbackNamespaceUri: string,
   namespaceContext: Map<string, string>,
   registry: SchemaRegistry,
-  errorHandler: ValidationErrorHandler
+  errorHandler: ValidationErrorHandler,
+  ignorableNamespaceUris?: Set<string>
 ): Set<string> {
   const collected = collectAllAttributes(
     schemaType,
@@ -236,11 +305,13 @@ export function validateAttributes(
     registry,
     fallbackNamespaceUri
   )
+  const schemaAttributeFormDefault = resolveSchemaAttributeFormDefault(registry, fallbackNamespaceUri)
   const allowedAttributes = buildAllowedAttributes(
     collected,
     namespaceContext,
     registry,
-    fallbackNamespaceUri
+    fallbackNamespaceUri,
+    schemaAttributeFormDefault
   )
 
   const validated = new Set<string>()
@@ -251,8 +322,29 @@ export function validateAttributes(
     }
 
     const attrKey = getXmlAttributeKey(xmlAttr)
-    const schemaDef = allowedAttributes.get(attrKey)
+    let matchedAttrKey = attrKey
+    let schemaDef = allowedAttributes.get(attrKey)
     if (!schemaDef) {
+      for (const compatibleKey of getCompatibleXmlAttributeKeys(xmlAttr)) {
+        const candidate = allowedAttributes.get(compatibleKey)
+        if (candidate) {
+          matchedAttrKey = compatibleKey
+          schemaDef = candidate
+          break
+        }
+      }
+    }
+    if (!schemaDef) {
+      const normalizedAttrNs = normalizeNamespace(xmlAttr.namespaceUri ?? '')
+      if (normalizedAttrNs === XSI_NAMESPACE) {
+        continue
+      }
+      if (normalizedAttrNs === MC_NAMESPACE) {
+        continue
+      }
+      if (ignorableNamespaceUris?.has(normalizedAttrNs)) {
+        continue
+      }
       if (collected.anyAttribute) {
         continue
       }
@@ -268,7 +360,7 @@ export function validateAttributes(
       errorHandler,
       fallbackNamespaceUri
     )
-    validated.add(attrKey)
+    validated.add(matchedAttrKey)
   }
 
   for (const [attrKey, attr] of allowedAttributes.entries()) {
@@ -297,11 +389,13 @@ export function checkRequiredAttributes(
     registry,
     fallbackNamespaceUri
   )
+  const schemaAttributeFormDefault = resolveSchemaAttributeFormDefault(registry, fallbackNamespaceUri)
   const allowedAttributes = buildAllowedAttributes(
     collected,
     namespaceContext,
     registry,
-    fallbackNamespaceUri
+    fallbackNamespaceUri,
+    schemaAttributeFormDefault
   )
 
   for (const [attrKey, attr] of allowedAttributes.entries()) {

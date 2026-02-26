@@ -79,6 +79,8 @@ const XSD_BUILTIN_TYPES = new Set([
 interface ParsedSchema {
   targetNamespace: string
   namespaces: { prefix: string; uri: string }[]
+  elementFormDefault: 'qualified' | 'unqualified'
+  attributeFormDefault: 'qualified' | 'unqualified'
   imports: { namespace: string; schemaLocation: string }[]
   simpleTypes: ParsedSimpleType[]
   complexTypes: ParsedComplexType[]
@@ -146,6 +148,7 @@ interface ParsedAttribute {
   ref?: string
   type: string
   use: 'required' | 'optional' | 'prohibited'
+  form?: 'qualified' | 'unqualified'
   default?: string
   fixed?: string
 }
@@ -255,6 +258,10 @@ export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
   const result: ParsedSchema = {
     targetNamespace,
     namespaces,
+    elementFormDefault:
+      (attr(schemaNode, 'elementFormDefault') as 'qualified' | 'unqualified') || 'unqualified',
+    attributeFormDefault:
+      (attr(schemaNode, 'attributeFormDefault') as 'qualified' | 'unqualified') || 'unqualified',
     imports: [],
     simpleTypes: [],
     complexTypes: [],
@@ -531,11 +538,13 @@ function parseElement(elNode: any): ParsedElement {
 }
 
 function parseAttribute(attrNode: any): ParsedAttribute {
+  const form = attr(attrNode, 'form')
   return {
     name: attr(attrNode, 'name') || '',
     ref: attr(attrNode, 'ref') || undefined,
     type: attr(attrNode, 'type') || 'xsd:string',
     use: (attr(attrNode, 'use') as 'required' | 'optional' | 'prohibited') || 'optional',
+    form: form === 'qualified' || form === 'unqualified' ? form : undefined,
     default: attr(attrNode, 'default'),
     fixed: attr(attrNode, 'fixed'),
   }
@@ -727,6 +736,7 @@ function generateAttribute(attr: ParsedAttribute): string {
     attr.ref ? `ref: ${makeTypeRef(attr.ref)}` : undefined,
     `typeRef: ${makeTypeRef(attr.type)}`,
     `use: "${attr.use}"`,
+    attr.form ? `form: "${attr.form}"` : undefined,
     attr.default ? `default: { value: "${escapeString(attr.default)}", fixed: false }` : undefined,
     attr.fixed ? `default: { value: "${escapeString(attr.fixed)}", fixed: true }` : undefined,
   ].filter(Boolean)
@@ -883,8 +893,8 @@ function generateTypeScript(schema: ParsedSchema, filename: string): string {
   lines.push(`export const ${varName}Schema: XsdSchema = {`)
   lines.push(`  targetNamespace: "${schema.targetNamespace}",`)
   lines.push(`  namespaces: [${nsEntries}],`)
-  lines.push(`  elementFormDefault: "qualified",`)
-  lines.push(`  attributeFormDefault: "unqualified",`)
+  lines.push(`  elementFormDefault: "${schema.elementFormDefault}",`)
+  lines.push(`  attributeFormDefault: "${schema.attributeFormDefault}",`)
   lines.push(`  imports: [`)
   if (imports) lines.push(`    ${imports}`)
   lines.push(`  ],`)
