@@ -16,3 +16,21 @@ export {
   type GetOoxmlPartInput,
   type GetOoxmlPartOutput,
 } from './get-part'
+export {
+  initUpload,
+  initUploadTool,
+  appendUploadChunk,
+  appendUploadChunkTool,
+  completeUpload,
+  completeUploadTool,
+  deleteUploadedFile,
+  deleteUploadedFileTool,
+  type InitUploadInput,
+  type InitUploadOutput,
+  type AppendUploadChunkInput,
+  type AppendUploadChunkOutput,
+  type CompleteUploadInput,
+  type CompleteUploadOutput,
+  type DeleteUploadedFileInput,
+  type DeleteUploadedFileOutput,
+} from './upload'
