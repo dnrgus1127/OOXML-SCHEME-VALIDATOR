@@ -32,9 +32,8 @@ export class SchemaRegistryImpl implements SchemaRegistry {
   }
 
   resolveType(namespaceUri: string, typeName: string): XsdComplexType | XsdSimpleType | undefined {
-    // Normalize namespace to handle Transitional -> Strict mapping
     const normalizedNs = normalizeNamespace(namespaceUri)
-    const schema = this.schemas.get(normalizedNs)
+    const schema = this.schemas.get(namespaceUri) ?? this.schemas.get(normalizedNs)
     if (!schema) {
       return undefined
     }
@@ -43,19 +42,19 @@ export class SchemaRegistryImpl implements SchemaRegistry {
 
   resolveElement(namespaceUri: string, elementName: string): XsdElement | undefined {
     const normalizedNs = normalizeNamespace(namespaceUri)
-    const schema = this.schemas.get(normalizedNs)
+    const schema = this.schemas.get(namespaceUri) ?? this.schemas.get(normalizedNs)
     return schema?.elements.get(elementName)
   }
 
   resolveGroup(namespaceUri: string, groupName: string): XsdGroup | undefined {
     const normalizedNs = normalizeNamespace(namespaceUri)
-    const schema = this.schemas.get(normalizedNs)
+    const schema = this.schemas.get(namespaceUri) ?? this.schemas.get(normalizedNs)
     return schema?.groups.get(groupName)
   }
 
   resolveAttributeGroup(namespaceUri: string, groupName: string): XsdAttributeGroup | undefined {
     const normalizedNs = normalizeNamespace(namespaceUri)
-    const schema = this.schemas.get(normalizedNs)
+    const schema = this.schemas.get(namespaceUri) ?? this.schemas.get(normalizedNs)
     return schema?.attributeGroups.get(groupName)
   }
 }

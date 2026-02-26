@@ -1,0 +1,5 @@
+Source: ECMA-376 Part 4 (5th edition, December 2016)
+Archive: https://ecma-international.org/wp-content/uploads/ECMA-376-4_5th_edition_december_2016.zip
+Inner archive: OfficeOpenXML-XMLSchema-Transitional.zip
+Downloaded by Codex on: 2026-02-26
+Notes: Files copied as-is from official ECMA distribution.

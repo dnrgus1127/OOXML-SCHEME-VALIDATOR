@@ -46,6 +46,34 @@ import { sharedDocumentPropertiesVariantTypesSchema } from '../schemas/shared-do
 import { sharedAdditionalCharacteristicsSchema } from '../schemas/shared-additionalCharacteristics'
 import { sharedCustomXmlDataPropertiesSchema } from '../schemas/shared-customXmlDataProperties'
 import { sharedCustomXmlSchemaPropertiesSchema } from '../schemas/shared-customXmlSchemaProperties'
+import {
+  dmlChartSchema as dmlChartTransitionalSchema,
+  dmlChartDrawingSchema as dmlChartDrawingTransitionalSchema,
+  dmlDiagramSchema as dmlDiagramTransitionalSchema,
+  dmlLockedCanvasSchema as dmlLockedCanvasTransitionalSchema,
+  dmlMainSchema as dmlMainTransitionalSchema,
+  dmlPictureSchema as dmlPictureTransitionalSchema,
+  dmlSpreadsheetDrawingSchema as dmlSpreadsheetDrawingTransitionalSchema,
+  dmlWordprocessingDrawingSchema as dmlWordprocessingDrawingTransitionalSchema,
+  pmlSchema as pmlTransitionalSchema,
+  sharedAdditionalCharacteristicsSchema as sharedAdditionalCharacteristicsTransitionalSchema,
+  sharedBibliographySchema as sharedBibliographyTransitionalSchema,
+  sharedCommonSimpleTypesSchema as sharedCommonSimpleTypesTransitionalSchema,
+  sharedCustomXmlDataPropertiesSchema as sharedCustomXmlDataPropertiesTransitionalSchema,
+  sharedCustomXmlSchemaPropertiesSchema as sharedCustomXmlSchemaPropertiesTransitionalSchema,
+  sharedDocumentPropertiesCustomSchema as sharedDocumentPropertiesCustomTransitionalSchema,
+  sharedDocumentPropertiesExtendedSchema as sharedDocumentPropertiesExtendedTransitionalSchema,
+  sharedDocumentPropertiesVariantTypesSchema as sharedDocumentPropertiesVariantTypesTransitionalSchema,
+  sharedMathSchema as sharedMathTransitionalSchema,
+  sharedRelationshipReferenceSchema as sharedRelationshipReferenceTransitionalSchema,
+  smlSchema as smlTransitionalSchema,
+  vmlMainSchema as vmlMainTransitionalSchema,
+  vmlOfficeDrawingSchema as vmlOfficeDrawingTransitionalSchema,
+  vmlPresentationDrawingSchema as vmlPresentationDrawingTransitionalSchema,
+  vmlSpreadsheetDrawingSchema as vmlSpreadsheetDrawingTransitionalSchema,
+  vmlWordprocessingDrawingSchema as vmlWordprocessingDrawingTransitionalSchema,
+  wmlSchema as wmlTransitionalSchema,
+} from '../schemas-transitional'
 
 export type OoxmlDocumentType = 'spreadsheet' | 'document' | 'presentation' | 'unknown'
 
@@ -89,6 +117,33 @@ const ALL_SCHEMAS: XsdSchema[] = [
   sharedAdditionalCharacteristicsSchema,
   sharedCustomXmlDataPropertiesSchema,
   sharedCustomXmlSchemaPropertiesSchema,
+  // Transitional schemas
+  smlTransitionalSchema,
+  wmlTransitionalSchema,
+  pmlTransitionalSchema,
+  dmlMainTransitionalSchema,
+  dmlChartTransitionalSchema,
+  dmlChartDrawingTransitionalSchema,
+  dmlDiagramTransitionalSchema,
+  dmlPictureTransitionalSchema,
+  dmlSpreadsheetDrawingTransitionalSchema,
+  dmlWordprocessingDrawingTransitionalSchema,
+  dmlLockedCanvasTransitionalSchema,
+  sharedCommonSimpleTypesTransitionalSchema,
+  sharedRelationshipReferenceTransitionalSchema,
+  sharedMathTransitionalSchema,
+  sharedBibliographyTransitionalSchema,
+  sharedDocumentPropertiesExtendedTransitionalSchema,
+  sharedDocumentPropertiesCustomTransitionalSchema,
+  sharedDocumentPropertiesVariantTypesTransitionalSchema,
+  sharedAdditionalCharacteristicsTransitionalSchema,
+  sharedCustomXmlDataPropertiesTransitionalSchema,
+  sharedCustomXmlSchemaPropertiesTransitionalSchema,
+  vmlMainTransitionalSchema,
+  vmlOfficeDrawingTransitionalSchema,
+  vmlPresentationDrawingTransitionalSchema,
+  vmlSpreadsheetDrawingTransitionalSchema,
+  vmlWordprocessingDrawingTransitionalSchema,
 ]
 
 /**
@@ -115,6 +170,24 @@ const SHARED_SCHEMAS: XsdSchema[] = [
   sharedCustomXmlSchemaPropertiesSchema,
 ]
 
+const TRANSITIONAL_SHARED_SCHEMAS: XsdSchema[] = [
+  sharedCommonSimpleTypesTransitionalSchema,
+  sharedRelationshipReferenceTransitionalSchema,
+  sharedMathTransitionalSchema,
+  sharedBibliographyTransitionalSchema,
+  sharedDocumentPropertiesExtendedTransitionalSchema,
+  sharedDocumentPropertiesCustomTransitionalSchema,
+  sharedDocumentPropertiesVariantTypesTransitionalSchema,
+  sharedAdditionalCharacteristicsTransitionalSchema,
+  sharedCustomXmlDataPropertiesTransitionalSchema,
+  sharedCustomXmlSchemaPropertiesTransitionalSchema,
+  vmlMainTransitionalSchema,
+  vmlOfficeDrawingTransitionalSchema,
+  vmlPresentationDrawingTransitionalSchema,
+  vmlSpreadsheetDrawingTransitionalSchema,
+  vmlWordprocessingDrawingTransitionalSchema,
+]
+
 /**
  * DrawingML schemas (shared across document types)
  */
@@ -125,6 +198,15 @@ const DRAWINGML_SCHEMAS: XsdSchema[] = [
   dmlDiagramSchema,
   dmlPictureSchema,
   dmlLockedCanvasSchema,
+]
+
+const TRANSITIONAL_DRAWINGML_SCHEMAS: XsdSchema[] = [
+  dmlMainTransitionalSchema,
+  dmlChartTransitionalSchema,
+  dmlChartDrawingTransitionalSchema,
+  dmlDiagramTransitionalSchema,
+  dmlPictureTransitionalSchema,
+  dmlLockedCanvasTransitionalSchema,
 ]
 
 /**
@@ -139,9 +221,19 @@ export function loadSchemaRegistry(documentType: OoxmlDocumentType): SchemaRegis
       schemas.set(schema.targetNamespace, schema)
     }
   }
+  for (const schema of TRANSITIONAL_SHARED_SCHEMAS) {
+    if (schema.targetNamespace) {
+      schemas.set(schema.targetNamespace, schema)
+    }
+  }
 
   // Add DrawingML schemas
   for (const schema of DRAWINGML_SCHEMAS) {
+    if (schema.targetNamespace) {
+      schemas.set(schema.targetNamespace, schema)
+    }
+  }
+  for (const schema of TRANSITIONAL_DRAWINGML_SCHEMAS) {
     if (schema.targetNamespace) {
       schemas.set(schema.targetNamespace, schema)
     }
@@ -153,8 +245,17 @@ export function loadSchemaRegistry(documentType: OoxmlDocumentType): SchemaRegis
       if (smlSchema.targetNamespace) {
         schemas.set(smlSchema.targetNamespace, smlSchema)
       }
+      if (smlTransitionalSchema.targetNamespace) {
+        schemas.set(smlTransitionalSchema.targetNamespace, smlTransitionalSchema)
+      }
       if (dmlSpreadsheetDrawingSchema.targetNamespace) {
         schemas.set(dmlSpreadsheetDrawingSchema.targetNamespace, dmlSpreadsheetDrawingSchema)
+      }
+      if (dmlSpreadsheetDrawingTransitionalSchema.targetNamespace) {
+        schemas.set(
+          dmlSpreadsheetDrawingTransitionalSchema.targetNamespace,
+          dmlSpreadsheetDrawingTransitionalSchema
+        )
       }
       break
 
@@ -162,14 +263,26 @@ export function loadSchemaRegistry(documentType: OoxmlDocumentType): SchemaRegis
       if (wmlSchema.targetNamespace) {
         schemas.set(wmlSchema.targetNamespace, wmlSchema)
       }
+      if (wmlTransitionalSchema.targetNamespace) {
+        schemas.set(wmlTransitionalSchema.targetNamespace, wmlTransitionalSchema)
+      }
       if (dmlWordprocessingDrawingSchema.targetNamespace) {
         schemas.set(dmlWordprocessingDrawingSchema.targetNamespace, dmlWordprocessingDrawingSchema)
+      }
+      if (dmlWordprocessingDrawingTransitionalSchema.targetNamespace) {
+        schemas.set(
+          dmlWordprocessingDrawingTransitionalSchema.targetNamespace,
+          dmlWordprocessingDrawingTransitionalSchema
+        )
       }
       break
 
     case 'presentation':
       if (pmlSchema.targetNamespace) {
         schemas.set(pmlSchema.targetNamespace, pmlSchema)
+      }
+      if (pmlTransitionalSchema.targetNamespace) {
+        schemas.set(pmlTransitionalSchema.targetNamespace, pmlTransitionalSchema)
       }
       break
 
