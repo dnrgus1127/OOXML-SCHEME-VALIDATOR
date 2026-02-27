@@ -28,6 +28,9 @@ const api = {
   removeRecentFile: (filePath: string) => ipcRenderer.invoke('recent-files:remove', filePath),
   clearRecentFiles: () => ipcRenderer.invoke('recent-files:clear'),
 
+  // Schema metadata
+  getSupportedSchemaList: () => ipcRenderer.invoke('schema:supported-list'),
+
   // OOXML operations
   parseDocument: (base64Data: string) => ipcRenderer.invoke('ooxml:parse', base64Data),
   getPart: (base64Data: string, partPath: string) =>
@@ -35,6 +38,8 @@ const api = {
   updatePart: (base64Data: string, partPath: string, content: string) =>
     ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content),
   validate: (base64Data: string) => ipcRenderer.invoke('ooxml:validate', base64Data),
+  analyzeSchemaReferences: (base64Data: string) =>
+    ipcRenderer.invoke('ooxml:analyzeSchemaReferences', base64Data),
 
   // Batch operations
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { HomeNavigationButton } from '../components/HomeNavigationButton'
 import { WindowTopBar } from '../components/layout/WindowTopBar'
 
@@ -5,60 +6,68 @@ interface SupportedSchemasScreenProps {
   onNavigateHome: () => void
 }
 
-interface SupportedSchemaEntry {
+interface SupportedSchemaNamespaceEntry {
   category: string
   schemaName: string
-  strictNamespace: string
-  transitionalNamespace?: string
-  description: string
+  namespaceUri: string
+  specType: 'Strict' | 'Transitional' | 'Other'
 }
 
-const SUPPORTED_SCHEMAS: SupportedSchemaEntry[] = [
-  {
-    category: '문서 본문',
-    schemaName: 'SpreadsheetML',
-    strictNamespace: 'http://purl.oclc.org/ooxml/spreadsheetml/main',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
-    description: 'XLSX 워크북 및 워크시트 본문 검증',
-  },
-  {
-    category: '문서 본문',
-    schemaName: 'WordprocessingML',
-    strictNamespace: 'http://purl.oclc.org/ooxml/wordprocessingml/main',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
-    description: 'DOCX 문서 본문 및 스타일 검증',
-  },
-  {
-    category: '문서 본문',
-    schemaName: 'PresentationML',
-    strictNamespace: 'http://purl.oclc.org/ooxml/presentationml/main',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/presentationml/2006/main',
-    description: 'PPTX 프레젠테이션 슬라이드 검증',
-  },
-  {
-    category: '공통 구성요소',
-    schemaName: 'DrawingML',
-    strictNamespace: 'http://purl.oclc.org/ooxml/drawingml/main',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/drawingml/2006/main',
-    description: '도형/차트/드로잉 공통 구조 검증',
-  },
-  {
-    category: '패키지 메타데이터',
-    schemaName: 'OPC Relationships',
-    strictNamespace: 'http://purl.oclc.org/ooxml/package/relationships',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/package/2006/relationships',
-    description: '패키지 내부 파트 간 참조 관계 검증',
-  },
-  {
-    category: '패키지 메타데이터',
-    schemaName: 'OPC Content Types',
-    strictNamespace: 'http://purl.oclc.org/ooxml/package/content-types',
-    transitionalNamespace: 'http://schemas.openxmlformats.org/package/2006/content-types',
-    description: '파트별 MIME Content-Type 선언 검증',
-  },
-]
-
 export function SupportedSchemasScreen({ onNavigateHome }: SupportedSchemasScreenProps) {
+  const [schemas, setSchemas] = useState<SupportedSchemaNamespaceEntry[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadSupportedSchemas = async () => {
+      setIsLoading(true)
+      setLoadError(null)
+
+      try {
+        const result = await window.electronAPI.getSupportedSchemaList()
+        if (cancelled) return
+
+        if (!Array.isArray(result)) {
+          setSchemas([])
+          setLoadError('지원 스키마 목록 형식이 올바르지 않습니다. 앱을 다시 실행해 주세요.')
+          return
+        }
+
+        setSchemas(result)
+      } catch {
+        if (cancelled) return
+
+        setSchemas([])
+        setLoadError('지원 스키마 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadSupportedSchemas()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const summary = useMemo(() => {
+    const strictCount = schemas.filter((schema) => schema.specType === 'Strict').length
+    const transitionalCount = schemas.filter((schema) => schema.specType === 'Transitional').length
+    const otherCount = schemas.filter((schema) => schema.specType === 'Other').length
+
+    return {
+      totalCount: schemas.length,
+      strictCount,
+      transitionalCount,
+      otherCount,
+    }
+  }, [schemas])
+
   return (
     <div className="supported-schemas-screen">
       <WindowTopBar
@@ -69,45 +78,64 @@ export function SupportedSchemasScreen({ onNavigateHome }: SupportedSchemasScree
 
       <main className="supported-schemas-content" aria-labelledby="supported-schemas-title">
         <section className="supported-schemas-intro">
-          <h1 id="supported-schemas-title">지원하는 OOXML 스키마</h1>
+          <h1 id="supported-schemas-title">지원하는 OOXML 스키마/네임스페이스</h1>
           <p>
-            현재 검증 엔진은 아래 스키마를 중심으로 Strict/Transitional 네임스페이스를
-            인식합니다.
+            현재 검증 엔진에 탑재된 실제 스키마를 기반으로, 인식 가능한 네임스페이스 목록을
+            표시합니다.
           </p>
         </section>
 
-        <div className="supported-schemas-table-wrapper">
-          <table className="supported-schemas-table">
-            <thead>
-              <tr>
-                <th scope="col">구분</th>
-                <th scope="col">스키마</th>
-                <th scope="col">Strict 네임스페이스</th>
-                <th scope="col">Transitional 네임스페이스</th>
-                <th scope="col">설명</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SUPPORTED_SCHEMAS.map((schema) => (
-                <tr key={schema.schemaName}>
-                  <td>{schema.category}</td>
-                  <td>{schema.schemaName}</td>
-                  <td>
-                    <code>{schema.strictNamespace}</code>
-                  </td>
-                  <td>
-                    {schema.transitionalNamespace ? (
-                      <code>{schema.transitionalNamespace}</code>
-                    ) : (
-                      <span className="supported-schemas-empty">-</span>
-                    )}
-                  </td>
-                  <td>{schema.description}</td>
+        <section className="supported-schemas-summary" aria-label="지원 스키마 요약">
+          <span>총 {summary.totalCount}개 네임스페이스</span>
+          <span>Strict {summary.strictCount}개</span>
+          <span>Transitional {summary.transitionalCount}개</span>
+          {summary.otherCount > 0 ? <span>기타 {summary.otherCount}개</span> : null}
+        </section>
+
+        {isLoading ? (
+          <p className="supported-schemas-state" role="status" aria-live="polite">
+            지원 스키마 목록을 불러오는 중입니다...
+          </p>
+        ) : null}
+
+        {!isLoading && loadError ? (
+          <p className="supported-schemas-state supported-schemas-state--error" role="alert">
+            {loadError}
+          </p>
+        ) : null}
+
+        {!isLoading && !loadError && schemas.length === 0 ? (
+          <p className="supported-schemas-state">표시할 지원 스키마가 없습니다.</p>
+        ) : null}
+
+        {!isLoading && !loadError && schemas.length > 0 ? (
+          <div className="supported-schemas-table-wrapper">
+            <table className="supported-schemas-table">
+              <thead>
+                <tr>
+                  <th scope="col">구분</th>
+                  <th scope="col">스키마</th>
+                  <th scope="col">스펙 타입</th>
+                  <th scope="col">네임스페이스 URI</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {schemas.map((schema) => (
+                  <tr
+                    key={`${schema.category}:${schema.schemaName}:${schema.namespaceUri}:${schema.specType}`}
+                  >
+                    <td>{schema.category}</td>
+                    <td>{schema.schemaName}</td>
+                    <td>{schema.specType}</td>
+                    <td>
+                      <code>{schema.namespaceUri}</code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </main>
     </div>
   )
