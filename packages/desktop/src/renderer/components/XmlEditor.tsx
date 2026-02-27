@@ -22,20 +22,25 @@ function formatXml(xml: string): string {
       const trimmed = line.trim()
       if (!trimmed) return ''
 
+      const isClosingTag = trimmed.startsWith('</')
+      const isOpeningTag =
+        trimmed.startsWith('<') &&
+        !isClosingTag &&
+        !trimmed.startsWith('<?') &&
+        !trimmed.startsWith('<!')
+      const isSelfClosingTag = trimmed.endsWith('/>')
+      const isInlineTag = isOpeningTag && trimmed.includes('</')
+
       // Decrease indent for closing tags
-      if (trimmed.startsWith('</')) {
+      if (isClosingTag) {
         indent = Math.max(0, indent - 1)
       }
 
       const indentedLine = '  '.repeat(indent) + trimmed
 
-      // Increase indent for opening tags (not self-closing)
-      if (
-        trimmed.startsWith('<') &&
-        !trimmed.startsWith('</') &&
-        !trimmed.startsWith('<?') &&
-        !trimmed.endsWith('/>')
-      ) {
+      // Increase indent only for true container opening tags.
+      // Inline tags like <AppVersion>1.0</AppVersion> should stay on the same level.
+      if (isOpeningTag && !isSelfClosingTag && !isInlineTag) {
         indent++
       }
 
