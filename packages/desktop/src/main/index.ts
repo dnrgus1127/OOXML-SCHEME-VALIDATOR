@@ -12,6 +12,8 @@ import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
   ValidationEngine,
   loadSchemaRegistry,
+  getSupportedSchemaNamespaces,
+  analyzeOoxmlSchemaReferences,
   type OoxmlDocumentType,
   type ValidationError,
   type SchemaRegistry,
@@ -219,6 +221,35 @@ function setupIpcHandlers(): void {
   // Recent files
   ipcMain.handle('recent-files:list', async () => {
     return listRecentFiles()
+  })
+
+  ipcMain.handle('schema:supported-list', async () => {
+    return getSupportedSchemaNamespaces()
+  })
+
+  ipcMain.handle('ooxml:analyzeSchemaReferences', async (_, base64Data: string) => {
+    try {
+      const buffer = Buffer.from(base64Data, 'base64')
+      const doc = await OoxmlParser.fromBuffer(buffer)
+
+      const xmlParts: Array<{ partPath: string; xml: string }> = []
+
+      for (const partPath of doc.parts.keys()) {
+        if (!partPath.toLowerCase().endsWith('.xml')) continue
+
+        const xml = doc.getPartAsXml(partPath)
+        if (!xml) continue
+
+        xmlParts.push({ partPath, xml })
+      }
+
+      return {
+        success: true,
+        data: analyzeOoxmlSchemaReferences(xmlParts),
+      }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
   })
 
   const isValidRecentFileInput = (

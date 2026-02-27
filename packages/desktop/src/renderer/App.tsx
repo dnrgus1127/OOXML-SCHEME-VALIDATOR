@@ -32,6 +32,14 @@ declare global {
       ) => Promise<RecentFileEntry[]>
       removeRecentFile: (filePath: string) => Promise<RecentFileEntry[]>
       clearRecentFiles: () => Promise<RecentFileEntry[]>
+      getSupportedSchemaList: () => Promise<
+        Array<{
+          category: string
+          schemaName: string
+          namespaceUri: string
+          specType: 'Strict' | 'Transitional' | 'Other'
+        }>
+      >
       parseDocument: (
         base64Data: string
       ) => Promise<{ success: boolean; data?: any; error?: string }>
@@ -45,6 +53,9 @@ declare global {
         content: string
       ) => Promise<{ success: boolean; data?: string; error?: string }>
       validate: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
+      analyzeSchemaReferences: (
+        base64Data: string
+      ) => Promise<{ success: boolean; data?: any; error?: string }>
       openFiles: () => Promise<string[] | null>
       batchValidate: (
         filePaths: string[]

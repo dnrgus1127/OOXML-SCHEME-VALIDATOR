@@ -3,6 +3,10 @@ import { useDocumentStore } from '../stores/document'
 import { DocumentTree } from '../components/DocumentTree'
 import { XmlEditor } from '../components/XmlEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
+import {
+  SchemaReferencePanel,
+  type OoxmlSchemaReferenceSummary,
+} from '../components/SchemaReferencePanel'
 import { Toolbar } from '../components/Toolbar'
 import { useSettingsStore } from '../stores/settings'
 import { matchesShortcut } from '../utils/shortcuts'
@@ -27,6 +31,7 @@ export function XmlEditorScreen({
 }: XmlEditorScreenProps) {
   const {
     filePath,
+    fileData,
     documentData,
     selectedPart,
     partContent,
@@ -47,6 +52,11 @@ export function XmlEditorScreen({
   const revalidateShortcut = useSettingsStore((state) => state.xmlEditor.revalidateShortcut)
 
   const [showValidation, setShowValidation] = useState(true)
+
+  const [schemaReferenceSummary, setSchemaReferenceSummary] =
+    useState<OoxmlSchemaReferenceSummary | null>(null)
+  const [isSchemaReferenceLoading, setIsSchemaReferenceLoading] = useState(false)
+  const [schemaReferenceError, setSchemaReferenceError] = useState<string | null>(null)
 
   const isDirty = modifiedContent !== null && modifiedContent !== partContent
 
@@ -194,6 +204,61 @@ export function XmlEditorScreen({
     setShowValidation(true)
   }
 
+  useEffect(() => {
+    if (!fileData) {
+      setSchemaReferenceSummary(null)
+      setSchemaReferenceError(null)
+      setIsSchemaReferenceLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setIsSchemaReferenceLoading(true)
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        let base64Data = fileData
+
+        if (modifiedContent !== null && selectedPart) {
+          const updated = await window.electronAPI.updatePart(
+            fileData,
+            selectedPart,
+            modifiedContent
+          )
+          if (updated.success && updated.data) {
+            base64Data = updated.data
+          }
+        }
+
+        const result = await window.electronAPI.analyzeSchemaReferences(base64Data)
+        if (cancelled) return
+
+        if (!result.success) {
+          setSchemaReferenceSummary(null)
+          setSchemaReferenceError(result.error || '문서 스키마 참조 분석에 실패했습니다.')
+          return
+        }
+
+        setSchemaReferenceSummary(result.data ?? null)
+        setSchemaReferenceError(null)
+      } catch {
+        if (cancelled) return
+
+        setSchemaReferenceSummary(null)
+        setSchemaReferenceError('문서 스키마 참조 분석 중 오류가 발생했습니다.')
+      } finally {
+        if (!cancelled) {
+          setIsSchemaReferenceLoading(false)
+        }
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [fileData, modifiedContent, selectedPart])
+
   return (
     <>
       <Toolbar
@@ -248,16 +313,24 @@ export function XmlEditorScreen({
               )}
             </main>
 
-            {showValidation && (
-              <aside className="validation-panel">
-                <ValidationPanel
-                  results={validationResults}
-                  onClose={() => setShowValidation(false)}
-                  onNavigate={handleSelectPart}
-                  onRevalidate={handleValidate}
-                />
-              </aside>
-            )}
+            <aside className="right-panels">
+              {showValidation ? (
+                <div className="validation-panel">
+                  <ValidationPanel
+                    results={validationResults}
+                    onClose={() => setShowValidation(false)}
+                    onNavigate={handleSelectPart}
+                    onRevalidate={handleValidate}
+                  />
+                </div>
+              ) : null}
+
+              <SchemaReferencePanel
+                summary={schemaReferenceSummary}
+                isLoading={isSchemaReferenceLoading}
+                error={schemaReferenceError}
+              />
+            </aside>
           </>
         )}
       </div>
