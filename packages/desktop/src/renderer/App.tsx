@@ -3,6 +3,7 @@ import { HomeScreen } from './screens/HomeScreen'
 import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { SupportedSchemasScreen } from './screens/SupportedSchemasScreen'
 import { useDocumentStore } from './stores/document'
 import { useSettingsStore } from './stores/settings'
 import type { OpenTool, RecentFileEntry } from '../shared/recent-files'
@@ -63,7 +64,7 @@ declare global {
   }
 }
 
-type Screen = 'home' | 'xml-editor' | 'batch-validator'
+type Screen = 'home' | 'xml-editor' | 'batch-validator' | 'supported-schemas'
 
 function getFileName(filePath: string): string {
   const segments = filePath.split(/[\\/]/)
@@ -116,13 +117,13 @@ export default function App() {
     void refreshRecentFiles()
   }, [refreshRecentFiles])
 
-  // Keep the global Open menu path working when app starts on the home screen.
+  // Keep the global Open menu path working on non-editor screens.
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
       if (isSettingsOpen) {
         closeSettings()
       }
-      if (currentScreen !== 'home') return
+      if (currentScreen !== 'home' && currentScreen !== 'supported-schemas') return
 
       setRecentError(null)
       setBatchInitialFilePaths(null)
@@ -248,12 +249,18 @@ export default function App() {
     setCurrentScreen('batch-validator')
   }
 
+  const handleOpenSchemasFromHome = () => {
+    setBatchInitialFilePaths(null)
+    setCurrentScreen('supported-schemas')
+  }
+
   return (
     <div className={`app${isMac ? ' app--mac' : ''}`}>
       {currentScreen === 'home' && (
         <HomeScreen
           onOpenXmlFromHome={handleOpenXmlFromHome}
           onOpenBatchFromHome={handleOpenBatchFromHome}
+          onOpenSchemasFromHome={handleOpenSchemasFromHome}
           onOpenSettingsFromHome={openSettings}
           recentFiles={recentFiles}
           recentError={recentError}
@@ -280,6 +287,10 @@ export default function App() {
           onOpenSettings={openSettings}
           onRecentRecord={refreshRecentFiles}
         />
+      )}
+
+      {currentScreen === 'supported-schemas' && (
+        <SupportedSchemasScreen onNavigateHome={handleNavigateToHome} />
       )}
 
       {isSettingsOpen && (
