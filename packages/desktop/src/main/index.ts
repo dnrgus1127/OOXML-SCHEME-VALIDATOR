@@ -469,7 +469,7 @@ function setupIpcHandlers(): void {
                       results.push({
                         path,
                         valid: false,
-                        errors: result.errors.map((err) => ({
+                        errors: result.errors.map((err: ValidationError) => ({
                           code: err.code,
                           message: err.message,
                           path: err.path,
@@ -649,7 +649,7 @@ function setupIpcHandlers(): void {
                   results.push({
                     path,
                     valid: false,
-                    errors: result.errors.map((err) => ({
+                    errors: result.errors.map((err: ValidationError) => ({
                       code: err.code,
                       message: err.message,
                       path: err.path,
