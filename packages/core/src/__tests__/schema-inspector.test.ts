@@ -48,4 +48,21 @@ describe('schema-inspector', () => {
     expect(summary.supportedSchemaNames).toContain('Open Packaging Conventions')
     expect(summary.parts).toHaveLength(2)
   })
+
+  it('다른 prefix로 선언된 schemaLocation도 추출한다', () => {
+    const summary = analyzeOoxmlSchemaReferences([
+      {
+        partPath: 'custom/item1.xml',
+        xml: `<?xml version="1.0" encoding="UTF-8"?>
+<root xmlns:si="http://www.w3.org/2001/XMLSchema-instance"
+      si:schemaLocation="http://example.com/ns custom-schema.xsd"
+      si:noNamespaceSchemaLocation="fallback.xsd" />`,
+      },
+    ])
+
+    expect(summary.schemaLocations).toContain('custom-schema.xsd')
+    expect(summary.schemaLocations).toContain('fallback.xsd')
+    expect(summary.xsdSchemaNames).toContain('custom-schema.xsd')
+    expect(summary.xsdSchemaNames).toContain('fallback.xsd')
+  })
 })

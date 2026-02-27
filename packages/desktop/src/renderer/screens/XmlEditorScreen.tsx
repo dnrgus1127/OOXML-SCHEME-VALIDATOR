@@ -257,7 +257,7 @@ export function XmlEditorScreen({
       cancelled = true
       window.clearTimeout(timeout)
     }
-  }, [fileData, modifiedContent, selectedPart])
+  }, [fileData, selectedPart])
 
   return (
     <>

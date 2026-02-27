@@ -1,5 +1,7 @@
 import { loadAllSchemas } from './schema-loader'
 
+const XSI_NAMESPACE_URI = 'http://www.w3.org/2001/XMLSchema-instance'
+
 export interface SupportedSchemaNamespaceEntry {
   category: string
   schemaName: string
@@ -98,13 +100,33 @@ export function getSupportedSchemaNamespaces(): SupportedSchemaNamespaceEntry[] 
     })
 }
 
+function extractNamespacePrefixMap(xml: string): Map<string, string> {
+  const prefixMap = new Map<string, string>()
+  const xmlnsPrefixRegex = /xmlns:([A-Za-z_][\w.-]*)\s*=\s*['"]([^'"]+)['"]/g
+  let match: RegExpExecArray | null = xmlnsPrefixRegex.exec(xml)
+
+  while (match) {
+    const prefix = match[1]
+    const namespaceUri = match[2]
+    if (prefix && namespaceUri) {
+      prefixMap.set(prefix, namespaceUri)
+    }
+    match = xmlnsPrefixRegex.exec(xml)
+  }
+
+  return prefixMap
+}
+
 function extractNamespaces(xml: string): string[] {
   const result = new Set<string>()
   const xmlnsRegex = /xmlns(?::[A-Za-z_][\w.-]*)?\s*=\s*['"]([^'"]+)['"]/g
-  let match = xmlnsRegex.exec(xml)
+  let match: RegExpExecArray | null = xmlnsRegex.exec(xml)
 
   while (match) {
-    result.add(match[1])
+    const namespaceUri = match[1]
+    if (namespaceUri) {
+      result.add(namespaceUri)
+    }
     match = xmlnsRegex.exec(xml)
   }
 
@@ -113,31 +135,46 @@ function extractNamespaces(xml: string): string[] {
 
 function extractSchemaLocations(xml: string): string[] {
   const result = new Set<string>()
+  const prefixMap = extractNamespacePrefixMap(xml)
 
-  const schemaLocationRegex = /xsi:schemaLocation\s*=\s*['"]([^'"]+)['"]/g
-  let schemaLocationMatch = schemaLocationRegex.exec(xml)
+  const attributeRegex =
+    /([A-Za-z_][\w.-]*):(schemaLocation|noNamespaceSchemaLocation)\s*=\s*['"]([^'"]+)['"]/g
+  let match: RegExpExecArray | null = attributeRegex.exec(xml)
 
-  while (schemaLocationMatch) {
-    const tokens = schemaLocationMatch[1].trim().split(/\s+/)
-    for (let index = 1; index < tokens.length; index += 2) {
-      const location = tokens[index]
+  while (match) {
+    const prefix = match[1]
+    const localName = match[2]
+    const value = match[3]
+
+    if (!prefix || !localName || !value) {
+      match = attributeRegex.exec(xml)
+      continue
+    }
+
+    const namespaceUri = prefixMap.get(prefix)
+    if (namespaceUri !== XSI_NAMESPACE_URI) {
+      match = attributeRegex.exec(xml)
+      continue
+    }
+
+    if (localName === 'schemaLocation') {
+      const tokens = value.trim().split(/\s+/)
+      for (let index = 1; index < tokens.length; index += 2) {
+        const location = tokens[index]
+        if (location) {
+          result.add(location)
+        }
+      }
+    }
+
+    if (localName === 'noNamespaceSchemaLocation') {
+      const location = value.trim()
       if (location) {
         result.add(location)
       }
     }
 
-    schemaLocationMatch = schemaLocationRegex.exec(xml)
-  }
-
-  const noNamespaceRegex = /xsi:noNamespaceSchemaLocation\s*=\s*['"]([^'"]+)['"]/g
-  let noNamespaceMatch = noNamespaceRegex.exec(xml)
-
-  while (noNamespaceMatch) {
-    const location = noNamespaceMatch[1].trim()
-    if (location) {
-      result.add(location)
-    }
-    noNamespaceMatch = noNamespaceRegex.exec(xml)
+    match = attributeRegex.exec(xml)
   }
 
   return [...result]
@@ -147,8 +184,8 @@ function toXsdSchemaName(schemaLocation: string): string | null {
   const lastSegment = schemaLocation.split(/[\\/]/).pop()?.trim() ?? ''
   if (!lastSegment) return null
 
-  const [withoutQuery] = lastSegment.split('?')
-  const [withoutHash] = withoutQuery.split('#')
+  const withoutQuery = lastSegment.split('?')[0] ?? ''
+  const withoutHash = withoutQuery.split('#')[0] ?? ''
   if (!withoutHash) return null
 
   return withoutHash.endsWith('.xsd') ? withoutHash : null
