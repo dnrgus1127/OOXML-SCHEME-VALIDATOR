@@ -8,6 +8,40 @@ interface SettingsScreenProps {
 
 type SettingsSection = 'general' | 'xml-editor' | 'batch-validator'
 
+interface ShortcutHelpItem {
+  action: string
+  shortcut: string
+  isCustomizable?: boolean
+}
+
+const xmlEditorShortcutHelp: ShortcutHelpItem[] = [
+  {
+    action: '현재 파일 재검증',
+    shortcut: 'CmdOrCtrl+Shift+V (기본값)',
+    isCustomizable: true,
+  },
+  {
+    action: '명령 팔레트 열기',
+    shortcut: 'F1 또는 Shift+CmdOrCtrl+P',
+  },
+  {
+    action: '빠른 파일 찾기',
+    shortcut: 'CmdOrCtrl+P',
+  },
+  {
+    action: '현재 라인 이동',
+    shortcut: 'CmdOrCtrl+G',
+  },
+  {
+    action: '찾기 / 치환',
+    shortcut: 'CmdOrCtrl+F / CmdOrCtrl+H',
+  },
+  {
+    action: '접기 / 펼치기',
+    shortcut: 'CmdOrCtrl+Shift+[ / CmdOrCtrl+Shift+]',
+  },
+]
+
 export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const { xmlEditor, updateXmlEditorSettings } = useSettingsStore()
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
@@ -122,6 +156,31 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
                   XML Editor 화면에서만 동작합니다. 입력 즉시 유효성 검사를 수행합니다.
                 </p>
                 {shortcutError && <p className="settings-error-text">{shortcutError}</p>}
+              </div>
+
+              <div className="settings-field-row" aria-labelledby="xml-editor-shortcut-help-title">
+                <h3 id="xml-editor-shortcut-help-title" className="settings-subtitle">
+                  XML Editor 단축키 도움말
+                </h3>
+                <p className="settings-help-text">
+                  아래는 Monaco Editor에서 기본으로 제공되는 주요 단축키입니다.
+                </p>
+
+                <ul className="settings-shortcut-list">
+                  {xmlEditorShortcutHelp.map((item) => (
+                    <li key={item.action} className="settings-shortcut-item">
+                      <div>
+                        <p className="settings-shortcut-action">{item.action}</p>
+                        {item.isCustomizable ? (
+                          <p className="settings-shortcut-customizable">설정에서 커스텀 가능</p>
+                        ) : (
+                          <p className="settings-shortcut-fixed">현재 버전에서는 기본 단축키만 지원</p>
+                        )}
+                      </div>
+                      <code className="settings-shortcut-code">{item.shortcut}</code>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </section>
           )}
