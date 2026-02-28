@@ -165,7 +165,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
         errors.push({
           code: schemaError.code,
           message: schemaError.message,
-          path: '/',
+          path: schemaError.path,
           partPath: part.path,
         })
       }
