@@ -8,6 +8,7 @@
  * - validate_ooxml: Validate OOXML documents against XSD schemas
  * - analyze_ooxml_structure: Analyze document structure and parts
  * - get_ooxml_part: Retrieve specific part content
+ * - init/append/complete/delete upload tools: Manage chunked temporary file uploads
  */
 
 export { createServer, runServer } from './server.js'

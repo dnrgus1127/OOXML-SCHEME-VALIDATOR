@@ -9,7 +9,7 @@
 
 import { XMLParser } from 'fast-xml-parser'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs'
-import { join, dirname, basename } from 'path'
+import { join, dirname, basename, resolve } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -191,7 +191,7 @@ interface ParsedSimpleContent {
 interface ParsedComplexContent {
   type: 'extension' | 'restriction'
   base: string
-  content?: { type: 'sequence' | 'choice'; particles: ParsedParticle[] }
+  content?: { type: 'sequence' | 'choice' | 'all'; particles: ParsedParticle[] }
   attributes: ParsedAttribute[]
   attributeGroups: string[]
 }
@@ -400,6 +400,7 @@ function parseComplexType(ctNode: any): ParsedComplexType {
   const sequence = findFirstByTag(children, 'sequence')
   const choice = findFirstByTag(children, 'choice')
   const all = findFirstByTag(children, 'all')
+  const directParticle = findFirstDirectParticle(children)
   const simpleContent = findFirstByTag(children, 'simpleContent')
   const complexContent = findFirstByTag(children, 'complexContent')
 
@@ -432,6 +433,13 @@ function parseComplexType(ctNode: any): ParsedComplexType {
         attr(all, 'maxOccurs') === 'unbounded'
           ? 'unbounded'
           : parseInt(attr(all, 'maxOccurs') || '1', 10),
+    }
+  } else if (directParticle) {
+    result.content = {
+      type: 'sequence',
+      particles: [directParticle],
+      minOccurs: 1,
+      maxOccurs: 1,
     }
   } else if (simpleContent) {
     result.simpleContent = parseSimpleContent(simpleContent)
@@ -473,68 +481,99 @@ function parseParticles(compositorNode: any): ParsedParticle[] {
   const children = nodeChildren(compositorNode)
 
   for (const child of children) {
-    const tag = nodeTag(child)
-
-    if (isXsdTag(tag, 'element')) {
-      particles.push({
-        type: 'element',
-        name: attr(child, 'name') || undefined,
-        ref: attr(child, 'ref') || undefined,
-        elementType: attr(child, 'type') || undefined,
-        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs:
-          attr(child, 'maxOccurs') === 'unbounded'
-            ? 'unbounded'
-            : parseInt(attr(child, 'maxOccurs') || '1', 10),
-      })
-    } else if (isXsdTag(tag, 'sequence')) {
-      particles.push({
-        type: 'sequence',
-        particles: parseParticles(child),
-        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs:
-          attr(child, 'maxOccurs') === 'unbounded'
-            ? 'unbounded'
-            : parseInt(attr(child, 'maxOccurs') || '1', 10),
-      })
-    } else if (isXsdTag(tag, 'choice')) {
-      particles.push({
-        type: 'choice',
-        particles: parseParticles(child),
-        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs:
-          attr(child, 'maxOccurs') === 'unbounded'
-            ? 'unbounded'
-            : parseInt(attr(child, 'maxOccurs') || '1', 10),
-      })
-    } else if (isXsdTag(tag, 'group')) {
-      const ref = attr(child, 'ref')
-      if (ref) {
-        particles.push({
-          type: 'group',
-          ref,
-          minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-          maxOccurs:
-            attr(child, 'maxOccurs') === 'unbounded'
-              ? 'unbounded'
-              : parseInt(attr(child, 'maxOccurs') || '1', 10),
-        })
-      }
-    } else if (isXsdTag(tag, 'any')) {
-      particles.push({
-        type: 'any',
-        namespace: attr(child, 'namespace') || '##any',
-        processContents: attr(child, 'processContents') || 'strict',
-        minOccurs: parseInt(attr(child, 'minOccurs') || '1', 10),
-        maxOccurs:
-          attr(child, 'maxOccurs') === 'unbounded'
-            ? 'unbounded'
-            : parseInt(attr(child, 'maxOccurs') || '1', 10),
-      })
+    const parsed = parseParticleNode(child)
+    if (parsed) {
+      particles.push(parsed)
     }
   }
 
   return particles
+}
+
+function parseOccurs(node: any): { minOccurs: number; maxOccurs: number | 'unbounded' } {
+  return {
+    minOccurs: parseInt(attr(node, 'minOccurs') || '1', 10),
+    maxOccurs:
+      attr(node, 'maxOccurs') === 'unbounded'
+        ? 'unbounded'
+        : parseInt(attr(node, 'maxOccurs') || '1', 10),
+  }
+}
+
+function parseParticleNode(node: any): ParsedParticle | undefined {
+  const tag = nodeTag(node)
+  const occurs = parseOccurs(node)
+
+  if (isXsdTag(tag, 'element')) {
+    return {
+      type: 'element',
+      name: attr(node, 'name') || undefined,
+      ref: attr(node, 'ref') || undefined,
+      elementType: attr(node, 'type') || undefined,
+      minOccurs: occurs.minOccurs,
+      maxOccurs: occurs.maxOccurs,
+    }
+  }
+
+  if (isXsdTag(tag, 'sequence')) {
+    return {
+      type: 'sequence',
+      particles: parseParticles(node),
+      minOccurs: occurs.minOccurs,
+      maxOccurs: occurs.maxOccurs,
+    }
+  }
+
+  if (isXsdTag(tag, 'choice')) {
+    return {
+      type: 'choice',
+      particles: parseParticles(node),
+      minOccurs: occurs.minOccurs,
+      maxOccurs: occurs.maxOccurs,
+    }
+  }
+
+  if (isXsdTag(tag, 'group')) {
+    const ref = attr(node, 'ref')
+    if (!ref) {
+      return undefined
+    }
+
+    return {
+      type: 'group',
+      ref,
+      minOccurs: occurs.minOccurs,
+      maxOccurs: occurs.maxOccurs,
+    }
+  }
+
+  if (isXsdTag(tag, 'any')) {
+    return {
+      type: 'any',
+      namespace: attr(node, 'namespace') || '##any',
+      processContents: attr(node, 'processContents') || 'strict',
+      minOccurs: occurs.minOccurs,
+      maxOccurs: occurs.maxOccurs,
+    }
+  }
+
+  return undefined
+}
+
+function findFirstDirectParticle(children: any[]): ParsedParticle | undefined {
+  for (const child of children) {
+    const tag = nodeTag(child)
+    if (!isXsdTag(tag, 'group') && !isXsdTag(tag, 'element') && !isXsdTag(tag, 'any')) {
+      continue
+    }
+
+    const parsed = parseParticleNode(child)
+    if (parsed) {
+      return parsed
+    }
+  }
+
+  return undefined
 }
 
 function parseElement(elNode: any): ParsedElement {
@@ -649,6 +688,8 @@ function parseComplexContent(ccNode: any): ParsedComplexContent {
   const sourceChildren = nodeChildren(source)
   const sequence = findFirstByTag(sourceChildren, 'sequence')
   const choice = findFirstByTag(sourceChildren, 'choice')
+  const all = findFirstByTag(sourceChildren, 'all')
+  const directParticle = findFirstDirectParticle(sourceChildren)
   const attrs = findByTag(sourceChildren, 'attribute')
   const attrGroups = findByTag(sourceChildren, 'attributeGroup')
 
@@ -659,7 +700,11 @@ function parseComplexContent(ccNode: any): ParsedComplexContent {
       ? { type: 'sequence', particles: parseParticles(sequence) }
       : choice
         ? { type: 'choice', particles: parseParticles(choice) }
-        : undefined,
+        : all
+          ? { type: 'all', particles: parseParticles(all) }
+          : directParticle
+            ? { type: 'sequence', particles: [directParticle] }
+            : undefined,
     attributes: attrs.map(parseAttribute),
     attributeGroups: attrGroups
       .filter((ref: any) => attr(ref, 'ref'))
@@ -813,7 +858,7 @@ function generateComplexType(ct: ParsedComplexType): string {
       .map((ag) => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`)
       .join(', ')
     const compositor = ct.complexContent.content
-      ? `{ kind: "${ct.complexContent.content.type}", particles: [${ct.complexContent.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
+      ? `{ kind: "${ct.complexContent.content.type}", ${ct.complexContent.content.type === 'all' ? 'elements' : 'particles'}: [${ct.complexContent.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
       : 'undefined'
     content = `{ kind: "complexContent", content: { derivation: "${ct.complexContent.type}", base: ${makeTypeRef(ct.complexContent.base)}, compositor: ${compositor}, attributes: [${ccAttrs}], attributeGroups: [${ccAttrGroups}] } }`
   } else {
@@ -856,7 +901,7 @@ function generateAttributeGroup(ag: ParsedAttributeGroup): string {
   return `{ kind: "attributeGroup", name: "${ag.name}", attributes: [${attrs}], attributeGroupRefs: [${refs}] }`
 }
 
-function generateTypeScript(schema: ParsedSchema, filename: string): string {
+export function generateTypeScript(schema: ParsedSchema, filename: string): string {
   const lines: string[] = []
 
   lines.push('/**')
@@ -1045,4 +1090,17 @@ ${exports}
   console.log(`\nGenerated: index.ts`)
 }
 
-main().catch(console.error)
+function isCliEntryPoint(): boolean {
+  if (!process.argv[1]) {
+    return false
+  }
+
+  return resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+}
+
+if (isCliEntryPoint()) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

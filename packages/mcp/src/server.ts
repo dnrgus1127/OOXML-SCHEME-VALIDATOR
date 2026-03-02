@@ -15,6 +15,14 @@ import {
   analyzeOoxmlStructureTool,
   getOoxmlPart,
   getOoxmlPartTool,
+  initUpload,
+  initUploadTool,
+  appendUploadChunk,
+  appendUploadChunkTool,
+  completeUpload,
+  completeUploadTool,
+  deleteUploadedFile,
+  deleteUploadedFileTool,
 } from './tools/index.js'
 
 const SERVER_NAME = 'ooxml-validator'
@@ -36,7 +44,15 @@ export function createServer(): Server {
   // Register tool list handler
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
-      tools: [validateOoxmlTool, analyzeOoxmlStructureTool, getOoxmlPartTool],
+      tools: [
+        validateOoxmlTool,
+        analyzeOoxmlStructureTool,
+        getOoxmlPartTool,
+        initUploadTool,
+        appendUploadChunkTool,
+        completeUploadTool,
+        deleteUploadedFileTool,
+      ],
     }
   })
 
@@ -72,6 +88,54 @@ export function createServer(): Server {
 
         case 'get_ooxml_part': {
           const result = await getOoxmlPart(args as any)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          }
+        }
+
+        case 'init_ooxml_upload': {
+          const result = initUpload(args as any)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          }
+        }
+
+        case 'append_ooxml_upload_chunk': {
+          const result = appendUploadChunk(args as any)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          }
+        }
+
+        case 'complete_ooxml_upload': {
+          const result = completeUpload(args as any)
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          }
+        }
+
+        case 'delete_ooxml_uploaded_file': {
+          const result = deleteUploadedFile(args as any)
           return {
             content: [
               {
