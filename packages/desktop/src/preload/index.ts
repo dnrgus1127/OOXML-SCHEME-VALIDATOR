@@ -11,6 +11,7 @@ import type { OpenTool } from '../shared/recent-files'
 const api = {
   // Dialog
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
+  openDroppedFiles: (filePaths: string[]) => ipcRenderer.invoke('app:openDroppedFiles', filePaths),
   saveFile: (defaultPath?: string) => ipcRenderer.invoke('dialog:saveFile', defaultPath),
   confirmFileChange: () => ipcRenderer.invoke('dialog:confirmFileChange'),
 
@@ -58,6 +59,11 @@ const api = {
     const listener = (_: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
     ipcRenderer.on('file:opened', listener)
     return () => ipcRenderer.removeListener('file:opened', listener)
+  },
+  onFilesOpened: (callback: (filePaths: string[]) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, filePaths: string[]) => callback(filePaths)
+    ipcRenderer.on('files:opened', listener)
+    return () => ipcRenderer.removeListener('files:opened', listener)
   },
   onMenuSave: (callback: () => void) => {
     const listener = () => callback()

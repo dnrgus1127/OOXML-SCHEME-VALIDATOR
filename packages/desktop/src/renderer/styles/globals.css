@@ -1732,3 +1732,37 @@ body {
 .supported-schemas-empty {
   color: var(--text-muted);
 }
+
+.file-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  pointer-events: none;
+}
+
+.file-drop-overlay__content {
+  min-width: 320px;
+  padding: 20px 24px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 94%, black 6%);
+  box-shadow: 0 8px 24px color-mix(in srgb, black 50%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.file-drop-overlay__content strong {
+  font-size: 16px;
+}
+
+.file-drop-overlay__content span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
