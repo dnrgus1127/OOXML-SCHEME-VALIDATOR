@@ -4,16 +4,18 @@
  * Validates OOXML documents against XSD schemas.
  */
 
-import { readFileSync } from 'fs'
 import { OoxmlParser, parseXmlToEventArray } from '@ooxml/parser'
 import type { XmlValidationEvent } from '@ooxml/parser'
 import { loadSchemaRegistry, validateXmlEvents, type ValidationOptions } from '@ooxml/core'
+import { resolveFileBuffer } from './file-input'
 
 export interface ValidateOoxmlInput {
   /** Path to the OOXML file */
   file_path?: string
   /** Base64 encoded file content (alternative to file_path) */
   file_base64?: string
+  /** Uploaded file reference from complete_ooxml_upload (alternative to file_path/file_base64) */
+  file_ref?: string
   /** Validation options */
   options?: {
     /** Strict validation mode */
@@ -56,20 +58,7 @@ export interface ValidateOoxmlOutput {
  * Execute validate_ooxml tool
  */
 export async function validateOoxml(input: ValidateOoxmlInput): Promise<ValidateOoxmlOutput> {
-  // Get file buffer
-  let buffer: Buffer
-
-  if (input.file_path) {
-    try {
-      buffer = readFileSync(input.file_path)
-    } catch (err) {
-      throw new Error(`Failed to read file: ${input.file_path}`)
-    }
-  } else if (input.file_base64) {
-    buffer = Buffer.from(input.file_base64, 'base64')
-  } else {
-    throw new Error('Either file_path or file_base64 must be provided')
-  }
+  const buffer = resolveFileBuffer(input)
 
   // Parse document
   const doc = await OoxmlParser.fromBuffer(buffer)
@@ -240,6 +229,11 @@ export const validateOoxmlTool = {
       file_base64: {
         type: 'string',
         description: 'Base64 encoded file content (alternative to file_path)',
+      },
+      file_ref: {
+        type: 'string',
+        description:
+          'Uploaded file reference from complete_ooxml_upload (alternative to file_path/file_base64)',
       },
       options: {
         type: 'object',

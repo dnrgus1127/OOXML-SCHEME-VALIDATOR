@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { convertXsd } from './index'
+import { convertXsd, generateTypeScript } from './index'
 
 describe('convertXsd direct particle handling', () => {
   it('parses direct group content in complexType as synthetic sequence', () => {
@@ -60,5 +60,28 @@ describe('convertXsd direct particle handling', () => {
     expect(directParticle?.ref).toBe('EG_PContent')
     expect(directParticle?.minOccurs).toBe(0)
     expect(directParticle?.maxOccurs).toBe('unbounded')
+  })
+
+  it('generates complexContent all compositor with elements property', () => {
+    const xsd = `<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:complexType name="CT_Base"/>
+  <xsd:complexType name="CT_Extended">
+    <xsd:complexContent>
+      <xsd:extension base="CT_Base">
+        <xsd:all>
+          <xsd:element name="foo" type="xsd:string"/>
+        </xsd:all>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+</xsd:schema>`
+
+    const parsed = convertXsd(xsd, 'complex-content-all.xsd')
+    const output = generateTypeScript(parsed, 'complex-content-all.xsd')
+
+    expect(output).toContain('kind: "complexContent"')
+    expect(output).toContain('kind: "all", elements:')
+    expect(output).not.toContain('kind: "all", particles:')
   })
 })

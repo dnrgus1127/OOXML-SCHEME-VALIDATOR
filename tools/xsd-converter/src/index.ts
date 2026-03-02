@@ -858,7 +858,7 @@ function generateComplexType(ct: ParsedComplexType): string {
       .map((ag) => `{ kind: "attributeGroup", ref: ${makeTypeRef(ag)} }`)
       .join(', ')
     const compositor = ct.complexContent.content
-      ? `{ kind: "${ct.complexContent.content.type}", particles: [${ct.complexContent.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
+      ? `{ kind: "${ct.complexContent.content.type}", ${ct.complexContent.content.type === 'all' ? 'elements' : 'particles'}: [${ct.complexContent.content.particles.map(generateParticle).join(', ')}], occurs: { minOccurs: 1, maxOccurs: 1 } }`
       : 'undefined'
     content = `{ kind: "complexContent", content: { derivation: "${ct.complexContent.type}", base: ${makeTypeRef(ct.complexContent.base)}, compositor: ${compositor}, attributes: [${ccAttrs}], attributeGroups: [${ccAttrGroups}] } }`
   } else {
@@ -901,7 +901,7 @@ function generateAttributeGroup(ag: ParsedAttributeGroup): string {
   return `{ kind: "attributeGroup", name: "${ag.name}", attributes: [${attrs}], attributeGroupRefs: [${refs}] }`
 }
 
-function generateTypeScript(schema: ParsedSchema, filename: string): string {
+export function generateTypeScript(schema: ParsedSchema, filename: string): string {
   const lines: string[] = []
 
   lines.push('/**')

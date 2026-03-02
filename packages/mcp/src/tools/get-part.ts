@@ -4,15 +4,17 @@
  * Retrieves the content of a specific part from an OOXML document.
  */
 
-import { readFileSync } from 'fs'
 import { OoxmlParser, xmlToJson, formatXml } from '@ooxml/parser'
 import type { JsonElement } from '@ooxml/parser'
+import { resolveFileBuffer } from './file-input'
 
 export interface GetOoxmlPartInput {
   /** Path to the OOXML file */
   file_path?: string
   /** Base64 encoded file content */
   file_base64?: string
+  /** Uploaded file reference from complete_ooxml_upload */
+  file_ref?: string
   /** Path of the part within the document */
   part_path: string
   /** Output format */
@@ -33,20 +35,7 @@ export interface GetOoxmlPartOutput {
  * Execute get_ooxml_part tool
  */
 export async function getOoxmlPart(input: GetOoxmlPartInput): Promise<GetOoxmlPartOutput> {
-  // Get file buffer
-  let buffer: Buffer
-
-  if (input.file_path) {
-    try {
-      buffer = readFileSync(input.file_path)
-    } catch (err) {
-      throw new Error(`Failed to read file: ${input.file_path}`)
-    }
-  } else if (input.file_base64) {
-    buffer = Buffer.from(input.file_base64, 'base64')
-  } else {
-    throw new Error('Either file_path or file_base64 must be provided')
-  }
+  const buffer = resolveFileBuffer(input)
 
   // Parse document
   const doc = await OoxmlParser.fromBuffer(buffer)
@@ -106,6 +95,11 @@ export const getOoxmlPartTool = {
       file_base64: {
         type: 'string',
         description: 'Base64 encoded file content (alternative to file_path)',
+      },
+      file_ref: {
+        type: 'string',
+        description:
+          'Uploaded file reference from complete_ooxml_upload (alternative to file_path/file_base64)',
       },
       part_path: {
         type: 'string',
