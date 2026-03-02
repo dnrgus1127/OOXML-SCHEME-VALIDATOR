@@ -30,6 +30,42 @@ import type { OpenTool } from '../shared/recent-files'
 
 let mainWindow: BrowserWindow | null = null
 
+const SUPPORTED_FILE_EXTENSIONS = new Set(['.xlsx', '.docx', '.pptx'])
+
+function isSupportedOfficeFile(filePath: string): boolean {
+  const lower = filePath.toLowerCase()
+  for (const extension of SUPPORTED_FILE_EXTENSIONS) {
+    if (lower.endsWith(extension)) return true
+  }
+  return false
+}
+
+function normalizeOpenableFilePaths(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+
+  const uniquePaths = new Set<string>()
+  for (const value of input) {
+    if (typeof value !== 'string') continue
+    const filePath = value.trim()
+    if (!filePath) continue
+    if (!existsSync(filePath)) continue
+    if (!isSupportedOfficeFile(filePath)) continue
+    uniquePaths.add(filePath)
+  }
+
+  return Array.from(uniquePaths)
+}
+
+function emitOpenFilesEvent(filePaths: string[]): void {
+  if (filePaths.length === 0) return
+  if (filePaths.length === 1) {
+    mainWindow?.webContents.send('file:opened', filePaths[0])
+    return
+  }
+
+  mainWindow?.webContents.send('files:opened', filePaths)
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -156,6 +192,12 @@ function setupIpcHandlers(): void {
 
     if (result.canceled) return null
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('app:openDroppedFiles', async (_, filePaths: unknown) => {
+    const normalizedPaths = normalizeOpenableFilePaths(filePaths)
+    emitOpenFilesEvent(normalizedPaths)
+    return normalizedPaths
   })
 
   // Save file dialog
