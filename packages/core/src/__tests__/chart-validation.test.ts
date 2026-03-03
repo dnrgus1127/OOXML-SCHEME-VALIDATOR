@@ -495,4 +495,161 @@ describe('cross-namespace type resolution', () => {
     const unknownTypeErrors = result.errors.filter((e) => e.code === 'UNKNOWN_TYPE')
     expect(unknownTypeErrors).toHaveLength(0)
   })
+
+  it('should resolve drawingml paragraph properties (a:pPr) inside chart rich text', () => {
+    const registry = loadSchemaRegistry('spreadsheet')
+
+    const engine = new ValidationEngine(registry, {
+      maxErrors: 200,
+      allowWhitespace: true,
+    })
+
+    const nsDecl = new Map([
+      ['', CHART_NS],
+      ['a', DML_MAIN_NS],
+    ])
+
+    engine.startDocument()
+    engine.startElement({
+      ...makeEl('chartSpace'),
+      namespaceDeclarations: nsDecl,
+    })
+
+    engine.startElement(makeEl('chart'))
+    engine.startElement(makeEl('title'))
+    engine.startElement(makeEl('tx'))
+    engine.startElement(makeEl('rich'))
+
+    engine.startElement(makeEl('bodyPr', DML_MAIN_NS))
+    engine.endElement(makeEl('bodyPr', DML_MAIN_NS))
+
+    engine.startElement(makeEl('lstStyle', DML_MAIN_NS))
+    engine.endElement(makeEl('lstStyle', DML_MAIN_NS))
+
+    engine.startElement(makeEl('p', DML_MAIN_NS))
+    engine.startElement(makeEl('pPr', DML_MAIN_NS))
+    engine.endElement(makeEl('pPr', DML_MAIN_NS))
+    engine.startElement(makeEl('endParaRPr', DML_MAIN_NS))
+    engine.endElement(makeEl('endParaRPr', DML_MAIN_NS))
+    engine.endElement(makeEl('p', DML_MAIN_NS))
+
+    engine.endElement(makeEl('rich'))
+    engine.endElement(makeEl('tx'))
+    engine.endElement(makeEl('title'))
+
+    engine.startElement(makeEl('plotArea'))
+    engine.startElement(makeEl('barChart'))
+    engine.startElement(makeEl('barDir'))
+    engine.endElement(makeEl('barDir'))
+    engine.startElement(makeEl('grouping'))
+    engine.endElement(makeEl('grouping'))
+    engine.startElement(makeEl('ser'))
+    engine.startElement(makeEl('idx', CHART_NS, [{ name: 'val', value: '0', localName: 'val' }]))
+    engine.endElement(makeEl('idx'))
+    engine.startElement(makeEl('order', CHART_NS, [{ name: 'val', value: '0', localName: 'val' }]))
+    engine.endElement(makeEl('order'))
+    engine.endElement(makeEl('ser'))
+    engine.startElement(makeEl('axId', CHART_NS, [{ name: 'val', value: '1', localName: 'val' }]))
+    engine.endElement(makeEl('axId'))
+    engine.startElement(makeEl('axId', CHART_NS, [{ name: 'val', value: '2', localName: 'val' }]))
+    engine.endElement(makeEl('axId'))
+    engine.endElement(makeEl('barChart'))
+
+    engine.startElement(makeEl('catAx'))
+    engine.startElement(makeEl('axId', CHART_NS, [{ name: 'val', value: '1', localName: 'val' }]))
+    engine.endElement(makeEl('axId'))
+    engine.startElement(makeEl('scaling'))
+    engine.startElement(
+      makeEl('orientation', CHART_NS, [{ name: 'val', value: 'minMax', localName: 'val' }])
+    )
+    engine.endElement(makeEl('orientation'))
+    engine.endElement(makeEl('scaling'))
+    engine.startElement(makeEl('delete', CHART_NS, [{ name: 'val', value: '0', localName: 'val' }]))
+    engine.endElement(makeEl('delete'))
+    engine.startElement(makeEl('axPos', CHART_NS, [{ name: 'val', value: 'b', localName: 'val' }]))
+    engine.endElement(makeEl('axPos'))
+    engine.startElement(
+      makeEl('majorTickMark', CHART_NS, [{ name: 'val', value: 'none', localName: 'val' }])
+    )
+    engine.endElement(makeEl('majorTickMark'))
+    engine.startElement(
+      makeEl('minorTickMark', CHART_NS, [{ name: 'val', value: 'none', localName: 'val' }])
+    )
+    engine.endElement(makeEl('minorTickMark'))
+    engine.startElement(
+      makeEl('tickLblPos', CHART_NS, [{ name: 'val', value: 'nextTo', localName: 'val' }])
+    )
+    engine.endElement(makeEl('tickLblPos'))
+    engine.startElement(makeEl('crossAx', CHART_NS, [{ name: 'val', value: '2', localName: 'val' }]))
+    engine.endElement(makeEl('crossAx'))
+    engine.startElement(
+      makeEl('crosses', CHART_NS, [{ name: 'val', value: 'autoZero', localName: 'val' }])
+    )
+    engine.endElement(makeEl('crosses'))
+    engine.startElement(makeEl('auto', CHART_NS, [{ name: 'val', value: '1', localName: 'val' }]))
+    engine.endElement(makeEl('auto'))
+    engine.startElement(makeEl('lblAlgn', CHART_NS, [{ name: 'val', value: 'ctr', localName: 'val' }]))
+    engine.endElement(makeEl('lblAlgn'))
+    engine.startElement(
+      makeEl('lblOffset', CHART_NS, [{ name: 'val', value: '100', localName: 'val' }])
+    )
+    engine.endElement(makeEl('lblOffset'))
+    engine.endElement(makeEl('catAx'))
+
+    engine.startElement(makeEl('valAx'))
+    engine.startElement(makeEl('axId', CHART_NS, [{ name: 'val', value: '2', localName: 'val' }]))
+    engine.endElement(makeEl('axId'))
+    engine.startElement(makeEl('scaling'))
+    engine.startElement(
+      makeEl('orientation', CHART_NS, [{ name: 'val', value: 'minMax', localName: 'val' }])
+    )
+    engine.endElement(makeEl('orientation'))
+    engine.endElement(makeEl('scaling'))
+    engine.startElement(makeEl('delete', CHART_NS, [{ name: 'val', value: '0', localName: 'val' }]))
+    engine.endElement(makeEl('delete'))
+    engine.startElement(makeEl('axPos', CHART_NS, [{ name: 'val', value: 'l', localName: 'val' }]))
+    engine.endElement(makeEl('axPos'))
+    engine.startElement(makeEl('majorGridlines'))
+    engine.endElement(makeEl('majorGridlines'))
+    engine.startElement(
+      makeEl('numFmt', CHART_NS, [
+        { name: 'formatCode', value: 'General', localName: 'formatCode' },
+        { name: 'sourceLinked', value: '1', localName: 'sourceLinked' },
+      ])
+    )
+    engine.endElement(makeEl('numFmt'))
+    engine.startElement(
+      makeEl('majorTickMark', CHART_NS, [{ name: 'val', value: 'none', localName: 'val' }])
+    )
+    engine.endElement(makeEl('majorTickMark'))
+    engine.startElement(
+      makeEl('minorTickMark', CHART_NS, [{ name: 'val', value: 'none', localName: 'val' }])
+    )
+    engine.endElement(makeEl('minorTickMark'))
+    engine.startElement(
+      makeEl('tickLblPos', CHART_NS, [{ name: 'val', value: 'nextTo', localName: 'val' }])
+    )
+    engine.endElement(makeEl('tickLblPos'))
+    engine.startElement(makeEl('crossAx', CHART_NS, [{ name: 'val', value: '1', localName: 'val' }]))
+    engine.endElement(makeEl('crossAx'))
+    engine.startElement(
+      makeEl('crosses', CHART_NS, [{ name: 'val', value: 'autoZero', localName: 'val' }])
+    )
+    engine.endElement(makeEl('crosses'))
+    engine.startElement(
+      makeEl('crossBetween', CHART_NS, [{ name: 'val', value: 'between', localName: 'val' }])
+    )
+    engine.endElement(makeEl('crossBetween'))
+    engine.endElement(makeEl('valAx'))
+
+    engine.endElement(makeEl('plotArea'))
+    engine.endElement(makeEl('chart'))
+    engine.endElement(makeEl('chartSpace'))
+
+    const result = engine.endDocument()
+
+    expect(result.valid).toBe(true)
+    const schemaNotFoundErrors = result.errors.filter((e) => e.code === 'ELEMENT_NOT_FOUND')
+    expect(schemaNotFoundErrors).toHaveLength(0)
+  })
 })
