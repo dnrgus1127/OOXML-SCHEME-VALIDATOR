@@ -44,6 +44,12 @@ export const ERROR_MESSAGES: MessageMap = {
     ko: (element: string, required: number, diff: number, actual: number) =>
       `'${element}' 요소의 개수가 스키마에서 허용되는 개수인 ${required}개보다 ${diff}개 적습니다. (실제 ${actual}개)`,
   },
+  'ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT': {
+    en: () =>
+      'Unsupported Markup Compatibility element AlternateContent was found. Its subtree was skipped.',
+    ko: () =>
+      '\uD604\uC7AC \uC571\uC5D0\uC11C \uBBF8\uC9C0\uC6D0\uD558\uB294 Markup Compatibility \uC694\uC18C AlternateContent\uAC00 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB0B4\uBD80 \uB0B4\uC6A9\uC740 \uAC80\uC99D\uD558\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.',
+  },
   'ELEMENT.UNEXPECTED_TEXT.ELEMENT_ONLY': {
     en: () => 'Text content is not allowed in element-only content',
     ko: () => 'element-only 컨텐츠에서 텍스트가 발견되었습니다',

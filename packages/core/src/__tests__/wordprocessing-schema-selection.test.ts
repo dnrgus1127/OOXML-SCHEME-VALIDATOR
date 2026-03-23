@@ -15,6 +15,9 @@ function createTestErrorHandler(codes: string[]): ValidationErrorHandler {
     pushError: (code: string) => {
       codes.push(code)
     },
+    pushWarning: () => {
+      // no-op
+    },
     pushFacetError: (facet: Facet) => {
       codes.push(facet.type === 'enumeration' ? 'INVALID_ENUM_VALUE' : 'INVALID_VALUE')
     },

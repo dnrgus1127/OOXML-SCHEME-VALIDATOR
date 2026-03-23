@@ -119,6 +119,20 @@ export class ValidationEngine {
     const ignorableNamespaces = this.resolveIgnorableNamespaces(element, namespaceContext)
     this.context.ignorableNamespaceStack.push(ignorableNamespaces)
 
+    if (parentFrame?.skipValidation) {
+      this.context.elementStack.push(this.createSkippedFrame(element))
+      return
+    }
+
+    if (this.isUnsupportedAlternateContent(element)) {
+      this.context.elementStack.push(this.createSkippedFrame(element))
+      this.errorHandler.pushWarning(
+        'UNSUPPORTED_ALTERNATE_CONTENT',
+        formatMessage('ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT')
+      )
+      return
+    }
+
     let shouldResolveSchema = true
 
     if (parentFrame?.compositorState) {
@@ -220,7 +234,7 @@ export class ValidationEngine {
 
   text(text: string): void {
     const frame = this.context.elementStack[this.context.elementStack.length - 1]
-    if (!frame) {
+    if (!frame || frame.skipValidation) {
       return
     }
 
@@ -230,6 +244,13 @@ export class ValidationEngine {
   endElement(element: XmlElementInfo): void {
     const currentFrame = this.context.elementStack[this.context.elementStack.length - 1]
     if (!currentFrame) {
+      return
+    }
+
+    if (currentFrame.skipValidation) {
+      this.context.elementStack.pop()
+      this.context.namespaceStack.pop()
+      this.context.ignorableNamespaceStack.pop()
       return
     }
 
@@ -366,6 +387,26 @@ export class ValidationEngine {
       violation.minOccurs - violation.actualCount,
       violation.actualCount
     )
+  }
+
+  private isUnsupportedAlternateContent(element: XmlElementInfo): boolean {
+    return (
+      normalizeNamespace(element.namespaceUri) === MC_NAMESPACE &&
+      element.localName === 'AlternateContent'
+    )
+  }
+
+  private createSkippedFrame(element: XmlElementInfo): ElementStackFrame {
+    return {
+      elementName: element.localName,
+      namespaceUri: element.namespaceUri,
+      schemaNamespaceUri: element.namespaceUri,
+      schemaType: null,
+      compositorState: null,
+      textContent: '',
+      validatedAttributes: new Set<string>(),
+      skipValidation: true,
+    }
   }
 
   private extractElementFromParticle(

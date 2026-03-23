@@ -35,6 +35,9 @@ function createBufferedErrorHandler(base: ValidationErrorHandler): ValidationErr
     pushError: () => {
       // no-op: caller decides whether to surface buffered attempt errors
     },
+    pushWarning: () => {
+      // no-op: caller decides whether to surface buffered attempt warnings
+    },
     pushFacetError: () => {
       // no-op: caller decides whether to surface buffered attempt errors
     },
@@ -51,6 +54,9 @@ function createTrackingErrorHandler(
       pushError: (code: string, message: string, value?: string) => {
         errored = true
         base.pushError(code, message, value)
+      },
+      pushWarning: (code: string, message: string) => {
+        base.pushWarning(code, message)
       },
       pushFacetError: (facet: Facet, value: string) => {
         errored = true

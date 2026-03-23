@@ -36,6 +36,7 @@ export interface ElementStackFrame {
   compositorState: CompositorState | null
   textContent: string
   validatedAttributes: Set<string>
+  skipValidation?: boolean
 }
 
 export interface XmlAttribute {

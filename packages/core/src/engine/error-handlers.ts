@@ -6,6 +6,7 @@ export type ErrorCallback = (code: string, message: string, value?: string) => v
 
 export interface ValidationErrorHandler {
   pushError: ErrorCallback
+  pushWarning(code: string, message: string): void
   pushFacetError(facet: Facet, value: string): void
   currentPath(): string
 }
@@ -23,6 +24,14 @@ export function createErrorHandler(context: RuntimeValidationContext): Validatio
       if (context.options.failFast) {
         throw new Error(message)
       }
+    },
+
+    pushWarning(code: string, message: string): void {
+      context.warnings.push({
+        code,
+        message,
+        path: this.currentPath(),
+      })
     },
 
     pushFacetError(facet: Facet, value: string): void {
