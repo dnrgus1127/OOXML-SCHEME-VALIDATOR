@@ -6,7 +6,12 @@
 
 import { OoxmlParser, parseXmlToEventArray } from '@ooxml/parser'
 import type { XmlValidationEvent } from '@ooxml/parser'
-import { loadSchemaRegistry, validateXmlEvents, type ValidationOptions } from '@ooxml/core'
+import {
+  loadSchemaRegistry,
+  validateXmlEvents,
+  type ValidationOptions,
+  type ValidationWarning as CoreValidationWarning,
+} from '@ooxml/core'
 import { resolveFileBuffer } from './file-input'
 
 export interface ValidateOoxmlInput {
@@ -36,11 +41,19 @@ export interface ValidationError {
   actual?: string
 }
 
+export interface ValidationWarning {
+  code: string
+  message: string
+  path: string
+  partPath: string
+}
+
 export interface PartValidationResult {
   partPath: string
   contentType: string
   valid: boolean
   errors: ValidationError[]
+  warnings: ValidationWarning[]
   elementCount: number
 }
 
@@ -111,6 +124,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
     const elementCount = events.filter((e) => e.type === 'startElement').length
 
     const errors: ValidationError[] = []
+    let warnings: ValidationWarning[] = []
 
     if (parseError) {
       errors.push({
@@ -154,13 +168,19 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
         errors.push({
           code: schemaError.code,
           message: schemaError.message,
-          path: '/',
+          path: schemaError.path,
           partPath: part.path,
         })
       }
 
       if (schemaValidation.warnings) {
-        totalWarnings += schemaValidation.warnings.length
+        warnings = schemaValidation.warnings.map((warning: CoreValidationWarning) => ({
+          code: warning.code,
+          message: warning.message,
+          path: warning.path,
+          partPath: part.path,
+        }))
+        totalWarnings += warnings.length
       }
     }
 
@@ -173,6 +193,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
         contentType: part.contentType,
         valid: errors.length === 0,
         errors,
+        warnings,
         elementCount,
       })
       break
@@ -183,6 +204,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
       contentType: part.contentType,
       valid: errors.length === 0,
       errors,
+      warnings,
       elementCount,
     })
   }
@@ -199,6 +221,7 @@ export async function validateOoxml(input: ValidateOoxmlInput): Promise<Validate
     `Invalid Parts: ${invalidParts}`,
     `Total Elements: ${totalElements}`,
     `Total Errors: ${totalErrors}`,
+    `Total Warnings: ${totalWarnings}`,
   ].join('\n')
 
   return {

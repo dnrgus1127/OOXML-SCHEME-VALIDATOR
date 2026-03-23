@@ -95,5 +95,6 @@ describe('validateOoxml', () => {
     expect(result.totalErrors).toBe(1)
     expect(result.totalWarnings).toBe(1)
     expect(result.results[0]?.errors[0]?.code).toBe('INVALID_CONTENT')
+    expect(result.results[0]?.warnings[0]?.code).toBe('WARN')
   })
 })
