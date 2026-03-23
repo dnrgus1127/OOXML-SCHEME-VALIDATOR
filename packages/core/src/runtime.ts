@@ -32,6 +32,7 @@ export interface ElementStackFrame {
   elementName: string
   namespaceUri: string
   schemaNamespaceUri: string
+  inferredDefaultNamespaceUri?: string
   schemaType: XsdComplexType | XsdSimpleType | null
   compositorState: CompositorState | null
   textContent: string

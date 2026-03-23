@@ -44,6 +44,12 @@ export const ERROR_MESSAGES: MessageMap = {
     ko: (element: string, required: number, diff: number, actual: number) =>
       `'${element}' 요소의 개수가 스키마에서 허용되는 개수인 ${required}개보다 ${diff}개 적습니다. (실제 ${actual}개)`,
   },
+  'ELEMENT.INFERRED_DEFAULT_NAMESPACE': {
+    en: (element: string, namespaceUri: string) =>
+      `Element '${element}' had no default namespace. Inferred namespace '${namespaceUri}' from declared prefixes.`,
+    ko: (element: string, namespaceUri: string) =>
+      `'${element}' \uC694\uC18C\uB294 default namespace\uAC00 \uC5C6\uC5B4 \uC120\uC5B8\uB41C prefix\uB85C namespace '${namespaceUri}'\uB97C \uCD94\uB860\uD588\uC2B5\uB2C8\uB2E4.`,
+  },
   'ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT': {
     en: () =>
       'Unsupported Markup Compatibility element AlternateContent was found. Its subtree was skipped.',

@@ -7,8 +7,10 @@ const CORE_PROPS_NS = 'http://schemas.openxmlformats.org/package/2006/metadata/c
 const CORE_PROPS_STRICT_NS = 'http://purl.oclc.org/ooxml/package/metadata/core-properties'
 const CONTENT_TYPES_NS = 'http://schemas.openxmlformats.org/package/2006/content-types'
 const CONTENT_TYPES_STRICT_NS = 'http://purl.oclc.org/ooxml/package/content-types'
+const CUSTOM_PROPS_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/custom-properties'
 const DC_NS = 'http://purl.org/dc/elements/1.1/'
 const DCTERMS_NS = 'http://purl.org/dc/terms/'
+const VT_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes'
 const XML_NS = 'http://www.w3.org/XML/1998/namespace'
 
 function attrs(values: Record<string, string>): XmlAttribute[] {
@@ -31,7 +33,11 @@ function el(
 
 function validate(events: XmlValidationEvent[]) {
   const registry = loadSchemaRegistry('document')
-  return validateXmlEvents(registry, events, { allowWhitespace: true, maxErrors: 100 })
+  return validateXmlEvents(registry, events, {
+    allowWhitespace: true,
+    maxErrors: 100,
+    includeWarnings: true,
+  })
 }
 
 describe('package metadata schema validation', () => {
@@ -119,6 +125,80 @@ describe('package metadata schema validation', () => {
     ])
 
     expect(result.valid).toBe(true)
+  })
+
+  it('accepts empty custom properties root when default namespace is missing', () => {
+    const root = el(
+      'Properties',
+      'Properties',
+      '',
+      [],
+      new Map([
+        ['r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'],
+        ['cfp', CUSTOM_PROPS_NS],
+        ['vt', VT_NS],
+      ])
+    )
+
+    const result = validate([
+      { type: 'startDocument' },
+      { type: 'startElement', element: root },
+      { type: 'endElement', element: root },
+      { type: 'endDocument' },
+    ])
+
+    expect(result.valid).toBe(true)
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: 'INFERRED_DEFAULT_NAMESPACE',
+        path: '/Properties',
+      }),
+    ])
+  })
+
+  it('infers custom properties namespace when default namespace is missing', () => {
+    const root = el(
+      'Properties',
+      'Properties',
+      '',
+      [],
+      new Map([
+        ['r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'],
+        ['cfp', CUSTOM_PROPS_NS],
+        ['vt', VT_NS],
+      ])
+    )
+    const propertyEl = el(
+      'property',
+      'property',
+      '',
+      attrs({
+        fmtid: '{D5CDD505-2E9C-101B-9397-08002B2CF9AE}',
+        pid: '2',
+        name: 'MyProp',
+      })
+    )
+    const valueEl = el('vt:lpwstr', 'lpwstr', VT_NS)
+
+    const result = validate([
+      { type: 'startDocument' },
+      { type: 'startElement', element: root },
+      { type: 'startElement', element: propertyEl },
+      { type: 'startElement', element: valueEl },
+      { type: 'text', text: 'hello' },
+      { type: 'endElement', element: valueEl },
+      { type: 'endElement', element: propertyEl },
+      { type: 'endElement', element: root },
+      { type: 'endDocument' },
+    ])
+
+    expect(result.valid).toBe(true)
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: 'INFERRED_DEFAULT_NAMESPACE',
+        path: '/Properties',
+      }),
+    ])
   })
 
   it('rejects nested elements inside dcterms:created', () => {

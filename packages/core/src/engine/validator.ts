@@ -124,8 +124,18 @@ export class ValidationEngine {
       return
     }
 
-    if (this.isUnsupportedAlternateContent(element)) {
-      this.context.elementStack.push(this.createSkippedFrame(element))
+    const namespaceResolution = this.resolveEffectiveElementNamespace(
+      element,
+      namespaceContext,
+      parentFrame
+    )
+    const effectiveElement =
+      namespaceResolution.namespaceUri === element.namespaceUri
+        ? element
+        : { ...element, namespaceUri: namespaceResolution.namespaceUri }
+
+    if (this.isUnsupportedAlternateContent(effectiveElement)) {
+      this.context.elementStack.push(this.createSkippedFrame(effectiveElement))
       this.errorHandler.pushWarning(
         'UNSUPPORTED_ALTERNATE_CONTENT',
         formatMessage('ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT')
@@ -137,8 +147,8 @@ export class ValidationEngine {
 
     if (parentFrame?.compositorState) {
       const result = validateCompositorChild(
-        element.namespaceUri,
-        element.localName,
+        effectiveElement.namespaceUri,
+        effectiveElement.localName,
         parentFrame.compositorState,
         this.registry,
         resolver
@@ -163,7 +173,7 @@ export class ValidationEngine {
       if (!result.success) {
         const message = result.occurrenceViolation
           ? this.formatOccurrenceViolationMessage(result.occurrenceViolation)
-          : formatMessage('ELEMENT.INVALID', element.name)
+          : formatMessage('ELEMENT.INVALID', effectiveElement.name)
         this.errorHandler.pushError(
           result.errorCode ?? 'INVALID_CONTENT',
           message
@@ -186,15 +196,18 @@ export class ValidationEngine {
             namespaceContext,
             parentFrame?.schemaNamespaceUri
           ) ??
-          this.registry.resolveElement(element.namespaceUri, element.localName))
-        : this.registry.resolveElement(element.namespaceUri, element.localName)
+          this.registry.resolveElement(
+            effectiveElement.namespaceUri,
+            effectiveElement.localName
+          ))
+        : this.registry.resolveElement(effectiveElement.namespaceUri, effectiveElement.localName)
 
     const schemaType = !shouldResolveSchema || isWildcardMatch
       ? null
       : resolveSchemaElementType(
           schemaElement,
           namespaceContext,
-          element,
+          effectiveElement,
           this.registry,
           this.errorHandler.pushError.bind(this.errorHandler)
         )
@@ -203,7 +216,7 @@ export class ValidationEngine {
       ? validateAttributes(
           element.attributes,
           schemaType,
-          this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri,
+          this.resolveSchemaTypeNamespace(schemaType) || effectiveElement.namespaceUri,
           namespaceContext,
           this.registry,
           this.errorHandler,
@@ -211,12 +224,14 @@ export class ValidationEngine {
         )
       : new Set<string>()
 
-    const schemaNamespaceUri = this.resolveSchemaTypeNamespace(schemaType) || element.namespaceUri
+    const schemaNamespaceUri =
+      this.resolveSchemaTypeNamespace(schemaType) || effectiveElement.namespaceUri
 
     const frame: ElementStackFrame = {
-      elementName: element.localName,
-      namespaceUri: element.namespaceUri,
+      elementName: effectiveElement.localName,
+      namespaceUri: effectiveElement.namespaceUri,
       schemaNamespaceUri,
+      inferredDefaultNamespaceUri: namespaceResolution.inferredDefaultNamespaceUri,
       schemaType,
       compositorState: isComplexSchemaType(schemaType)
         ? initCompositorState(
@@ -230,6 +245,13 @@ export class ValidationEngine {
     }
 
     this.context.elementStack.push(frame)
+
+    if (namespaceResolution.warningMessage) {
+      this.errorHandler.pushWarning(
+        'INFERRED_DEFAULT_NAMESPACE',
+        namespaceResolution.warningMessage
+      )
+    }
   }
 
   text(text: string): void {
@@ -387,6 +409,77 @@ export class ValidationEngine {
       violation.minOccurs - violation.actualCount,
       violation.actualCount
     )
+  }
+
+  private resolveEffectiveElementNamespace(
+    element: XmlElementInfo,
+    namespaceContext: Map<string, string>,
+    parentFrame?: ElementStackFrame
+  ): {
+    namespaceUri: string
+    inferredDefaultNamespaceUri?: string
+    warningMessage?: string
+  } {
+    if (element.namespaceUri || element.name !== element.localName) {
+      return { namespaceUri: element.namespaceUri }
+    }
+
+    if (parentFrame?.inferredDefaultNamespaceUri && !element.namespaceDeclarations?.has('')) {
+      return {
+        namespaceUri: parentFrame.inferredDefaultNamespaceUri,
+        inferredDefaultNamespaceUri: parentFrame.inferredDefaultNamespaceUri,
+      }
+    }
+
+    if (parentFrame) {
+      return { namespaceUri: element.namespaceUri }
+    }
+
+    const inferredNamespaceUri = this.inferNamespaceFromDeclaredPrefixes(
+      element.localName,
+      namespaceContext
+    )
+    if (!inferredNamespaceUri) {
+      return { namespaceUri: element.namespaceUri }
+    }
+
+    return {
+      namespaceUri: inferredNamespaceUri,
+      inferredDefaultNamespaceUri: inferredNamespaceUri,
+      warningMessage: formatMessage(
+        'ELEMENT.INFERRED_DEFAULT_NAMESPACE',
+        element.localName,
+        inferredNamespaceUri
+      ),
+    }
+  }
+
+  private inferNamespaceFromDeclaredPrefixes(
+    localName: string,
+    namespaceContext: Map<string, string>
+  ): string | undefined {
+    const candidates = new Map<string, string>()
+
+    for (const [prefix, namespaceUri] of namespaceContext.entries()) {
+      if (!namespaceUri || prefix === '' || prefix === 'xml' || prefix === 'xmlns') {
+        continue
+      }
+
+      if (!this.registry.resolveElement(namespaceUri, localName)) {
+        continue
+      }
+
+      const normalizedNamespaceUri = normalizeNamespace(namespaceUri)
+      if (!candidates.has(normalizedNamespaceUri)) {
+        candidates.set(normalizedNamespaceUri, namespaceUri)
+      }
+    }
+
+    if (candidates.size !== 1) {
+      return undefined
+    }
+
+    return Array.from(candidates.values())[0]
   }
 
   private isUnsupportedAlternateContent(element: XmlElementInfo): boolean {
