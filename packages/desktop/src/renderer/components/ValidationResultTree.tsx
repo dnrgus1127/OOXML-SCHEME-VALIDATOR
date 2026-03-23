@@ -9,10 +9,20 @@ interface ValidationError {
   column?: number
 }
 
+interface ValidationWarning {
+  code: string
+  message: string
+  path: string
+  value?: string
+  line?: number
+  column?: number
+}
+
 interface PartResult {
   path: string
   valid: boolean
   errors?: ValidationError[]
+  warnings?: ValidationWarning[]
 }
 
 interface FileValidationResult {
@@ -28,6 +38,7 @@ interface FileValidationResult {
       validParts: number
       invalidParts: number
       totalErrors: number
+      totalWarnings: number
     }
   }
   error?: string
@@ -39,6 +50,20 @@ interface ValidationResultTreeProps {
   onToggleFile: (filePath: string) => void
 }
 
+function formatIssueCount(errorCount: number, warningCount: number): string {
+  const parts: string[] = []
+
+  if (errorCount > 0) {
+    parts.push(`${errorCount} error${errorCount !== 1 ? 's' : ''}`)
+  }
+
+  if (warningCount > 0) {
+    parts.push(`${warningCount} warning${warningCount !== 1 ? 's' : ''}`)
+  }
+
+  return parts.join(', ')
+}
+
 export function ValidationResultTree({
   results,
   expandedFiles,
@@ -47,42 +72,37 @@ export function ValidationResultTree({
   const [expandedParts, setExpandedParts] = useState<Set<string>>(new Set())
 
   const togglePart = (partKey: string) => {
-    const newExpanded = new Set(expandedParts)
-    if (newExpanded.has(partKey)) {
-      newExpanded.delete(partKey)
+    const next = new Set(expandedParts)
+    if (next.has(partKey)) {
+      next.delete(partKey)
     } else {
-      newExpanded.add(partKey)
+      next.add(partKey)
     }
-    setExpandedParts(newExpanded)
+    setExpandedParts(next)
   }
 
   return (
     <div className="validation-tree">
       {results.map((file) => {
         const isExpanded = expandedFiles.has(file.filePath)
-        const isValid = file.success && file.validation?.valid
+        const warningCount = file.validation?.summary.totalWarnings ?? 0
+        const tone = !file.success ? 'invalid' : !file.validation?.valid ? 'invalid' : warningCount > 0 ? 'warning' : 'valid'
+        const statusText = !file.success ? 'ERROR' : tone === 'invalid' ? 'INVALID' : tone === 'warning' ? 'WARNINGS' : 'VALID'
 
         return (
           <div key={file.filePath} className="tree-file">
-            <div
-              className={`tree-file-header ${isValid ? 'valid' : 'invalid'}`}
-              onClick={() => onToggleFile(file.filePath)}
-            >
-              <span className="tree-icon">{isExpanded ? '▼' : '▶'}</span>
+            <div className={`tree-file-header ${tone}`} onClick={() => onToggleFile(file.filePath)}>
+              <span className="tree-icon">{isExpanded ? '-' : '+'}</span>
               <span className="tree-file-name">{file.fileName}</span>
-              <span className={`tree-status ${isValid ? 'valid' : 'invalid'}`}>
-                {file.success ? (isValid ? '✓ VALID' : '✗ INVALID') : '✗ ERROR'}
-              </span>
+              <span className={`tree-status ${tone}`}>{statusText}</span>
               {file.validation && (
                 <span className="tree-stats">
-                  {file.validation.summary.invalidParts > 0 && (
-                    <>
-                      {file.validation.summary.invalidParts} invalid part
-                      {file.validation.summary.invalidParts > 1 ? 's' : ''} ·{' '}
-                      {file.validation.summary.totalErrors} error
-                      {file.validation.summary.totalErrors > 1 ? 's' : ''}
-                    </>
-                  )}
+                  {file.validation.summary.invalidParts > 0 &&
+                    `${file.validation.summary.invalidParts} invalid part${file.validation.summary.invalidParts > 1 ? 's' : ''}`}
+                  {file.validation.summary.totalErrors > 0 &&
+                    `${file.validation.summary.invalidParts > 0 ? ', ' : ''}${file.validation.summary.totalErrors} error${file.validation.summary.totalErrors > 1 ? 's' : ''}`}
+                  {warningCount > 0 &&
+                    `${file.validation.summary.invalidParts > 0 || file.validation.summary.totalErrors > 0 ? ', ' : ''}${warningCount} warning${warningCount > 1 ? 's' : ''}`}
                 </span>
               )}
             </div>
@@ -93,37 +113,41 @@ export function ValidationResultTree({
                   file.validation ? (
                     <div className="tree-parts">
                       {file.validation.results
-                        .filter((p) => !p.valid)
+                        .filter(
+                          (part) => !part.valid || (part.warnings?.length ?? 0) > 0 || (part.errors?.length ?? 0) > 0
+                        )
                         .map((part) => {
                           const partKey = `${file.filePath}:${part.path}`
                           const isPartExpanded = expandedParts.has(partKey)
+                          const errorCount = part.errors?.length ?? 0
+                          const partWarningCount = part.warnings?.length ?? 0
+                          const partTone = part.valid ? (partWarningCount > 0 ? 'warning' : 'valid') : 'invalid'
 
                           return (
                             <div key={partKey} className="tree-part">
                               <div
-                                className="tree-part-header"
+                                className={`tree-part-header ${partTone}`}
                                 onClick={() => togglePart(partKey)}
                               >
-                                <span className="tree-icon">
-                                  {isPartExpanded ? '▼' : '▶'}
-                                </span>
+                                <span className="tree-icon">{isPartExpanded ? '-' : '+'}</span>
                                 <span className="tree-part-name">{part.path}</span>
-                                <span className="tree-part-errors">
-                                  {part.errors?.length || 0} error
-                                  {part.errors && part.errors.length > 1 ? 's' : ''}
+                                <span
+                                  className={`tree-part-issues${errorCount === 0 && partWarningCount > 0 ? ' warning-only' : ''}`}
+                                >
+                                  {formatIssueCount(errorCount, partWarningCount)}
                                 </span>
                               </div>
 
-                              {isPartExpanded && part.errors && (
+                              {isPartExpanded && (
                                 <div className="tree-errors">
-                                  {part.errors.map((error, idx) => (
-                                    <div key={idx} className="tree-error">
+                                  {part.errors?.map((error, index) => (
+                                    <div key={`error-${index}`} className="tree-error">
                                       <div className="error-header">
                                         <span className="error-code">{error.code}</span>
-                                        {error.line && (
+                                        {error.line !== undefined && (
                                           <span className="error-location">
                                             Line {error.line}
-                                            {error.column && `, Col ${error.column}`}
+                                            {error.column !== undefined && `, Col ${error.column}`}
                                           </span>
                                         )}
                                       </div>
@@ -134,14 +158,36 @@ export function ValidationResultTree({
                                       )}
                                     </div>
                                   ))}
+
+                                  {part.warnings?.map((warning, index) => (
+                                    <div key={`warning-${index}`} className="tree-warning">
+                                      <div className="error-header">
+                                        <span className="warning-code">{warning.code}</span>
+                                        {warning.line !== undefined && (
+                                          <span className="error-location">
+                                            Line {warning.line}
+                                            {warning.column !== undefined && `, Col ${warning.column}`}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="error-message">{warning.message}</div>
+                                      <div className="error-path">{warning.path}</div>
+                                      {warning.value && (
+                                        <div className="error-value">Value: {warning.value}</div>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
                           )
                         })}
-                      {file.validation.results.every((p) => p.valid) && (
-                        <div className="tree-no-errors">All parts are valid</div>
-                      )}
+                      {file.validation.results.every(
+                        (part) =>
+                          part.valid &&
+                          (part.errors?.length ?? 0) === 0 &&
+                          (part.warnings?.length ?? 0) === 0
+                      ) && <div className="tree-no-errors">All parts are valid</div>}
                     </div>
                   ) : (
                     <div className="tree-error-message">No validation data available</div>

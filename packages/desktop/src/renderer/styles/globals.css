@@ -519,6 +519,10 @@ body {
   background: rgba(78, 201, 176, 0.1);
 }
 
+.validation-summary.warning {
+  background: rgba(220, 220, 170, 0.12);
+}
+
 .validation-summary.invalid {
   background: rgba(241, 76, 76, 0.1);
 }
@@ -529,6 +533,9 @@ body {
 
 .validation-summary.valid .status-icon {
   color: var(--success);
+}
+.validation-summary.warning .status-icon {
+  color: var(--warning);
 }
 .validation-summary.invalid .status-icon {
   color: var(--error);
@@ -612,11 +619,14 @@ body {
 .validation-item-container.valid .item-icon {
   color: var(--success);
 }
+.validation-item-container.warning .item-icon {
+  color: var(--warning);
+}
 .validation-item-container.invalid .item-icon {
   color: var(--error);
 }
 
-.item-error-count {
+.item-issue-count {
   font-size: 11px;
   color: var(--error);
   display: flex;
@@ -624,7 +634,11 @@ body {
   gap: 4px;
 }
 
-.item-error-count .expand-icon {
+.item-issue-count.warning-only {
+  color: var(--warning);
+}
+
+.item-issue-count .expand-icon {
   font-size: 8px;
   width: auto;
 }
@@ -677,6 +691,17 @@ body {
   border-bottom: none;
 }
 
+.validation-warning {
+  padding: 8px 12px 8px 28px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  background: rgba(220, 220, 170, 0.08);
+}
+
+.validation-warning:last-child {
+  border-bottom: none;
+}
+
 .error-header {
   display: flex;
   align-items: center;
@@ -687,6 +712,16 @@ body {
 .error-code {
   background: var(--error);
   color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.warning-code {
+  background: var(--warning);
+  color: #1f1f1f;
   padding: 1px 6px;
   border-radius: 3px;
   font-family: var(--font-mono);
@@ -1264,6 +1299,10 @@ body {
   border-left: 4px solid var(--success);
 }
 
+.tree-file-header.warning {
+  border-left: 4px solid var(--warning);
+}
+
 .tree-file-header.invalid {
   border-left: 4px solid var(--error);
 }
@@ -1290,6 +1329,11 @@ body {
 .tree-status.valid {
   color: var(--success);
   background: rgba(78, 201, 176, 0.1);
+}
+
+.tree-status.warning {
+  color: #1f1f1f;
+  background: rgba(220, 220, 170, 0.85);
 }
 
 .tree-status.invalid {
@@ -1333,16 +1377,28 @@ body {
   background: var(--bg-hover);
 }
 
+.tree-part-header.warning {
+  border-left: 3px solid var(--warning);
+}
+
+.tree-part-header.invalid {
+  border-left: 3px solid var(--error);
+}
+
 .tree-part-name {
   flex: 1;
   font-size: 13px;
   font-family: var(--font-mono);
 }
 
-.tree-part-errors {
+.tree-part-issues {
   font-size: 12px;
   color: var(--error);
   font-weight: 600;
+}
+
+.tree-part-issues.warning-only {
+  color: var(--warning);
 }
 
 .tree-errors {
@@ -1362,7 +1418,20 @@ body {
   margin-bottom: 0;
 }
 
-.tree-error .error-header {
+.tree-warning {
+  padding: 12px;
+  margin-bottom: 8px;
+  background: rgba(220, 220, 170, 0.1);
+  border-left: 3px solid var(--warning);
+  border-radius: 3px;
+}
+
+.tree-warning:last-child {
+  margin-bottom: 0;
+}
+
+.tree-error .error-header,
+.tree-warning .error-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1375,26 +1444,39 @@ body {
   font-size: 13px;
 }
 
-.tree-error .error-location {
+.tree-error .error-location,
+.tree-warning .error-location {
   font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 
-.tree-error .error-message {
+.tree-warning .warning-code {
+  font-weight: 600;
+  color: #1f1f1f;
+  background: var(--warning);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.tree-error .error-message,
+.tree-warning .error-message {
   font-size: 13px;
   margin-bottom: 6px;
   line-height: 1.5;
 }
 
-.tree-error .error-path {
+.tree-error .error-path,
+.tree-warning .error-path {
   font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   margin-bottom: 4px;
 }
 
-.tree-error .error-value {
+.tree-error .error-value,
+.tree-warning .error-value {
   font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);

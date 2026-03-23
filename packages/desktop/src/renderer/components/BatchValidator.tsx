@@ -21,12 +21,21 @@ interface FileValidationResult {
         line?: number
         column?: number
       }>
+      warnings?: Array<{
+        code: string
+        message: string
+        path: string
+        value?: string
+        line?: number
+        column?: number
+      }>
     }>
     summary: {
       totalParts: number
       validParts: number
       invalidParts: number
       totalErrors: number
+      totalWarnings: number
     }
   }
   error?: string
@@ -195,6 +204,10 @@ export function BatchValidator({
   const validFiles = results.filter((r) => r.success && r.validation?.valid).length
   const invalidFiles = results.filter((r) => !r.success || !r.validation?.valid).length
   const totalErrors = results.reduce((sum, r) => sum + (r.validation?.summary?.totalErrors || 0), 0)
+  const totalWarnings = results.reduce(
+    (sum, r) => sum + (r.validation?.summary?.totalWarnings || 0),
+    0
+  )
 
   return (
     <div className="batch-validator">
@@ -279,6 +292,10 @@ export function BatchValidator({
               <div className="stat">
                 <span className="stat-label">Total Errors:</span>
                 <span className="stat-value">{totalErrors}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Total Warnings:</span>
+                <span className="stat-value">{totalWarnings}</span>
               </div>
             </div>
           </div>

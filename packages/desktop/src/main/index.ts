@@ -10,12 +10,13 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readFile as readFileAsync } from 'fs/promises'
 import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
 import {
-  ValidationEngine,
   loadSchemaRegistry,
   getSupportedSchemaNamespaces,
   analyzeOoxmlSchemaReferences,
+  validateXmlEvents,
   type OoxmlDocumentType,
   type ValidationError,
+  type ValidationWarning,
   type SchemaRegistry,
 } from '@ooxml/core'
 import { shouldValidateXmlPart } from './part-validation-filter'
@@ -31,6 +32,31 @@ import type { OpenTool } from '../shared/recent-files'
 let mainWindow: BrowserWindow | null = null
 
 const SUPPORTED_FILE_EXTENSIONS = new Set(['.xlsx', '.docx', '.pptx'])
+
+interface RendererValidationIssue {
+  code: string
+  message: string
+  path: string
+  value?: string
+  line?: number
+  column?: number
+}
+
+interface RendererPartValidationResult {
+  path: string
+  valid: boolean
+  error?: string
+  errors?: RendererValidationIssue[]
+  warnings?: RendererValidationIssue[]
+}
+
+interface RendererValidationSummary {
+  totalParts: number
+  validParts: number
+  invalidParts: number
+  totalErrors: number
+  totalWarnings: number
+}
 
 function isSupportedOfficeFile(filePath: string): boolean {
   const lower = filePath.toLowerCase()
@@ -54,6 +80,67 @@ function normalizeOpenableFilePaths(input: unknown): string[] {
   }
 
   return Array.from(uniquePaths)
+}
+
+function mapValidationIssues(
+  issues: Array<ValidationError | ValidationWarning> | undefined
+): RendererValidationIssue[] | undefined {
+  if (!issues || issues.length === 0) {
+    return undefined
+  }
+
+  return issues.map((issue) => ({
+    code: issue.code,
+    message: issue.message,
+    path: issue.path,
+    value: 'value' in issue ? issue.value : undefined,
+    line: 'line' in issue ? issue.line : undefined,
+    column: 'column' in issue ? issue.column : undefined,
+  }))
+}
+
+function summarizeValidationResults(results: RendererPartValidationResult[]): RendererValidationSummary {
+  return {
+    totalParts: results.length,
+    validParts: results.filter((result) => result.valid).length,
+    invalidParts: results.filter((result) => !result.valid).length,
+    totalErrors: results.reduce((sum, result) => sum + (result.errors?.length ?? 0), 0),
+    totalWarnings: results.reduce((sum, result) => sum + (result.warnings?.length ?? 0), 0),
+  }
+}
+
+function validateXmlPart(
+  path: string,
+  xmlContent: string,
+  registry: SchemaRegistry
+): RendererPartValidationResult {
+  try {
+    const events = parseXmlToEventArray(xmlContent)
+    const result = validateXmlEvents(registry, events, {
+      maxErrors: 100,
+      allowWhitespace: true,
+      includeWarnings: true,
+    })
+
+    return {
+      path,
+      valid: result.valid,
+      errors: mapValidationIssues(result.errors),
+      warnings: mapValidationIssues(result.warnings),
+    }
+  } catch (error) {
+    return {
+      path,
+      valid: false,
+      errors: [
+        {
+          code: 'XML_PARSE_ERROR',
+          message: String(error),
+          path: '/',
+        },
+      ],
+    }
+  }
 }
 
 function emitOpenFilesEvent(filePaths: string[]): void {
@@ -418,24 +505,8 @@ function setupIpcHandlers(): void {
         documentType?: string
         validation?: {
           valid: boolean
-          results: Array<{
-            path: string
-            valid: boolean
-            errors?: Array<{
-              code: string
-              message: string
-              path: string
-              value?: string
-              line?: number
-              column?: number
-            }>
-          }>
-          summary: {
-            totalParts: number
-            validParts: number
-            invalidParts: number
-            totalErrors: number
-          }
+          results: RendererPartValidationResult[]
+          summary: RendererValidationSummary
         }
         error?: string
       }> = []
@@ -465,82 +536,15 @@ function setupIpcHandlers(): void {
             continue
           }
 
-          const results: {
-            path: string
-            valid: boolean
-            errors?: Array<{
-              code: string
-              message: string
-              path: string
-              value?: string
-              line?: number
-              column?: number
-            }>
-          }[] = []
+          const results: RendererPartValidationResult[] = []
 
           for (const [path, part] of doc.parts) {
             if (!shouldValidateXmlPart(path, part.contentType)) continue
 
-            try {
-              const xmlContent = part.content.toString('utf-8')
-              const events = parseXmlToEventArray(xmlContent)
-              const engine = new ValidationEngine(registry, {
-                maxErrors: 100,
-                allowWhitespace: true,
-              })
-
-              for (const event of events) {
-                switch (event.type) {
-                  case 'startDocument':
-                    engine.startDocument()
-                    break
-                  case 'startElement':
-                    engine.startElement(event.element)
-                    break
-                  case 'text':
-                    engine.text(event.text)
-                    break
-                  case 'endElement':
-                    engine.endElement(event.element)
-                    break
-                  case 'endDocument':
-                    const result = engine.endDocument()
-                    if (result.valid) {
-                      results.push({ path, valid: true })
-                    } else {
-                      results.push({
-                        path,
-                        valid: false,
-                        errors: result.errors.map((err: ValidationError) => ({
-                          code: err.code,
-                          message: err.message,
-                          path: err.path,
-                          value: err.value,
-                          line: err.line,
-                          column: err.column,
-                        })),
-                      })
-                    }
-                    break
-                }
-              }
-            } catch (err) {
-              results.push({
-                path,
-                valid: false,
-                errors: [
-                  {
-                    code: 'XML_PARSE_ERROR',
-                    message: String(err),
-                    path: '/',
-                  },
-                ],
-              })
-            }
+            results.push(validateXmlPart(path, part.content.toString('utf-8'), registry))
           }
 
-          const valid = results.every((r) => r.valid)
-          const totalErrors = results.reduce((sum, r) => sum + (r.errors?.length || 0), 0)
+          const summary = summarizeValidationResults(results)
 
           fileResults.push({
             filePath,
@@ -548,14 +552,9 @@ function setupIpcHandlers(): void {
             success: true,
             documentType,
             validation: {
-              valid,
+              valid: summary.totalErrors === 0,
               results,
-              summary: {
-                totalParts: results.length,
-                validParts: results.filter((r) => r.valid).length,
-                invalidParts: results.filter((r) => !r.valid).length,
-                totalErrors,
-              },
+              summary,
             },
           })
         } catch (error) {
@@ -641,99 +640,22 @@ function setupIpcHandlers(): void {
       }
 
       // Validate each XML part
-      const results: {
-        path: string
-        valid: boolean
-        errors?: Array<{
-          code: string
-          message: string
-          path: string
-          value?: string
-          line?: number
-          column?: number
-        }>
-      }[] = []
+      const results: RendererPartValidationResult[] = []
 
       for (const [path, part] of doc.parts) {
         if (!shouldValidateXmlPart(path, part.contentType)) continue
 
-        try {
-          const xmlContent = part.content.toString('utf-8')
-          const events = parseXmlToEventArray(xmlContent)
-
-          // Create validation engine for this part
-          const engine = new ValidationEngine(registry, {
-            maxErrors: 100,
-            allowWhitespace: true,
-          })
-
-          // Process validation events
-          for (const event of events) {
-            switch (event.type) {
-              case 'startDocument':
-                engine.startDocument()
-                break
-              case 'startElement':
-                engine.startElement(event.element)
-                break
-              case 'text':
-                engine.text(event.text)
-                break
-              case 'endElement':
-                engine.endElement(event.element)
-                break
-              case 'endDocument':
-                // Get validation result
-                const result = engine.endDocument()
-                if (result.valid) {
-                  results.push({ path, valid: true })
-                } else {
-                  results.push({
-                    path,
-                    valid: false,
-                    errors: result.errors.map((err: ValidationError) => ({
-                      code: err.code,
-                      message: err.message,
-                      path: err.path,
-                      value: err.value,
-                      line: err.line,
-                      column: err.column,
-                    })),
-                  })
-                }
-                break
-            }
-          }
-        } catch (err) {
-          // XML parsing error
-          results.push({
-            path,
-            valid: false,
-            errors: [
-              {
-                code: 'XML_PARSE_ERROR',
-                message: String(err),
-                path: '/',
-              },
-            ],
-          })
-        }
+        results.push(validateXmlPart(path, part.content.toString('utf-8'), registry))
       }
 
-      const valid = results.every((r) => r.valid)
-      const totalErrors = results.reduce((sum, r) => sum + (r.errors?.length || 0), 0)
+      const summary = summarizeValidationResults(results)
 
       return {
         success: true,
         data: {
-          valid,
+          valid: summary.totalErrors === 0,
           results,
-          summary: {
-            totalParts: results.length,
-            validParts: results.filter((r) => r.valid).length,
-            invalidParts: results.filter((r) => !r.valid).length,
-            totalErrors,
-          },
+          summary,
         },
       }
     } catch (error) {
@@ -760,9 +682,14 @@ function generateCSV(data: any): string {
     if (!file.validation) continue
 
     for (const part of file.validation.results) {
-      if (part.valid) {
+      const hasErrors = Array.isArray(part.errors) && part.errors.length > 0
+      const hasWarnings = Array.isArray(part.warnings) && part.warnings.length > 0
+
+      if (!hasErrors && !hasWarnings && part.valid) {
         lines.push(buildCsvRow([file.fileName, part.path, 'VALID', '', '', '', '', '']))
-      } else if (part.errors) {
+      }
+
+      if (part.errors) {
         for (const error of part.errors) {
           lines.push(
             buildCsvRow([
@@ -774,6 +701,23 @@ function generateCSV(data: any): string {
               error.path,
               error.line ?? '',
               error.column ?? '',
+            ])
+          )
+        }
+      }
+
+      if (part.warnings) {
+        for (const warning of part.warnings) {
+          lines.push(
+            buildCsvRow([
+              file.fileName,
+              part.path,
+              'WARNING',
+              warning.code,
+              warning.message,
+              warning.path,
+              warning.line ?? '',
+              warning.column ?? '',
             ])
           )
         }
@@ -846,6 +790,7 @@ function generateHTML(data: any): string {
     <div><strong>Valid Files:</strong> ${data.filter((f: any) => f.success && f.validation?.valid).length}</div>
     <div><strong>Invalid Files:</strong> ${data.filter((f: any) => !f.success || !f.validation?.valid).length}</div>
     <div><strong>Total Errors:</strong> ${data.reduce((sum: number, f: any) => sum + (f.validation?.summary?.totalErrors || 0), 0)}</div>
+    <div><strong>Total Warnings:</strong> ${data.reduce((sum: number, f: any) => sum + (f.validation?.summary?.totalWarnings || 0), 0)}</div>
   </div>
 `
 
@@ -867,6 +812,7 @@ function generateHTML(data: any): string {
             | Valid: ${file.validation.summary.validParts}
             | Invalid: ${file.validation.summary.invalidParts}
             | Errors: ${file.validation.summary.totalErrors}
+            | Warnings: ${file.validation.summary.totalWarnings}
           `
               : ''
           }
@@ -878,10 +824,12 @@ function generateHTML(data: any): string {
 `
 
     if (file.success && file.validation) {
-      const invalidParts = file.validation.results.filter((p: any) => !p.valid)
-      if (invalidParts.length > 0) {
+      const partsWithIssues = file.validation.results.filter(
+        (part: any) => !part.valid || (part.errors?.length ?? 0) > 0 || (part.warnings?.length ?? 0) > 0
+      )
+      if (partsWithIssues.length > 0) {
         html += `    <div class="parts">\n`
-        for (const part of invalidParts) {
+        for (const part of partsWithIssues) {
           html += `      <div class="part">
         <div class="part-header">${escapeHtml(part.path)}</div>
 `
@@ -891,6 +839,16 @@ function generateHTML(data: any): string {
           <div class="error-code">${escapeHtml(error.code)}</div>
           <div class="error-message">${escapeHtml(error.message)}</div>
           <div class="error-path">Path: ${escapeHtml(error.path)}${error.line ? ` | Line: ${error.line}` : ''}${error.column ? `, Col: ${error.column}` : ''}</div>
+        </div>
+`
+            }
+          }
+          if (part.warnings) {
+            for (const warning of part.warnings) {
+              html += `        <div class="error">
+          <div class="error-code">${escapeHtml(warning.code)}</div>
+          <div class="error-message">${escapeHtml(warning.message)}</div>
+          <div class="error-path">Path: ${escapeHtml(warning.path)}${warning.line ? ` | Line: ${warning.line}` : ''}${warning.column ? `, Col: ${warning.column}` : ''}</div>
         </div>
 `
             }
@@ -940,6 +898,7 @@ async function basicValidation(doc: Awaited<ReturnType<typeof OoxmlParser.fromBu
         validParts: results.filter((r) => r.valid).length,
         invalidParts: results.filter((r) => !r.valid).length,
         totalErrors: results.filter((r) => !r.valid).length,
+        totalWarnings: 0,
       },
     },
   }

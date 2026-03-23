@@ -15,11 +15,21 @@ interface ValidationError {
   column?: number
 }
 
+interface ValidationWarning {
+  code: string
+  message: string
+  path: string
+  value?: string
+  line?: number
+  column?: number
+}
+
 interface PartValidationResult {
   path: string
   valid: boolean
   error?: string // For backward compatibility (XML parse errors)
   errors?: ValidationError[] // Schema validation errors
+  warnings?: ValidationWarning[]
 }
 
 interface ValidationSummary {
@@ -27,6 +37,7 @@ interface ValidationSummary {
   validParts: number
   invalidParts: number
   totalErrors: number
+  totalWarnings: number
 }
 
 interface ValidationResult {
