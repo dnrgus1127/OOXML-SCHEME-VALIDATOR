@@ -35,6 +35,8 @@ interface ValidationSummary {
 }
 
 interface ValidationResult {
+  supportStatus?: 'supported' | 'unsupported'
+  message?: string
   valid: boolean
   results: PartValidationResult[]
   summary?: ValidationSummary
@@ -95,6 +97,32 @@ export function ValidationPanel({
         </div>
         <div className="validation-empty">
           No validation results. Click "Validate" to check the document.
+        </div>
+      </div>
+    )
+  }
+
+  if (results.supportStatus === 'unsupported') {
+    return (
+      <div className="validation-results">
+        <div className="validation-header">
+          <h3>Validation Results</h3>
+          <button onClick={onRevalidate} className="revalidate-btn">
+            Re-validate
+          </button>
+          <button onClick={onClose} className="close-btn" aria-label="Close validation results">
+            x
+          </button>
+        </div>
+
+        <div className="validation-summary warning">
+          <span className="status-icon">INFO</span>
+          <span className="status-text">Validation unsupported</span>
+          <span className="counts">This document can be viewed and edited, but validation is skipped.</span>
+        </div>
+
+        <div className="validation-empty">
+          {results.message ?? 'Validation is not available for this document format.'}
         </div>
       </div>
     )

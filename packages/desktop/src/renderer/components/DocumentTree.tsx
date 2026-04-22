@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 interface PartInfo {
   contentType: string
@@ -6,6 +6,7 @@ interface PartInfo {
 }
 
 interface DocumentTreeProps {
+  containerFormat?: 'ooxml' | 'odf'
   documentType: string
   parts: Record<string, PartInfo>
   selectedPart: string | null
@@ -34,8 +35,7 @@ function buildTree(parts: Record<string, PartInfo>): TreeNode[] {
       const isLast = i === segments.length - 1
       const currentPath = '/' + segments.slice(0, i + 1).join('/')
 
-      let child = current.children.find((c) => c.name === segment)
-
+      let child = current.children.find((candidate) => candidate.name === segment)
       if (!child) {
         child = {
           name: segment,
@@ -51,14 +51,14 @@ function buildTree(parts: Record<string, PartInfo>): TreeNode[] {
     }
   }
 
-  // Sort: directories first, then alphabetically
   function sortChildren(node: TreeNode) {
-    node.children.sort((a, b) => {
-      if (a.isDirectory !== b.isDirectory) {
-        return a.isDirectory ? -1 : 1
+    node.children.sort((left, right) => {
+      if (left.isDirectory !== right.isDirectory) {
+        return left.isDirectory ? -1 : 1
       }
-      return a.name.localeCompare(b.name)
+      return left.name.localeCompare(right.name)
     })
+
     node.children.forEach(sortChildren)
   }
 
@@ -73,19 +73,38 @@ function formatSize(bytes: number): string {
 }
 
 function getIcon(node: TreeNode): string {
-  if (node.isDirectory) {
-    if (node.name === '_rels') return '🔗'
-    if (node.name.includes('xl')) return '📊'
-    if (node.name.includes('word')) return '📝'
-    if (node.name.includes('ppt')) return '📽️'
-    return '📁'
-  }
+  if (node.isDirectory) return 'DIR'
 
   const ext = node.name.split('.').pop()?.toLowerCase()
-  if (ext === 'xml') return '📄'
-  if (ext === 'rels') return '🔗'
-  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext || '')) return '🖼️'
-  return '📄'
+  if (ext === 'xml') return 'XML'
+  if (ext === 'rels') return 'REL'
+  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext || '')) return 'IMG'
+  return 'FILE'
+}
+
+function getDocumentLabel(containerFormat: 'ooxml' | 'odf' | undefined, documentType: string): string {
+  const prefix = containerFormat === 'odf' ? 'ODF' : 'OOXML'
+
+  switch (documentType) {
+    case 'spreadsheet':
+      return `${prefix} Spreadsheet`
+    case 'document':
+      return `${prefix} Text`
+    case 'presentation':
+      return `${prefix} Presentation`
+    case 'odf-text':
+      return 'ODF Text'
+    case 'odf-spreadsheet':
+      return 'ODF Spreadsheet'
+    case 'odf-presentation':
+      return 'ODF Presentation'
+    case 'odf-graphics':
+      return 'ODF Graphics'
+    case 'odf-package':
+      return 'ODF Package'
+    default:
+      return `${prefix} Package`
+  }
 }
 
 interface TreeNodeComponentProps {
@@ -97,26 +116,28 @@ interface TreeNodeComponentProps {
 
 function TreeNodeComponent({ node, selectedPart, onSelectPart, depth }: TreeNodeComponentProps) {
   const [expanded, setExpanded] = useState(depth < 2)
+  const isSelected = node.path === selectedPart
+  const isXml = node.part?.contentType.includes('xml')
 
   const handleClick = () => {
     if (node.isDirectory) {
-      setExpanded(!expanded)
-    } else {
-      onSelectPart(node.path)
+      setExpanded((current) => !current)
+      return
     }
-  }
 
-  const isSelected = node.path === selectedPart
-  const isXml = node.part?.contentType.includes('xml')
+    onSelectPart(node.path)
+  }
 
   return (
     <div className="tree-node">
       <div
-        className={`tree-item ${isSelected ? 'selected' : ''} ${!node.isDirectory && !isXml ? 'disabled' : ''}`}
+        className={`tree-item ${isSelected ? 'selected' : ''} ${
+          !node.isDirectory && !isXml ? 'disabled' : ''
+        }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
       >
-        {node.isDirectory && <span className="expand-icon">{expanded ? '▼' : '▶'}</span>}
+        {node.isDirectory && <span className="expand-icon">{expanded ? 'v' : '>'}</span>}
         <span className="icon">{getIcon(node)}</span>
         <span className="name">{node.name}</span>
         {node.part && <span className="size">{formatSize(node.part.size)}</span>}
@@ -140,6 +161,7 @@ function TreeNodeComponent({ node, selectedPart, onSelectPart, depth }: TreeNode
 }
 
 export function DocumentTree({
+  containerFormat,
   documentType,
   parts,
   selectedPart,
@@ -151,12 +173,7 @@ export function DocumentTree({
   return (
     <div className="document-tree">
       <div className="tree-header">
-        <span className="doc-type">
-          {documentType === 'spreadsheet' && '📊 Excel'}
-          {documentType === 'document' && '📝 Word'}
-          {documentType === 'presentation' && '📽️ PowerPoint'}
-          {documentType === 'unknown' && '📄 Unknown'}
-        </span>
+        <span className="doc-type">{getDocumentLabel(containerFormat, documentType)}</span>
         <span className="part-count">{partCount} parts</span>
       </div>
 
@@ -174,3 +191,4 @@ export function DocumentTree({
     </div>
   )
 }
+

@@ -8,7 +8,7 @@ import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { basename, join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { readFile as readFileAsync } from 'fs/promises'
-import { OoxmlParser, OoxmlBuilder, parseXmlToEventArray } from '@ooxml/parser'
+import { OoxmlParser, parseXmlToEventArray } from '@ooxml/parser'
 import {
   loadSchemaRegistry,
   getSupportedSchemaNamespaces,
@@ -21,6 +21,14 @@ import {
 } from '@ooxml/core'
 import { shouldValidateXmlPart } from './part-validation-filter'
 import {
+  detectDocumentFormatFromBuffer,
+  getEditablePartText,
+  isSupportedBatchFile,
+  isSupportedEditorFile,
+  parseEditableDocument,
+  updateEditablePartText,
+} from './editable-document'
+import {
   addRecentFile,
   addRecentFiles,
   clearRecentFiles,
@@ -30,8 +38,6 @@ import {
 import type { OpenTool } from '../shared/recent-files'
 
 let mainWindow: BrowserWindow | null = null
-
-const SUPPORTED_FILE_EXTENSIONS = new Set(['.xlsx', '.docx', '.pptx'])
 
 interface RendererValidationIssue {
   code: string
@@ -58,15 +64,31 @@ interface RendererValidationSummary {
   totalWarnings: number
 }
 
-function isSupportedOfficeFile(filePath: string): boolean {
-  const lower = filePath.toLowerCase()
-  for (const extension of SUPPORTED_FILE_EXTENSIONS) {
-    if (lower.endsWith(extension)) return true
-  }
-  return false
+interface RendererValidationResult {
+  supportStatus?: 'supported' | 'unsupported'
+  message?: string
+  valid: boolean
+  results: RendererPartValidationResult[]
+  summary: RendererValidationSummary
 }
 
-function normalizeOpenableFilePaths(input: unknown): string[] {
+function createUnsupportedValidationResult(message: string): RendererValidationResult {
+  return {
+    supportStatus: 'unsupported',
+    message,
+    valid: false,
+    results: [],
+    summary: {
+      totalParts: 0,
+      validParts: 0,
+      invalidParts: 0,
+      totalErrors: 0,
+      totalWarnings: 0,
+    },
+  }
+}
+
+function normalizeOpenableFilePaths(input: unknown, mode: 'editor' | 'batch' = 'editor'): string[] {
   if (!Array.isArray(input)) return []
 
   const uniquePaths = new Set<string>()
@@ -75,7 +97,8 @@ function normalizeOpenableFilePaths(input: unknown): string[] {
     const filePath = value.trim()
     if (!filePath) continue
     if (!existsSync(filePath)) continue
-    if (!isSupportedOfficeFile(filePath)) continue
+    if (mode === 'batch' && !isSupportedBatchFile(filePath)) continue
+    if (mode === 'editor' && !isSupportedEditorFile(filePath)) continue
     uniquePaths.add(filePath)
   }
 
@@ -255,7 +278,7 @@ async function handleOpenFile(): Promise<void> {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
-      { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx'] },
+      { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx', 'odt', 'ods', 'odp'] },
       { name: 'All Files', extensions: ['*'] },
     ],
   })
@@ -272,7 +295,7 @@ function setupIpcHandlers(): void {
     const result = await dialog.showOpenDialog(mainWindow!, {
       properties: ['openFile'],
       filters: [
-        { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx'] },
+        { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx', 'odt', 'ods', 'odp'] },
         { name: 'All Files', extensions: ['*'] },
       ],
     })
@@ -292,7 +315,7 @@ function setupIpcHandlers(): void {
     const result = await dialog.showSaveDialog(mainWindow!, {
       defaultPath,
       filters: [
-        { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx'] },
+        { name: 'Office Documents', extensions: ['xlsx', 'docx', 'pptx', 'odt', 'ods', 'odp'] },
         { name: 'All Files', extensions: ['*'] },
       ],
     })
@@ -359,6 +382,10 @@ function setupIpcHandlers(): void {
   ipcMain.handle('ooxml:analyzeSchemaReferences', async (_, base64Data: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
+      if (detectDocumentFormatFromBuffer(buffer) !== 'ooxml') {
+        return { success: true, data: null }
+      }
+
       const doc = await OoxmlParser.fromBuffer(buffer)
 
       const xmlParts: Array<{ partPath: string; xml: string }> = []
@@ -423,24 +450,10 @@ function setupIpcHandlers(): void {
   ipcMain.handle('ooxml:parse', async (_, base64Data: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
-      const doc = await OoxmlParser.fromBuffer(buffer)
-
-      // Convert to serializable format
-      const parts: Record<string, { contentType: string; size: number }> = {}
-      for (const [path, part] of doc.parts) {
-        parts[path] = {
-          contentType: part.contentType,
-          size: part.content.length,
-        }
-      }
 
       return {
         success: true,
-        data: {
-          documentType: doc.documentType,
-          contentTypes: doc.contentTypes,
-          parts,
-        },
+        data: parseEditableDocument(buffer),
       }
     } catch (error) {
       return { success: false, error: String(error) }
@@ -451,8 +464,7 @@ function setupIpcHandlers(): void {
   ipcMain.handle('ooxml:getPart', async (_, base64Data: string, partPath: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
-      const doc = await OoxmlParser.fromBuffer(buffer)
-      const content = doc.getPartAsXml(partPath)
+      const content = getEditablePartText(buffer, partPath)
 
       if (!content) {
         return { success: false, error: 'Part not found' }
@@ -470,9 +482,7 @@ function setupIpcHandlers(): void {
     async (_, base64Data: string, partPath: string, content: string) => {
       try {
         const buffer = Buffer.from(base64Data, 'base64')
-        const builder = OoxmlBuilder.fromBuffer(buffer)
-        builder.setPart(partPath, content)
-        const newBuffer = builder.toBuffer()
+        const newBuffer = updateEditablePartText(buffer, partPath, content)
 
         return { success: true, data: newBuffer.toString('base64') }
       } catch (error) {
@@ -503,11 +513,7 @@ function setupIpcHandlers(): void {
         fileName: string
         success: boolean
         documentType?: string
-        validation?: {
-          valid: boolean
-          results: RendererPartValidationResult[]
-          summary: RendererValidationSummary
-        }
+        validation?: RendererValidationResult
         error?: string
       }> = []
 
@@ -520,6 +526,19 @@ function setupIpcHandlers(): void {
         await new Promise<void>((resolve) => setImmediate(resolve))
         try {
           const buffer = await readFileAsync(filePath)
+          if (detectDocumentFormatFromBuffer(buffer, filePath) !== 'ooxml') {
+            fileResults.push({
+              filePath,
+              fileName: basename(filePath) || filePath,
+              success: true,
+              documentType: 'odf',
+              validation: createUnsupportedValidationResult(
+                'ODF validation is not supported. Open the file in XML Editor to inspect XML parts.'
+              ),
+            })
+            continue
+          }
+
           const doc = await OoxmlParser.fromBuffer(buffer)
           const documentType = doc.documentType as OoxmlDocumentType
 
@@ -626,6 +645,15 @@ function setupIpcHandlers(): void {
   ipcMain.handle('ooxml:validate', async (_, base64Data: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
+      if (detectDocumentFormatFromBuffer(buffer) !== 'ooxml') {
+        return {
+          success: true,
+          data: createUnsupportedValidationResult(
+            'ODF validation is not supported. XML parts can be opened and edited, but validation is skipped.'
+          ),
+        }
+      }
+
       const doc = await OoxmlParser.fromBuffer(buffer)
 
       // Load schema registry based on document type
@@ -653,6 +681,7 @@ function setupIpcHandlers(): void {
       return {
         success: true,
         data: {
+          supportStatus: 'supported',
           valid: summary.totalErrors === 0,
           results,
           summary,
@@ -891,6 +920,7 @@ async function basicValidation(doc: Awaited<ReturnType<typeof OoxmlParser.fromBu
   return {
     success: true,
     data: {
+      supportStatus: 'supported',
       valid,
       results,
       summary: {

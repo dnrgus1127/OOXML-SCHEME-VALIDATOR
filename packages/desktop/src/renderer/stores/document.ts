@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 
 interface DocumentData {
+  containerFormat: 'ooxml' | 'odf'
+  validationSupport: 'supported' | 'unsupported'
   documentType: string
   contentTypes: any[]
   parts: Record<string, { contentType: string; size: number }>
@@ -41,6 +43,8 @@ interface ValidationSummary {
 }
 
 interface ValidationResult {
+  supportStatus?: 'supported' | 'unsupported'
+  message?: string
   valid: boolean
   results: PartValidationResult[]
   summary?: ValidationSummary

@@ -205,7 +205,7 @@ export function XmlEditorScreen({
   }
 
   useEffect(() => {
-    if (!fileData) {
+    if (!fileData || !documentData || documentData.containerFormat !== 'ooxml') {
       setSchemaReferenceSummary(null)
       setSchemaReferenceError(null)
       setIsSchemaReferenceLoading(false)
@@ -257,7 +257,7 @@ export function XmlEditorScreen({
       cancelled = true
       window.clearTimeout(timeout)
     }
-  }, [fileData, selectedPart])
+  }, [documentData, fileData, modifiedContent, selectedPart])
 
   return (
     <>
@@ -285,13 +285,14 @@ export function XmlEditorScreen({
         {!documentData ? (
           <div className="welcome">
             <h1>OOXML Validator</h1>
-            <p>Open an Office document (xlsx, docx, pptx) to start</p>
+            <p>Open an OOXML or ODF document (xlsx, docx, pptx, odt, ods, odp) to start</p>
             <button onClick={() => void handleChangeFile()}>Open File</button>
           </div>
         ) : (
           <>
             <aside className="sidebar">
               <DocumentTree
+                containerFormat={documentData.containerFormat}
                 documentType={documentData.documentType}
                 parts={documentData.parts}
                 selectedPart={selectedPart}
@@ -325,11 +326,13 @@ export function XmlEditorScreen({
                 </div>
               ) : null}
 
-              <SchemaReferencePanel
-                summary={schemaReferenceSummary}
-                isLoading={isSchemaReferenceLoading}
-                error={schemaReferenceError}
-              />
+              {documentData.containerFormat === 'ooxml' ? (
+                <SchemaReferencePanel
+                  summary={schemaReferenceSummary}
+                  isLoading={isSchemaReferenceLoading}
+                  error={schemaReferenceError}
+                />
+              ) : null}
             </aside>
           </>
         )}

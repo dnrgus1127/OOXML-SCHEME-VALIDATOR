@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { HomeScreen } from './screens/HomeScreen'
-import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { BatchValidator } from './components/BatchValidator'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { HomeScreen } from './screens/HomeScreen'
 import { SupportedSchemasScreen } from './screens/SupportedSchemasScreen'
+import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { useDocumentStore } from './stores/document'
 import { useSettingsStore } from './stores/settings'
 import type { OpenTool, RecentFileEntry } from '../shared/recent-files'
@@ -78,19 +78,27 @@ declare global {
 }
 
 type Screen = 'home' | 'xml-editor' | 'batch-validator' | 'supported-schemas'
-
 type FileWithPath = File & { path?: string }
 
-const SUPPORTED_EXTENSIONS = ['.xlsx', '.docx', '.pptx']
+const XML_EDITOR_EXTENSIONS = ['.xlsx', '.docx', '.pptx', '.odt', '.ods', '.odp']
+const BATCH_EXTENSIONS = ['.xlsx', '.docx', '.pptx']
 
 function getFileName(filePath: string): string {
   const segments = filePath.split(/[\\/]/)
   return segments[segments.length - 1] || filePath
 }
 
-function isSupportedOfficePath(filePath: string): boolean {
+function hasExtension(filePath: string, extensions: string[]): boolean {
   const lower = filePath.toLowerCase()
-  return SUPPORTED_EXTENSIONS.some((extension) => lower.endsWith(extension))
+  return extensions.some((extension) => lower.endsWith(extension))
+}
+
+function isSupportedOfficePath(filePath: string): boolean {
+  return hasExtension(filePath, XML_EDITOR_EXTENSIONS)
+}
+
+function isBatchOfficePath(filePath: string): boolean {
+  return hasExtension(filePath, BATCH_EXTENSIONS)
 }
 
 function getDroppedFilePaths(dataTransfer: DataTransfer): string[] {
@@ -174,7 +182,6 @@ export default function App() {
     void refreshRecentFiles()
   }, [refreshRecentFiles])
 
-  // Keep the global Open menu path working on non-editor screens.
   useEffect(() => {
     const cleanup = window.electronAPI.onFileOpened(async (path) => {
       if (isSettingsOpen) {
@@ -263,13 +270,18 @@ export default function App() {
 
       const droppedPaths = getDroppedFilePaths(dataTransfer)
       if (droppedPaths.length === 0) {
-        setRecentError('지원되는 OOXML 파일(.xlsx, .docx, .pptx)을 드롭해 주세요.')
+        setRecentError('Drop an OOXML or ODF file (.xlsx, .docx, .pptx, .odt, .ods, .odp).')
+        return
+      }
+
+      if (droppedPaths.length > 1 && droppedPaths.some((path) => !isBatchOfficePath(path))) {
+        setRecentError('ODF files can be dropped only one at a time in XML Editor.')
         return
       }
 
       const openedPaths = await window.electronAPI.openDroppedFiles(droppedPaths)
       if (!openedPaths || openedPaths.length === 0) {
-        setRecentError('드롭한 파일을 열 수 없습니다. 파일 존재 여부를 확인해 주세요.')
+        setRecentError('The dropped files could not be opened.')
       }
     }
 
@@ -431,8 +443,8 @@ export default function App() {
       {isDragActive && (
         <div className="file-drop-overlay" role="status" aria-live="polite">
           <div className="file-drop-overlay__content">
-            <strong>파일을 놓아 즉시 열기</strong>
-            <span>지원 형식: .xlsx, .docx, .pptx</span>
+            <strong>Drop files to open them</strong>
+            <span>Supported: .xlsx, .docx, .pptx, .odt, .ods, .odp</span>
           </div>
         </div>
       )}
@@ -447,3 +459,4 @@ export default function App() {
     </div>
   )
 }
+
