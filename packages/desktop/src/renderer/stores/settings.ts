@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import type { EditorThemeId } from '../constants/editorTheme'
 
 export interface XmlEditorSettings {
   validateOnOpen: boolean
   revalidateShortcut: string
+  editorTheme: EditorThemeId
 }
 
 export interface GeneralSettings {
@@ -20,8 +22,18 @@ export interface SettingsData {
   batchValidator: BatchValidatorSettings
 }
 
+export interface PersistedSettingsData {
+  general?: Partial<GeneralSettings>
+  xmlEditor?: Partial<XmlEditorSettings>
+  batchValidator?: Partial<BatchValidatorSettings>
+}
+
 interface SettingsState extends SettingsData {
+  previewEditorTheme: EditorThemeId | null
+  effectiveEditorTheme: EditorThemeId
   updateXmlEditorSettings: (updates: Partial<XmlEditorSettings>) => void
+  setPreviewEditorTheme: (theme: EditorThemeId | null) => void
+  clearPreviewEditorTheme: () => void
   resetSettings: () => void
 }
 
@@ -32,26 +44,77 @@ const defaultSettings: SettingsData = {
   xmlEditor: {
     validateOnOpen: true,
     revalidateShortcut: 'CmdOrCtrl+Shift+V',
+    editorTheme: 'vs-dark',
   },
   batchValidator: {
     autoExpandResults: true,
   },
 }
 
+export function mergeSettingsData(
+  persistedState: PersistedSettingsData | undefined,
+  currentState: SettingsState
+) {
+  const persisted = persistedState ?? {}
+  const xmlEditor = {
+    ...currentState.xmlEditor,
+    ...persisted.xmlEditor,
+  }
+
+  return {
+    ...currentState,
+    ...persisted,
+    general: {
+      ...currentState.general,
+      ...persisted.general,
+    },
+    xmlEditor,
+    batchValidator: {
+      ...currentState.batchValidator,
+      ...persisted.batchValidator,
+    },
+    effectiveEditorTheme: currentState.previewEditorTheme ?? xmlEditor.editorTheme,
+  }
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       ...defaultSettings,
+      previewEditorTheme: null,
+      effectiveEditorTheme: defaultSettings.xmlEditor.editorTheme,
 
       updateXmlEditorSettings: (updates) =>
-        set((state) => ({
-          xmlEditor: {
+        set((state) => {
+          const xmlEditor = {
             ...state.xmlEditor,
             ...updates,
-          },
+          }
+
+          return {
+            xmlEditor,
+            effectiveEditorTheme: state.previewEditorTheme ?? xmlEditor.editorTheme,
+          }
+        }),
+
+      setPreviewEditorTheme: (theme) =>
+        set((state) => ({
+          previewEditorTheme: theme,
+          effectiveEditorTheme: theme ?? state.xmlEditor.editorTheme,
         })),
 
-      resetSettings: () => set(defaultSettings),
+      clearPreviewEditorTheme: () =>
+        set((state) => ({
+          previewEditorTheme: null,
+          effectiveEditorTheme: state.xmlEditor.editorTheme,
+        })),
+
+      resetSettings: () =>
+        set({
+          ...defaultSettings,
+          previewEditorTheme: null,
+          effectiveEditorTheme: defaultSettings.xmlEditor.editorTheme,
+        }),
     }),
     {
       name: 'ooxml-validator-settings',
@@ -61,25 +124,8 @@ export const useSettingsStore = create<SettingsState>()(
         xmlEditor: state.xmlEditor,
         batchValidator: state.batchValidator,
       }),
-      merge: (persistedState, currentState) => {
-        const persisted = (persistedState as Partial<SettingsData>) ?? {}
-        return {
-          ...currentState,
-          ...persisted,
-          general: {
-            ...currentState.general,
-            ...persisted.general,
-          },
-          xmlEditor: {
-            ...currentState.xmlEditor,
-            ...persisted.xmlEditor,
-          },
-          batchValidator: {
-            ...currentState.batchValidator,
-            ...persisted.batchValidator,
-          },
-        }
-      },
+      merge: (persistedState, currentState) =>
+        mergeSettingsData(persistedState as PersistedSettingsData | undefined, currentState),
     }
   )
 )

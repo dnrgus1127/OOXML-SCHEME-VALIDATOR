@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  editorThemeOptions,
+  getEditorThemeLabel,
+  getEditorThemePreviewVars,
+  type EditorThemeId,
+} from '../constants/editorTheme'
 import { useSettingsStore } from '../stores/settings'
 import { normalizeShortcut } from '../utils/shortcuts'
 
@@ -43,10 +49,18 @@ const xmlEditorShortcutHelp: ShortcutHelpItem[] = [
 ]
 
 export function SettingsScreen({ onClose }: SettingsScreenProps) {
-  const { xmlEditor, updateXmlEditorSettings } = useSettingsStore()
+  const {
+    xmlEditor,
+    previewEditorTheme,
+    updateXmlEditorSettings,
+    setPreviewEditorTheme,
+    clearPreviewEditorTheme,
+  } = useSettingsStore()
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [shortcutInput, setShortcutInput] = useState(xmlEditor.revalidateShortcut)
   const [shortcutError, setShortcutError] = useState<string | null>(null)
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
+  const themeMenuRef = useRef<HTMLDivElement>(null)
 
   const sections = useMemo(
     () => [
@@ -60,6 +74,22 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   useEffect(() => {
     setShortcutInput(xmlEditor.revalidateShortcut)
   }, [xmlEditor.revalidateShortcut])
+
+  useEffect(() => {
+    if (!isThemeMenuOpen) {
+      clearPreviewEditorTheme()
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!themeMenuRef.current?.contains(event.target as Node)) {
+        setIsThemeMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [clearPreviewEditorTheme, isThemeMenuOpen])
 
   const handleShortcutInputChange = (value: string) => {
     setShortcutInput(value)
@@ -75,6 +105,18 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
     setShortcutError(null)
     updateXmlEditorSettings({ revalidateShortcut: normalized })
   }
+
+  const handleThemePreview = (themeId: EditorThemeId) => {
+    setPreviewEditorTheme(themeId)
+  }
+
+  const handleThemeSelect = (themeId: EditorThemeId) => {
+    updateXmlEditorSettings({ editorTheme: themeId })
+    setPreviewEditorTheme(themeId)
+    setIsThemeMenuOpen(false)
+  }
+
+  const displayedTheme = previewEditorTheme ?? xmlEditor.editorTheme
 
   return (
     <div
@@ -136,6 +178,90 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
                 <p className="settings-help-text">
                   파일을 열자마자 문서 검증을 자동으로 실행합니다.
                 </p>
+              </div>
+
+              <div className="settings-field-row">
+                <div>
+                  <h3 className="settings-subtitle">에디터 테마</h3>
+                  <p className="settings-help-text">
+                    Monaco Editor가 기본 제공하는 모든 테마를 드롭다운에서 선택할 수 있습니다.
+                    항목에 마우스를 올리면 앱과 에디터에 즉시 미리보기 됩니다.
+                  </p>
+                </div>
+
+                <div
+                  className={`settings-select${isThemeMenuOpen ? ' is-open' : ''}`}
+                  ref={themeMenuRef}
+                  onMouseLeave={() => {
+                    if (isThemeMenuOpen) {
+                      clearPreviewEditorTheme()
+                    }
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="settings-select-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={isThemeMenuOpen}
+                    onClick={() => setIsThemeMenuOpen((open) => !open)}
+                  >
+                    <span className="settings-select-trigger-copy">
+                      <span className="settings-select-label">현재 선택</span>
+                      <span className="settings-select-value">
+                        {getEditorThemeLabel(xmlEditor.editorTheme)}
+                      </span>
+                    </span>
+                    <span
+                      className="editor-theme-preview"
+                      style={getEditorThemePreviewVars(displayedTheme)}
+                      aria-hidden="true"
+                    >
+                      <span className="editor-theme-preview__gutter" />
+                      <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
+                      <span className="editor-theme-preview__line" />
+                      <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
+                    </span>
+                  </button>
+
+                  {isThemeMenuOpen && (
+                    <div className="settings-select-menu" role="listbox" aria-label="Editor theme">
+                      {editorThemeOptions.map((theme) => {
+                        const selected = xmlEditor.editorTheme === theme.id
+
+                        return (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            className={`settings-select-option${selected ? ' is-selected' : ''}`}
+                            onMouseEnter={() => handleThemePreview(theme.id)}
+                            onFocus={() => handleThemePreview(theme.id)}
+                            onClick={() => handleThemeSelect(theme.id)}
+                          >
+                            <span
+                              className="editor-theme-preview"
+                              style={getEditorThemePreviewVars(theme.id)}
+                              aria-hidden="true"
+                            >
+                              <span className="editor-theme-preview__gutter" />
+                              <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
+                              <span className="editor-theme-preview__line" />
+                              <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
+                            </span>
+                            <span className="settings-option-copy">
+                              <span className="settings-option-title">
+                                {theme.label}
+                                <span className="settings-option-family">{theme.family}</span>
+                              </span>
+                              <span className="settings-option-description">{theme.description}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="settings-field-row">

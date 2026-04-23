@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BatchValidator } from './components/BatchValidator'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { HomeScreen } from './screens/HomeScreen'
@@ -7,6 +7,7 @@ import { XmlEditorScreen } from './screens/XmlEditorScreen'
 import { useDocumentStore } from './stores/document'
 import { useSettingsStore } from './stores/settings'
 import type { OpenTool, RecentFileEntry } from '../shared/recent-files'
+import { getEditorThemeCssVars } from './constants/editorTheme'
 
 declare global {
   interface Window {
@@ -131,11 +132,16 @@ export default function App() {
   const saveDocument = useDocumentStore((state) => state.saveDocument)
   const validateDocument = useDocumentStore((state) => state.validate)
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
+  const effectiveEditorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
   const isMac = navigator.platform.includes('Mac')
 
   const isDirty = useMemo(
     () => modifiedContent !== null && modifiedContent !== partContent,
     [modifiedContent, partContent]
+  )
+  const appThemeVars = useMemo(
+    () => getEditorThemeCssVars(effectiveEditorTheme) as CSSProperties,
+    [effectiveEditorTheme]
   )
 
   const openSettings = useCallback(() => {
@@ -402,7 +408,11 @@ export default function App() {
   }
 
   return (
-    <div className={`app${isMac ? ' app--mac' : ''}`}>
+    <div
+      className={`app${isMac ? ' app--mac' : ''}`}
+      data-app-theme={effectiveEditorTheme}
+      style={appThemeVars}
+    >
       {currentScreen === 'home' && (
         <HomeScreen
           onOpenXmlFromHome={handleOpenXmlFromHome}

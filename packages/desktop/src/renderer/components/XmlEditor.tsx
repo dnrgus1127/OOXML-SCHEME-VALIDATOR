@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { getEditorThemeLabel, registerEditorThemes } from '../constants/editorTheme'
+import { useSettingsStore } from '../stores/settings'
 
 interface XmlEditorProps {
   content: string
@@ -56,10 +58,12 @@ function formatXml(xml: string): string {
 export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<any>(null)
+  const monacoRef = useRef<any>(null)
 
   const [localContent, setLocalContent] = useState(content)
   const [isMonacoReady, setIsMonacoReady] = useState(false)
   const [monacoLoadError, setMonacoLoadError] = useState(false)
+  const editorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
 
   useEffect(() => {
     let disposed = false
@@ -71,10 +75,12 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
         const monaco = await import('monaco-editor')
         if (disposed || !editorContainerRef.current) return
 
+        registerEditorThemes(monaco)
+        monacoRef.current = monaco
         editorRef.current = monaco.editor.create(editorContainerRef.current, {
           value: localContent,
           language: 'xml',
-          theme: 'vs-dark',
+          theme: editorTheme,
           automaticLayout: true,
           minimap: { enabled: false },
           // Monaco 기본 gutter/folding 사용 (라인 번호/접기 영역 자동 동기화)
@@ -105,8 +111,14 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
       disposed = true
       editorRef.current?.dispose()
       editorRef.current = null
+      monacoRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    if (!monacoRef.current || !editorRef.current) return
+    monacoRef.current.editor.setTheme(editorTheme)
+  }, [editorTheme])
 
   useEffect(() => {
     const formatted = formatXml(content)
@@ -137,9 +149,14 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
   }
 
   return (
-    <div className="xml-editor">
+    <div className="xml-editor" data-editor-theme={editorTheme}>
       <div className="editor-header">
-        <span className="part-path">{partPath}</span>
+        <div className="editor-meta">
+          <span className="part-path">{partPath}</span>
+          <span className="editor-theme-badge" aria-label={`Current editor theme: ${editorTheme}`}>
+            {getEditorThemeLabel(editorTheme)}
+          </span>
+        </div>
         <div className="editor-actions">
           <button onClick={handleCollapseAll} className="editor-btn" disabled={!isMonacoReady}>
             전체 접기
