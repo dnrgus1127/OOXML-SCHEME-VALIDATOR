@@ -1,4 +1,4 @@
-import { OoxmlBuilder, OoxmlParser, ZipReader } from '@ooxml/parser'
+import { OoxmlBuilder, OoxmlParser, ZipReader, ZipWriter } from '@ooxml/parser'
 
 export type EditableDocumentFormat = 'ooxml' | 'odf'
 export type ValidationSupportStatus = 'supported' | 'unsupported'
@@ -48,13 +48,28 @@ function readOdfMimeType(buffer: Buffer): string | null {
   try {
     const zip = ZipReader.fromBuffer(buffer)
     const mimeType = zip.readEntryAsText('/mimetype')?.trim()
-    if (!mimeType?.startsWith(ODF_MIMETYPE_PREFIX)) {
-      return null
+    if (mimeType?.startsWith(ODF_MIMETYPE_PREFIX)) {
+      return mimeType
     }
-    return mimeType
+
+    const manifestXml = zip.readEntryAsText('/META-INF/manifest.xml')
+    const manifestMimeType = manifestXml ? readOdfMimeTypeFromManifest(manifestXml) : null
+    if (manifestMimeType?.startsWith(ODF_MIMETYPE_PREFIX)) {
+      return manifestMimeType
+    }
+
+    return null
   } catch {
     return null
   }
+}
+
+function readOdfMimeTypeFromManifest(manifestXml: string): string | null {
+  const match = manifestXml.match(
+    /manifest:media-type="([^"]+)"[^>]*manifest:full-path="\/"|manifest:full-path="\/"[^>]*manifest:media-type="([^"]+)"/
+  )
+
+  return match?.[1] ?? match?.[2] ?? null
 }
 
 function detectOdfDocumentType(mimeType: string | null, filePath?: string): string {
@@ -170,9 +185,25 @@ export function getEditablePartText(
   return undefined
 }
 
-export function updateEditablePartText(buffer: Buffer, partPath: string, content: string): Buffer {
-  const builder = OoxmlBuilder.fromBuffer(buffer)
-  builder.setPart(partPath, content)
-  return builder.toBuffer()
-}
+export function updateEditablePartText(
+  buffer: Buffer,
+  partPath: string,
+  content: string,
+  filePath?: string
+): Buffer {
+  const format = detectDocumentFormatFromBuffer(buffer, filePath)
 
+  if (format === 'ooxml') {
+    const builder = OoxmlBuilder.fromBuffer(buffer)
+    builder.setPart(partPath, content)
+    return builder.toBuffer()
+  }
+
+  if (format === 'odf') {
+    const writer = ZipWriter.fromBuffer(buffer)
+    writer.addEntry(partPath, content)
+    return writer.toBuffer()
+  }
+
+  throw new Error('Unsupported document format')
+}

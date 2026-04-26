@@ -14,6 +14,8 @@ const api = {
   openDroppedFiles: (filePaths: string[]) => ipcRenderer.invoke('app:openDroppedFiles', filePaths),
   saveFile: (defaultPath?: string) => ipcRenderer.invoke('dialog:saveFile', defaultPath),
   confirmFileChange: () => ipcRenderer.invoke('dialog:confirmFileChange'),
+  confirmOverwriteOriginal: (filePath?: string) =>
+    ipcRenderer.invoke('dialog:confirmOverwriteOriginal', filePath),
 
   // File system
   readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
@@ -33,12 +35,14 @@ const api = {
   getSupportedSchemaList: () => ipcRenderer.invoke('schema:supported-list'),
 
   // OOXML operations
-  parseDocument: (base64Data: string) => ipcRenderer.invoke('ooxml:parse', base64Data),
-  getPart: (base64Data: string, partPath: string) =>
-    ipcRenderer.invoke('ooxml:getPart', base64Data, partPath),
-  updatePart: (base64Data: string, partPath: string, content: string) =>
-    ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content),
-  validate: (base64Data: string) => ipcRenderer.invoke('ooxml:validate', base64Data),
+  parseDocument: (base64Data: string, filePath?: string) =>
+    ipcRenderer.invoke('ooxml:parse', base64Data, filePath),
+  getPart: (base64Data: string, partPath: string, filePath?: string) =>
+    ipcRenderer.invoke('ooxml:getPart', base64Data, partPath, filePath),
+  updatePart: (base64Data: string, partPath: string, content: string, filePath?: string) =>
+    ipcRenderer.invoke('ooxml:updatePart', base64Data, partPath, content, filePath),
+  validate: (base64Data: string, filePath?: string) =>
+    ipcRenderer.invoke('ooxml:validate', base64Data, filePath),
   analyzeSchemaReferences: (base64Data: string) =>
     ipcRenderer.invoke('ooxml:analyzeSchemaReferences', base64Data),
 

@@ -39,6 +39,7 @@ export function XmlEditorScreen({
     isLoading,
     error,
     setFilePath,
+    shouldWarnBeforeOverwrite,
     loadDocument,
     selectPart,
     updatePartContent,
@@ -70,6 +71,22 @@ export function XmlEditorScreen({
 
     return saveDocument(filePath)
   }, [filePath, isDirty, saveDocument])
+
+  const executeSave = useCallback(async () => {
+    if (!filePath) return false
+
+    if (shouldWarnBeforeOverwrite()) {
+      const confirmed = await window.electronAPI.confirmOverwriteOriginal(filePath)
+      if (!confirmed) return false
+    }
+
+    const saved = await saveDocument(filePath)
+    if (!saved) return false
+
+    await validate()
+    setShowValidation(true)
+    return true
+  }, [filePath, saveDocument, shouldWarnBeforeOverwrite, validate])
 
   const loadFileAtPath = useCallback(
     async (path: string) => {
@@ -118,16 +135,10 @@ export function XmlEditorScreen({
   // Handle save from menu
   useEffect(() => {
     const cleanup = window.electronAPI.onMenuSave(async () => {
-      if (filePath) {
-        const saved = await saveDocument(filePath)
-        if (saved) {
-          await validate()
-          setShowValidation(true)
-        }
-      }
+      await executeSave()
     })
     return cleanup
-  }, [filePath, saveDocument, validate])
+  }, [executeSave])
 
   // Handle save-as from menu
   useEffect(() => {
@@ -172,12 +183,7 @@ export function XmlEditorScreen({
   }, [documentData, isSettingsOpen, revalidateShortcut, validate])
 
   const handleSave = async () => {
-    if (!filePath) return
-    const saved = await saveDocument(filePath)
-    if (saved) {
-      await validate()
-      setShowValidation(true)
-    }
+    await executeSave()
   }
 
   const handleSaveAs = async () => {

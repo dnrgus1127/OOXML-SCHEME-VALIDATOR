@@ -340,6 +340,22 @@ function setupIpcHandlers(): void {
     return 'cancel'
   })
 
+  ipcMain.handle('dialog:confirmOverwriteOriginal', async (_, filePath?: string) => {
+    const result = await dialog.showMessageBox(mainWindow!, {
+      type: 'warning',
+      buttons: ['원본에 저장', '취소'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+      message: '원본 파일이 변경됩니다.',
+      detail: filePath
+        ? `저장하면 다음 원본 문서에 변경 사항이 덮어쓰기됩니다:\n${filePath}`
+        : '저장하면 원본 문서에 변경 사항이 덮어쓰기됩니다.',
+    })
+
+    return result.response === 0
+  })
+
   // Read file
   ipcMain.handle('fs:readFile', async (_, filePath: string) => {
     try {
@@ -447,13 +463,13 @@ function setupIpcHandlers(): void {
   })
 
   // Parse OOXML document
-  ipcMain.handle('ooxml:parse', async (_, base64Data: string) => {
+  ipcMain.handle('ooxml:parse', async (_, base64Data: string, filePath?: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
 
       return {
         success: true,
-        data: parseEditableDocument(buffer),
+        data: parseEditableDocument(buffer, filePath),
       }
     } catch (error) {
       return { success: false, error: String(error) }
@@ -461,10 +477,10 @@ function setupIpcHandlers(): void {
   })
 
   // Get part content
-  ipcMain.handle('ooxml:getPart', async (_, base64Data: string, partPath: string) => {
+  ipcMain.handle('ooxml:getPart', async (_, base64Data: string, partPath: string, filePath?: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
-      const content = getEditablePartText(buffer, partPath)
+      const content = getEditablePartText(buffer, partPath, filePath)
 
       if (!content) {
         return { success: false, error: 'Part not found' }
@@ -479,10 +495,10 @@ function setupIpcHandlers(): void {
   // Update part content
   ipcMain.handle(
     'ooxml:updatePart',
-    async (_, base64Data: string, partPath: string, content: string) => {
+    async (_, base64Data: string, partPath: string, content: string, filePath?: string) => {
       try {
         const buffer = Buffer.from(base64Data, 'base64')
-        const newBuffer = updateEditablePartText(buffer, partPath, content)
+        const newBuffer = updateEditablePartText(buffer, partPath, content, filePath)
 
         return { success: true, data: newBuffer.toString('base64') }
       } catch (error) {
@@ -642,10 +658,10 @@ function setupIpcHandlers(): void {
   )
 
   // Validate document with XSD schema validation
-  ipcMain.handle('ooxml:validate', async (_, base64Data: string) => {
+  ipcMain.handle('ooxml:validate', async (_, base64Data: string, filePath?: string) => {
     try {
       const buffer = Buffer.from(base64Data, 'base64')
-      if (detectDocumentFormatFromBuffer(buffer) !== 'ooxml') {
+      if (detectDocumentFormatFromBuffer(buffer, filePath) !== 'ooxml') {
         return {
           success: true,
           data: createUnsupportedValidationResult(

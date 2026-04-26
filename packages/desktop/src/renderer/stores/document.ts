@@ -50,9 +50,17 @@ interface ValidationResult {
   summary?: ValidationSummary
 }
 
+export function isOriginalDocumentPath(
+  filePath: string | null,
+  originalFilePath: string | null
+): boolean {
+  return Boolean(filePath && originalFilePath && filePath === originalFilePath)
+}
+
 interface DocumentState {
   // State
   filePath: string | null
+  originalFilePath: string | null
   fileData: string | null // base64
   documentData: DocumentData | null
   selectedPart: string | null
@@ -64,6 +72,7 @@ interface DocumentState {
 
   // Actions
   setFilePath: (path: string | null) => void
+  shouldWarnBeforeOverwrite: () => boolean
   loadDocument: (path: string) => Promise<boolean>
   selectPart: (partPath: string) => Promise<void>
   updatePartContent: (content: string) => void
@@ -76,6 +85,7 @@ interface DocumentState {
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   filePath: null,
+  originalFilePath: null,
   fileData: null,
   documentData: null,
   selectedPart: null,
@@ -86,6 +96,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   error: null,
 
   setFilePath: (path) => set({ filePath: path }),
+
+  shouldWarnBeforeOverwrite: () => {
+    const { filePath, originalFilePath } = get()
+    return isOriginalDocumentPath(filePath, originalFilePath)
+  },
 
   loadDocument: async (path) => {
     set({ isLoading: true, error: null })
@@ -100,13 +115,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       const fileData = readResult.data!
 
       // Parse document
-      const parseResult = await window.electronAPI.parseDocument(fileData)
+      const parseResult = await window.electronAPI.parseDocument(fileData, path)
       if (!parseResult.success) {
         throw new Error(parseResult.error || 'Failed to parse document')
       }
 
       set({
         filePath: path,
+        originalFilePath: path,
         fileData,
         documentData: parseResult.data,
         selectedPart: null,
@@ -134,7 +150,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       const updateResult = await window.electronAPI.updatePart(
         fileData,
         selectedPart,
-        modifiedContent
+        modifiedContent,
+        get().filePath ?? undefined
       )
       if (updateResult.success) {
         set({ fileData: updateResult.data! })
@@ -145,7 +162,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     try {
       const currentFileData = get().fileData!
-      const result = await window.electronAPI.getPart(currentFileData, partPath)
+      const result = await window.electronAPI.getPart(
+        currentFileData,
+        partPath,
+        get().filePath ?? undefined
+      )
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to get part content')
@@ -183,7 +204,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const updateResult = await window.electronAPI.updatePart(
           currentFileData,
           selectedPart,
-          modifiedContent
+          modifiedContent,
+          get().filePath ?? undefined
         )
         if (updateResult.success) {
           currentFileData = updateResult.data!
@@ -222,7 +244,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const updateResult = await window.electronAPI.updatePart(
           currentFileData,
           selectedPart,
-          modifiedContent
+          modifiedContent,
+          get().filePath ?? undefined
         )
         if (updateResult.success) {
           currentFileData = updateResult.data!
@@ -262,14 +285,18 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const updateResult = await window.electronAPI.updatePart(
           currentFileData,
           selectedPart,
-          modifiedContent
+          modifiedContent,
+          get().filePath ?? undefined
         )
         if (updateResult.success) {
           currentFileData = updateResult.data!
         }
       }
 
-      const result = await window.electronAPI.validate(currentFileData)
+      const result = await window.electronAPI.validate(
+        currentFileData,
+        get().filePath ?? undefined
+      )
       if (!result.success) {
         throw new Error(result.error || 'Validation failed')
       }
@@ -289,6 +316,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   reset: () =>
     set({
       filePath: null,
+      originalFilePath: null,
       fileData: null,
       documentData: null,
       selectedPart: null,

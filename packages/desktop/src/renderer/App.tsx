@@ -16,6 +16,7 @@ declare global {
       openDroppedFiles: (filePaths: string[]) => Promise<string[]>
       saveFile: (defaultPath?: string) => Promise<string | null>
       confirmFileChange: () => Promise<'save' | 'discard' | 'cancel'>
+      confirmOverwriteOriginal: (filePath?: string) => Promise<boolean>
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       writeFile: (filePath: string, data: string) => Promise<{ success: boolean; error?: string }>
       fileExists: (filePath: string) => Promise<boolean>
@@ -43,18 +44,24 @@ declare global {
         }>
       >
       parseDocument: (
-        base64Data: string
+        base64Data: string,
+        filePath?: string
       ) => Promise<{ success: boolean; data?: any; error?: string }>
       getPart: (
         base64Data: string,
-        partPath: string
+        partPath: string,
+        filePath?: string
       ) => Promise<{ success: boolean; data?: string; error?: string }>
       updatePart: (
         base64Data: string,
         partPath: string,
-        content: string
+        content: string,
+        filePath?: string
       ) => Promise<{ success: boolean; data?: string; error?: string }>
-      validate: (base64Data: string) => Promise<{ success: boolean; data?: any; error?: string }>
+      validate: (
+        base64Data: string,
+        filePath?: string
+      ) => Promise<{ success: boolean; data?: any; error?: string }>
       analyzeSchemaReferences: (
         base64Data: string
       ) => Promise<{ success: boolean; data?: any; error?: string }>
@@ -469,4 +476,3 @@ export default function App() {
     </div>
   )
 }
-

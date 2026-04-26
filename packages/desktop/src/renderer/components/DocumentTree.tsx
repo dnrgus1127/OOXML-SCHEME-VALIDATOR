@@ -73,13 +73,19 @@ function formatSize(bytes: number): string {
 }
 
 function getIcon(node: TreeNode): string {
-  if (node.isDirectory) return 'DIR'
+  if (node.isDirectory) {
+    if (node.name === '_rels') return '🔗'
+    if (node.name.includes('xl')) return '📊'
+    if (node.name.includes('word')) return '📝'
+    if (node.name.includes('ppt')) return '📽️'
+    return '📁'
+  }
 
   const ext = node.name.split('.').pop()?.toLowerCase()
-  if (ext === 'xml') return 'XML'
-  if (ext === 'rels') return 'REL'
-  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext || '')) return 'IMG'
-  return 'FILE'
+  if (ext === 'xml') return '📄'
+  if (ext === 'rels') return '🔗'
+  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext || '')) return '🖼️'
+  return '📄'
 }
 
 function getDocumentLabel(containerFormat: 'ooxml' | 'odf' | undefined, documentType: string): string {
@@ -137,7 +143,7 @@ function TreeNodeComponent({ node, selectedPart, onSelectPart, depth }: TreeNode
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
       >
-        {node.isDirectory && <span className="expand-icon">{expanded ? 'v' : '>'}</span>}
+        {node.isDirectory && <span className="expand-icon">{expanded ? '▼' : '▶'}</span>}
         <span className="icon">{getIcon(node)}</span>
         <span className="name">{node.name}</span>
         {node.part && <span className="size">{formatSize(node.part.size)}</span>}
@@ -191,4 +197,3 @@ export function DocumentTree({
     </div>
   )
 }
-
