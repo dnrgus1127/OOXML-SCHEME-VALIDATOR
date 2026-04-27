@@ -1,5 +1,4 @@
-import type { RecentFileEntry } from '../../../shared/recent-files'
-import { useRecentFilesPanel } from './useRecentFilesPanel'
+import type { RecentFileEntry, OpenTool } from '../../../shared/recent-files'
 
 interface RecentFilesPanelProps {
   recentFiles: RecentFileEntry[]
@@ -10,8 +9,25 @@ interface RecentFilesPanelProps {
   onClearRecent: () => void
 }
 
-function toolLabel(lastTool: RecentFileEntry['lastTool']): string {
-  return lastTool === 'xml-editor' ? 'XML Editor' : 'Batch Validator'
+type ValidationStatus = 'valid' | 'invalid' | 'warning'
+
+const STATUS_LABEL: Record<ValidationStatus, string> = {
+  valid: 'Valid',
+  invalid: 'Errors',
+  warning: 'Warnings',
+}
+
+function toolLabel(lastTool: OpenTool): string {
+  return lastTool === 'xml-editor' ? 'XML Editor' : 'Batch'
+}
+
+function fileGlyph(entry: RecentFileEntry): string {
+  const lower = entry.fileName.toLowerCase()
+  if (lower.endsWith('.xlsx') || lower.endsWith('.ods')) return '📊'
+  if (lower.endsWith('.docx') || lower.endsWith('.odt')) return '📝'
+  if (lower.endsWith('.pptx') || lower.endsWith('.odp')) return '🎨'
+  if (lower.endsWith('/') || lower.endsWith('\\')) return '📁'
+  return '📄'
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -29,6 +45,11 @@ function formatRelativeTime(isoString: string): string {
   return `${absDays}d ago`
 }
 
+function getValidationStatus(_entry: RecentFileEntry): ValidationStatus {
+  // 검증 결과 캐시가 연결되기 전까지는 항상 valid 로 표시
+  return 'valid'
+}
+
 function RecentFileItem({
   entry,
   onOpenRecent,
@@ -38,48 +59,59 @@ function RecentFileItem({
   onOpenRecent: (entry: RecentFileEntry) => void
   onRemoveRecent: (filePath: string) => void
 }) {
+  const status = getValidationStatus(entry)
+
   return (
-    <li
-      key={entry.filePath}
-      className="home-recent-item"
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpenRecent(entry)}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return
-        if (event.key === 'Enter' || event.key === ' ') {
+    <li>
+      <div
+        className="bold-recent-item"
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpenRecent(entry)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return
+          if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
           onOpenRecent(entry)
-        }
-      }}
-    >
-      <div className="home-recent-item-main">
-        <div className="home-recent-item-name" title={entry.filePath}>
-          {entry.fileName}
+        }}
+        title={entry.filePath}
+      >
+        <div className="bold-recent-glyph" aria-hidden>
+          {fileGlyph(entry)}
         </div>
-        <div className="home-recent-item-path" title={entry.filePath}>
-          {entry.filePath}
+        <div className="bold-recent-info">
+          <div className="bold-recent-name">{entry.fileName}</div>
+          <div className="bold-recent-meta">
+            <span>{toolLabel(entry.lastTool)}</span>
+            <span className="sep">/</span>
+            <span>{formatRelativeTime(entry.lastOpenedAt)}</span>
+            <span className="sep">/</span>
+            <span className="bold-recent-meta-path">{entry.filePath}</span>
+          </div>
         </div>
-      </div>
-      <div className="home-recent-item-meta">
-        <span className="home-tool-badge">{toolLabel(entry.lastTool)}</span>
-        <span className="home-recent-time">{formatRelativeTime(entry.lastOpenedAt)}</span>
-        <button
-          className="home-recent-remove-btn"
-          onClick={(event) => {
-            event.stopPropagation()
-            onRemoveRecent(entry.filePath)
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') return
-            event.preventDefault()
-            event.stopPropagation()
-            onRemoveRecent(entry.filePath)
-          }}
-          aria-label={`Remove ${entry.fileName} from recent files`}
-        >
-          ×
-        </button>
+        <div className="bold-recent-trailing">
+          <span className={`bold-recent-status ${status}`}>
+            <span className="dot" aria-hidden />
+            {STATUS_LABEL[status]}
+          </span>
+          <button
+            type="button"
+            className="bold-recent-remove-btn"
+            onClick={(event) => {
+              event.stopPropagation()
+              onRemoveRecent(entry.filePath)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
+              event.stopPropagation()
+              onRemoveRecent(entry.filePath)
+            }}
+            aria-label={`Remove ${entry.fileName} from recent files`}
+          >
+            ×
+          </button>
+        </div>
       </div>
     </li>
   )
@@ -93,66 +125,51 @@ export function RecentFilesPanel({
   onRemoveRecent,
   onClearRecent,
 }: RecentFilesPanelProps) {
-  const { isOpen, toggle, contentId } = useRecentFilesPanel()
-
   return (
-    <aside className={`home-recent-panel ${isOpen ? 'is-open' : 'is-collapsed'}`}>
-      <div className="home-recent-header">
-        <button
-          type="button"
-          className="recent-toggle-btn"
-          onClick={toggle}
-          aria-expanded={isOpen}
-          aria-controls={contentId}
-        >
-          <span className="recent-toggle-icon" aria-hidden>
-            {isOpen ? '▾' : '▸'}
-          </span>
-          <span className="home-recent-title">Recent Files</span>
-        </button>
-
-        {isOpen && (
+    <aside className="bold-right">
+      <div className="bold-right-header">
+        <span className="bold-right-title">Recent · {recentFiles.length}</span>
+        <div className="bold-right-actions">
           <button
+            type="button"
+            className="bold-right-clear-btn"
             onClick={onClearRecent}
             disabled={recentFiles.length === 0}
-            className="recent-clear-btn"
           >
             Clear
           </button>
-        )}
+        </div>
       </div>
 
-      {isOpen && (
-        <div id={contentId} className="home-recent-content">
-          {recentError && (
-            <div className="home-recent-error">
-              <span>{recentError}</span>
-              <button onClick={onDismissRecentError} aria-label="Dismiss recent error">
-                ×
-              </button>
-            </div>
-          )}
-
-          {recentFiles.length === 0 && (
-            <div className="home-recent-empty">
-              <p>No recently opened files</p>
-              <p>Files you open in XML Editor or Batch Validator appear here.</p>
-            </div>
-          )}
-
-          {recentFiles.length > 0 && (
-            <ul className="home-recent-list">
-              {recentFiles.map((entry) => (
-                <RecentFileItem
-                  key={entry.filePath}
-                  entry={entry}
-                  onOpenRecent={onOpenRecent}
-                  onRemoveRecent={onRemoveRecent}
-                />
-              ))}
-            </ul>
-          )}
+      {recentError && (
+        <div className="bold-recent-error">
+          <span>{recentError}</span>
+          <button
+            type="button"
+            onClick={onDismissRecentError}
+            aria-label="Dismiss recent error"
+          >
+            ×
+          </button>
         </div>
+      )}
+
+      {recentFiles.length === 0 ? (
+        <div className="bold-recent-empty">
+          <p>No recently opened files</p>
+          <p>Files you open in XML Editor or Batch Validator appear here.</p>
+        </div>
+      ) : (
+        <ul className="bold-recent-list">
+          {recentFiles.map((entry) => (
+            <RecentFileItem
+              key={entry.filePath}
+              entry={entry}
+              onOpenRecent={onOpenRecent}
+              onRemoveRecent={onRemoveRecent}
+            />
+          ))}
+        </ul>
       )}
     </aside>
   )

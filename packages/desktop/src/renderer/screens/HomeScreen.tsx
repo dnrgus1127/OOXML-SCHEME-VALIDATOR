@@ -1,32 +1,6 @@
+import { useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { RecentFileEntry } from '../../shared/recent-files'
 import { RecentFilesPanel } from './home/RecentFilesPanel'
-
-interface ToolCardProps {
-  icon: string
-  title: string
-  description: string
-  actionLabel: string
-  onAction: () => void | Promise<void>
-}
-
-function ToolCard({ icon, title, description, actionLabel, onAction }: ToolCardProps) {
-  return (
-    <div className="tool-card" onClick={onAction}>
-      <div className="tool-icon">{icon}</div>
-      <div className="tool-title">{title}</div>
-      <div className="tool-description">{description}</div>
-      <button
-        className="tool-action"
-        onClick={(e) => {
-          e.stopPropagation()
-          onAction()
-        }}
-      >
-        {actionLabel}
-      </button>
-    </div>
-  )
-}
 
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
@@ -53,57 +27,145 @@ export function HomeScreen({
   onRemoveRecent,
   onClearRecent,
 }: HomeScreenProps) {
+  const [isDropOver, setIsDropOver] = useState(false)
+
+  const handleDropzoneClick = () => {
+    void onOpenXmlFromHome()
+  }
+
+  const handleDropzoneKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    void onOpenXmlFromHome()
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    const types = Array.from(event.dataTransfer.types ?? [])
+    if (!types.includes('Files')) return
+    event.preventDefault()
+    setIsDropOver(true)
+  }
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node)) return
+    setIsDropOver(false)
+  }
+
+  const handleDrop = () => {
+    // 실제 파일 처리는 App.tsx의 전역 drop 핸들러가 담당
+    setIsDropOver(false)
+  }
+
   return (
     <div className="home-screen">
-      <RecentFilesPanel
-        recentFiles={recentFiles}
-        recentError={recentError}
-        onDismissRecentError={onDismissRecentError}
-        onOpenRecent={onOpenRecent}
-        onRemoveRecent={onRemoveRecent}
-        onClearRecent={onClearRecent}
-      />
+      <div className="home--bold">
+        <div className="bold-left">
+          <button
+            type="button"
+            className="bold-settings-btn"
+            onClick={onOpenSettingsFromHome}
+            aria-label="Open settings"
+            title="Settings"
+          >
+            ⚙
+          </button>
 
-      <div className="home-main">
-        <button
-          type="button"
-          className="home-settings-btn"
-          onClick={onOpenSettingsFromHome}
-          aria-label="Open settings"
-          title="Settings"
-        >
-          ⚙
-        </button>
+          <div className="bold-eyebrow">
+            <span className="dot" aria-hidden />
+            <span>OOXML Validator</span>
+          </div>
 
-        <div className="home-header">
-          <h1 className="home-title">OOXML Validator</h1>
-          <p className="home-subtitle">Choose a tool to get started</p>
+          <h1 className="bold-title">
+            Validate.
+            <br />
+            Edit. <em>Ship clean XML.</em>
+          </h1>
+
+          <p className="bold-tagline">
+            ECMA-376 OOXML schema validator for .xlsx, .docx and .pptx —
+            <br />
+            built for engineers who care about specification compliance.
+          </p>
+
+          <div
+            className={`bold-dropzone${isDropOver ? ' is-over' : ''}`}
+            role="button"
+            tabIndex={0}
+            onClick={handleDropzoneClick}
+            onKeyDown={handleDropzoneKeyDown}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="bold-dropzone-glyph" aria-hidden>
+              📝
+            </div>
+            <div className="bold-dropzone-title">Drop a document to begin</div>
+            <div className="bold-dropzone-sub">
+              <span>Drag &amp; drop</span>
+              <span className="divider">·</span>
+              <span>
+                or press <span className="kbd">⌘</span> <span className="kbd">O</span>
+              </span>
+            </div>
+            <div className="bold-formats">
+              <span className="bold-format-chip">.xlsx</span>
+              <span className="bold-format-chip">.docx</span>
+              <span className="bold-format-chip">.pptx</span>
+            </div>
+          </div>
+
+          <div className="bold-secondary">
+            <button
+              type="button"
+              className="bold-action"
+              onClick={() => void onOpenBatchFromHome()}
+            >
+              <span className="bold-action-icon" aria-hidden>
+                📊
+              </span>
+              <span className="bold-action-text">
+                <span className="bold-action-title">Batch Validator</span>
+                <span className="bold-action-desc">Validate multiple files</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bold-action"
+              onClick={() => void onOpenSchemasFromHome()}
+            >
+              <span className="bold-action-icon" aria-hidden>
+                📚
+              </span>
+              <span className="bold-action-text">
+                <span className="bold-action-title">지원 스키마</span>
+                <span className="bold-action-desc">Browse supported schemas</span>
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="tools-grid">
-          <ToolCard
-            icon="📝"
-            title="XML Editor"
-            description="단일 OOXML 파일을 열어 XML 파트를 편집하고 검증합니다"
-            actionLabel="Open File"
-            onAction={onOpenXmlFromHome}
-          />
+        <RecentFilesPanel
+          recentFiles={recentFiles}
+          recentError={recentError}
+          onDismissRecentError={onDismissRecentError}
+          onOpenRecent={onOpenRecent}
+          onRemoveRecent={onRemoveRecent}
+          onClearRecent={onClearRecent}
+        />
+      </div>
 
-          <ToolCard
-            icon="📊"
-            title="Batch Validator"
-            description="여러 파일을 한번에 검증하고 결과를 보고서로 내보냅니다"
-            actionLabel="Select Files"
-            onAction={onOpenBatchFromHome}
-          />
-
-          <ToolCard
-            icon="📚"
-            title="지원 스키마"
-            description="검증 엔진이 지원하는 주요 OOXML 스키마 목록을 확인합니다"
-            actionLabel="View Schemas"
-            onAction={onOpenSchemasFromHome}
-          />
+      <div className="statusbar">
+        <div className="sb-item">
+          <span className="dot ok" aria-hidden />
+          <span>Engine ready</span>
+        </div>
+        <div className="sb-spacer" />
+        <div className="sb-item">
+          <span>READY</span>
+        </div>
+        <div className="sb-item">
+          <span>ECMA-376 · ISO/IEC 29500</span>
         </div>
       </div>
     </div>
