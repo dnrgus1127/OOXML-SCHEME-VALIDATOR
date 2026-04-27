@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useDocumentStore } from '../stores/document'
 import { DocumentTree } from '../components/DocumentTree'
 import { XmlEditor } from '../components/XmlEditor'
+import type { PluginContext } from '../plugins'
 import { ValidationPanel } from '../components/ValidationPanel'
 import {
   SchemaReferencePanel,
@@ -201,6 +202,32 @@ export function XmlEditorScreen({
     await selectPart(partPath)
   }
 
+  const getPluginContext = useCallback((): PluginContext | null => {
+    const state = useDocumentStore.getState()
+    if (!state.fileData || !state.filePath || !state.selectedPart || !state.documentData) {
+      return null
+    }
+    const currentFilePath = state.filePath
+    return {
+      filePath: currentFilePath,
+      partPath: state.selectedPart,
+      containerFormat: state.documentData.containerFormat,
+      documentType: state.documentData.documentType,
+      parts: state.documentData.parts,
+      getPart: async (path) => {
+        const fresh = useDocumentStore.getState()
+        if (!fresh.fileData) return null
+        const result = await window.electronAPI.getPart(
+          fresh.fileData,
+          path,
+          fresh.filePath ?? undefined
+        )
+        if (!result?.success) return null
+        return (result.data ?? null) as string | null
+      },
+    }
+  }, [])
+
   const handleContentChange = (content: string) => {
     updatePartContent(content)
   }
@@ -312,6 +339,7 @@ export function XmlEditorScreen({
                   content={partContent}
                   partPath={selectedPart}
                   onChange={handleContentChange}
+                  getPluginContext={getPluginContext}
                 />
               ) : isLoading ? (
                 <div className="loading">Loading...</div>

@@ -15,11 +15,17 @@ describe('mergeSettingsData', () => {
       batchValidator: {
         autoExpandResults: true,
       },
+      plugins: {
+        enabled: {
+          'odf-chart-style-resolver': true,
+        },
+      },
       previewEditorTheme: null,
       effectiveEditorTheme: 'vs-dark' as const,
       updateXmlEditorSettings: () => undefined,
       setPreviewEditorTheme: () => undefined,
       clearPreviewEditorTheme: () => undefined,
+      updatePluginEnabled: () => undefined,
       resetSettings: () => undefined,
     }
 

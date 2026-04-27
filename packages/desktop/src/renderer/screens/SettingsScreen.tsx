@@ -7,17 +7,49 @@ import {
 } from '../constants/editorTheme'
 import { useSettingsStore } from '../stores/settings'
 import { normalizeShortcut } from '../utils/shortcuts'
+import { getAllPlugins } from '../plugins'
+import { MarkdownLite } from '../components/MarkdownLite'
 
 interface SettingsScreenProps {
   onClose: () => void
 }
 
-type SettingsSection = 'general' | 'xml-editor' | 'batch-validator'
+type SettingsSection = 'general' | 'xml-editor' | 'batch-validator' | 'extensions'
 
 interface ShortcutHelpItem {
   action: string
   shortcut: string
   isCustomizable?: boolean
+}
+
+function getPluginInitials(name: string): string {
+  const words = name
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Za-z0-9가-힣]/g, ''))
+    .filter(Boolean)
+  if (words.length === 0) return '?'
+  if (words.length === 1) {
+    const w = words[0] ?? ''
+    return w.slice(0, 2).toUpperCase()
+  }
+  return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase()
+}
+
+const PLUGIN_ACCENT_PALETTE: Array<{ gradient: string; fg: string }> = [
+  { gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', fg: '#ffffff' },
+  { gradient: 'linear-gradient(135deg, #0ea5e9 0%, #22d3ee 100%)', fg: '#ffffff' },
+  { gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', fg: '#ffffff' },
+  { gradient: 'linear-gradient(135deg, #f97316 0%, #fbbf24 100%)', fg: '#ffffff' },
+  { gradient: 'linear-gradient(135deg, #ec4899 0%, #f472b6 100%)', fg: '#ffffff' },
+]
+
+function getPluginAccent(id: string): { gradient: string; fg: string } {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0
+  }
+  const idx = Math.abs(hash) % PLUGIN_ACCENT_PALETTE.length
+  return PLUGIN_ACCENT_PALETTE[idx] ?? PLUGIN_ACCENT_PALETTE[0]!
 }
 
 const xmlEditorShortcutHelp: ShortcutHelpItem[] = [
@@ -52,21 +84,35 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const {
     xmlEditor,
     previewEditorTheme,
+    plugins,
     updateXmlEditorSettings,
     setPreviewEditorTheme,
     clearPreviewEditorTheme,
+    updatePluginEnabled,
   } = useSettingsStore()
+  const allPlugins = useMemo(() => getAllPlugins(), [])
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [shortcutInput, setShortcutInput] = useState(xmlEditor.revalidateShortcut)
   const [shortcutError, setShortcutError] = useState<string | null>(null)
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
+  const [expandedPluginIds, setExpandedPluginIds] = useState<Set<string>>(new Set())
   const themeMenuRef = useRef<HTMLDivElement>(null)
+
+  const togglePluginExpanded = (id: string) => {
+    setExpandedPluginIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const sections = useMemo(
     () => [
       { id: 'general' as const, label: '기본' },
       { id: 'xml-editor' as const, label: 'XML Editor' },
       { id: 'batch-validator' as const, label: 'Batch Validator' },
+      { id: 'extensions' as const, label: 'Extensions' },
     ],
     []
   )
@@ -317,6 +363,180 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
               <p className="settings-placeholder">
                 Batch Validator 설정 항목은 추후 추가될 예정입니다.
               </p>
+            </section>
+          )}
+
+          {activeSection === 'extensions' && (
+            <section className="settings-section ext-section" aria-labelledby="settings-extensions-title">
+              <header className="ext-section-header">
+                <h2 id="settings-extensions-title" className="ext-section-title">
+                  Extensions
+                  <span className="ext-section-count">{allPlugins.length}</span>
+                </h2>
+                <p className="ext-section-subtitle">
+                  XML Editor에서 동작하는 보조 기능을 켜고 끌 수 있습니다. 각 확장은 적용 가능한 문서
+                  컨텍스트에서만 동작합니다.
+                </p>
+              </header>
+
+              {allPlugins.length === 0 ? (
+                <p className="settings-placeholder">등록된 확장이 없습니다.</p>
+              ) : (
+                <ul className="ext-list">
+                  {allPlugins.map((plugin) => {
+                    const enabled = plugins.enabled[plugin.id] !== false
+                    const expanded = expandedPluginIds.has(plugin.id)
+                    const detailsId = `plugin-details-${plugin.id}`
+                    const initials = getPluginInitials(plugin.name)
+                    const accent = getPluginAccent(plugin.id)
+
+                    return (
+                      <li
+                        key={plugin.id}
+                        className={`ext-row${expanded ? ' is-expanded' : ''}${enabled ? '' : ' is-disabled'}`}
+                      >
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className="ext-row-summary"
+                          aria-expanded={expanded}
+                          aria-controls={detailsId}
+                          onClick={() => togglePluginExpanded(plugin.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              togglePluginExpanded(plugin.id)
+                            }
+                          }}
+                        >
+                          <span
+                            className="ext-row-icon"
+                            style={{ background: accent.gradient, color: accent.fg }}
+                            aria-hidden="true"
+                          >
+                            {initials}
+                          </span>
+
+                          <div className="ext-row-body">
+                            <div className="ext-row-title">
+                              <span className="ext-row-name">{plugin.name}</span>
+                              <span className="ext-row-version">v{plugin.version}</span>
+                            </div>
+                            <p className="ext-row-description">{plugin.description}</p>
+                            <div className="ext-row-meta">
+                              <span className="ext-row-publisher">{plugin.author}</span>
+                              <span className="ext-row-meta-sep">·</span>
+                              <code className="ext-row-id">{plugin.id}</code>
+                            </div>
+                          </div>
+
+                          <div
+                            className="ext-row-actions"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className={`ext-action-btn${enabled ? '' : ' is-primary'}`}
+                              onClick={() => updatePluginEnabled(plugin.id, !enabled)}
+                              aria-pressed={enabled}
+                            >
+                              {enabled ? 'Disable' : 'Enable'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {expanded && (
+                          <div id={detailsId} className="ext-detail">
+                            <div className="ext-detail-header">
+                              <span className="ext-detail-tab is-active">Details</span>
+                            </div>
+
+                            <div className="ext-detail-body">
+                              {plugin.detailedDescription && (
+                                <article className="ext-detail-section">
+                                  <h3 className="ext-detail-section-title">Description</h3>
+                                  <MarkdownLite
+                                    className="ext-detail-prose"
+                                    source={plugin.detailedDescription}
+                                  />
+                                </article>
+                              )}
+
+                              {plugin.preview && (
+                                <article className="ext-detail-section">
+                                  <h3 className="ext-detail-section-title">Preview</h3>
+                                  <div className="ext-preview-grid">
+                                    <div className="ext-preview-cell">
+                                      <header className="ext-preview-header">
+                                        <span className="ext-preview-kind">
+                                          {plugin.preview.inputLabel ?? 'Input'}
+                                        </span>
+                                        {plugin.preview.input.label ? (
+                                          <span className="ext-preview-source">
+                                            {plugin.preview.input.label}
+                                          </span>
+                                        ) : null}
+                                      </header>
+                                      <pre className="ext-preview-block">
+                                        <code>{plugin.preview.input.body}</code>
+                                      </pre>
+                                    </div>
+                                    <div className="ext-preview-cell">
+                                      <header className="ext-preview-header">
+                                        <span className="ext-preview-kind">
+                                          {plugin.preview.outputLabel ?? 'Output'}
+                                        </span>
+                                        {plugin.preview.output.label ? (
+                                          <span className="ext-preview-source">
+                                            {plugin.preview.output.label}
+                                          </span>
+                                        ) : null}
+                                      </header>
+                                      <pre className="ext-preview-block">
+                                        <code>{plugin.preview.output.body}</code>
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </article>
+                              )}
+
+                              <article className="ext-detail-section">
+                                <h3 className="ext-detail-section-title">More info</h3>
+                                <dl className="ext-meta-grid">
+                                  <div>
+                                    <dt>Identifier</dt>
+                                    <dd>
+                                      <code>{plugin.id}</code>
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Version</dt>
+                                    <dd>{plugin.version}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Publisher</dt>
+                                    <dd>{plugin.author}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Status</dt>
+                                    <dd>
+                                      <span
+                                        className={`ext-status-badge${enabled ? ' is-on' : ' is-off'}`}
+                                      >
+                                        {enabled ? 'Enabled' : 'Disabled'}
+                                      </span>
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </article>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
             </section>
           )}
         </main>

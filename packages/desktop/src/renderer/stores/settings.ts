@@ -16,16 +16,22 @@ export interface BatchValidatorSettings {
   autoExpandResults: boolean
 }
 
+export interface PluginsSettings {
+  enabled: Record<string, boolean>
+}
+
 export interface SettingsData {
   general: GeneralSettings
   xmlEditor: XmlEditorSettings
   batchValidator: BatchValidatorSettings
+  plugins: PluginsSettings
 }
 
 export interface PersistedSettingsData {
   general?: Partial<GeneralSettings>
   xmlEditor?: Partial<XmlEditorSettings>
   batchValidator?: Partial<BatchValidatorSettings>
+  plugins?: { enabled?: Record<string, boolean> }
 }
 
 interface SettingsState extends SettingsData {
@@ -34,6 +40,7 @@ interface SettingsState extends SettingsData {
   updateXmlEditorSettings: (updates: Partial<XmlEditorSettings>) => void
   setPreviewEditorTheme: (theme: EditorThemeId | null) => void
   clearPreviewEditorTheme: () => void
+  updatePluginEnabled: (id: string, enabled: boolean) => void
   resetSettings: () => void
 }
 
@@ -48,6 +55,11 @@ const defaultSettings: SettingsData = {
   },
   batchValidator: {
     autoExpandResults: true,
+  },
+  plugins: {
+    enabled: {
+      'odf-chart-style-resolver': true,
+    },
   },
 }
 
@@ -72,6 +84,12 @@ export function mergeSettingsData(
     batchValidator: {
       ...currentState.batchValidator,
       ...persisted.batchValidator,
+    },
+    plugins: {
+      enabled: {
+        ...currentState.plugins.enabled,
+        ...(persisted.plugins?.enabled ?? {}),
+      },
     },
     effectiveEditorTheme: currentState.previewEditorTheme ?? xmlEditor.editorTheme,
   }
@@ -109,6 +127,16 @@ export const useSettingsStore = create<SettingsState>()(
           effectiveEditorTheme: state.xmlEditor.editorTheme,
         })),
 
+      updatePluginEnabled: (id, enabled) =>
+        set((state) => ({
+          plugins: {
+            enabled: {
+              ...state.plugins.enabled,
+              [id]: enabled,
+            },
+          },
+        })),
+
       resetSettings: () =>
         set({
           ...defaultSettings,
@@ -123,6 +151,7 @@ export const useSettingsStore = create<SettingsState>()(
         general: state.general,
         xmlEditor: state.xmlEditor,
         batchValidator: state.batchValidator,
+        plugins: state.plugins,
       }),
       merge: (persistedState, currentState) =>
         mergeSettingsData(persistedState as PersistedSettingsData | undefined, currentState),

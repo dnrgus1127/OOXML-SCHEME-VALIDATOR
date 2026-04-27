@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { getEditorThemeLabel, registerEditorThemes } from '../constants/editorTheme'
 import { useSettingsStore } from '../stores/settings'
+import { getActivePlugins, type PluginContext } from '../plugins'
+
+type PluginContextProvider = () => PluginContext | null
 
 interface XmlEditorProps {
   content: string
   partPath: string
   onChange: (content: string) => void
+  getPluginContext?: PluginContextProvider
 }
 
 // Format XML with proper indentation
@@ -55,15 +59,21 @@ function formatXml(xml: string): string {
   }
 }
 
-export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
+export function XmlEditor({ content, partPath, onChange, getPluginContext }: XmlEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)
+  const hoverProviderRef = useRef<{ dispose: () => void } | null>(null)
+  const pluginCtxProviderRef = useRef<PluginContextProvider | undefined>(getPluginContext)
 
   const [localContent, setLocalContent] = useState(content)
   const [isMonacoReady, setIsMonacoReady] = useState(false)
   const [monacoLoadError, setMonacoLoadError] = useState(false)
   const editorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
+
+  useEffect(() => {
+    pluginCtxProviderRef.current = getPluginContext
+  }, [getPluginContext])
 
   useEffect(() => {
     let disposed = false
@@ -99,6 +109,43 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
           onChange(value)
         })
 
+        hoverProviderRef.current = monaco.languages.registerHoverProvider('xml', {
+          provideHover: async (model, position, token) => {
+            const provider = pluginCtxProviderRef.current
+            if (!provider) return null
+            const ctx = provider()
+            if (!ctx) return null
+            if (model.uri.toString() !== editorRef.current?.getModel()?.uri.toString()) {
+              return null
+            }
+
+            const enabled = useSettingsStore.getState().plugins.enabled
+            const active = getActivePlugins(ctx, enabled)
+
+            for (const plugin of active) {
+              if (!plugin.hooks.provideMonacoHover) continue
+              try {
+                const result = await plugin.hooks.provideMonacoHover(ctx, {
+                  monaco,
+                  model,
+                  position,
+                  token,
+                })
+                if (token.isCancellationRequested) return null
+                if (result) {
+                  return {
+                    contents: result.contents.map((value) => ({ value })),
+                    range: result.range,
+                  }
+                }
+              } catch {
+                continue
+              }
+            }
+            return null
+          },
+        })
+
         setIsMonacoReady(true)
       } catch {
         setMonacoLoadError(true)
@@ -109,6 +156,8 @@ export function XmlEditor({ content, partPath, onChange }: XmlEditorProps) {
 
     return () => {
       disposed = true
+      hoverProviderRef.current?.dispose()
+      hoverProviderRef.current = null
       editorRef.current?.dispose()
       editorRef.current = null
       monacoRef.current = null
