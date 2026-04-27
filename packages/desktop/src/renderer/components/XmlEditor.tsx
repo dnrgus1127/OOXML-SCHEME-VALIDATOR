@@ -10,6 +10,10 @@ interface XmlEditorProps {
   partPath: string
   onChange: (content: string) => void
   getPluginContext?: PluginContextProvider
+  compareMode?: boolean
+  comparisonContent?: string | null
+  primaryLabel?: string
+  comparisonLabel?: string
 }
 
 // Format XML with proper indentation
@@ -59,9 +63,19 @@ function formatXml(xml: string): string {
   }
 }
 
-export function XmlEditor({ content, partPath, onChange, getPluginContext }: XmlEditorProps) {
+export function XmlEditor({
+  content,
+  partPath,
+  onChange,
+  getPluginContext,
+  compareMode = false,
+  comparisonContent = null,
+  primaryLabel,
+  comparisonLabel,
+}: XmlEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<any>(null)
+  const diffEditorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)
   const hoverProviderRef = useRef<{ dispose: () => void } | null>(null)
   const pluginCtxProviderRef = useRef<PluginContextProvider | undefined>(getPluginContext)
@@ -79,7 +93,8 @@ export function XmlEditor({ content, partPath, onChange, getPluginContext }: Xml
     let disposed = false
 
     async function initMonaco() {
-      if (!editorContainerRef.current || editorRef.current) return
+      if (!editorContainerRef.current) return
+      if (editorRef.current || diffEditorRef.current) return
 
       try {
         const monaco = await import('monaco-editor')
@@ -87,6 +102,30 @@ export function XmlEditor({ content, partPath, onChange, getPluginContext }: Xml
 
         registerEditorThemes(monaco)
         monacoRef.current = monaco
+
+        if (compareMode) {
+          const formattedPrimary = formatXml(content)
+          const formattedComparison = formatXml(comparisonContent ?? '')
+          const originalModel = monaco.editor.createModel(formattedPrimary, 'xml')
+          const modifiedModel = monaco.editor.createModel(formattedComparison, 'xml')
+
+          diffEditorRef.current = monaco.editor.createDiffEditor(editorContainerRef.current, {
+            theme: editorTheme,
+            automaticLayout: true,
+            readOnly: true,
+            originalEditable: false,
+            renderSideBySide: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            fontSize: 12,
+            lineHeight: 18,
+            ignoreTrimWhitespace: false,
+          })
+          diffEditorRef.current.setModel({ original: originalModel, modified: modifiedModel })
+          setIsMonacoReady(true)
+          return
+        }
+
         editorRef.current = monaco.editor.create(editorContainerRef.current, {
           value: localContent,
           language: 'xml',
@@ -158,18 +197,41 @@ export function XmlEditor({ content, partPath, onChange, getPluginContext }: Xml
       disposed = true
       hoverProviderRef.current?.dispose()
       hoverProviderRef.current = null
-      editorRef.current?.dispose()
+
+      const diffModel = diffEditorRef.current?.getModel?.()
+      diffEditorRef.current?.dispose?.()
+      diffEditorRef.current = null
+      diffModel?.original?.dispose?.()
+      diffModel?.modified?.dispose?.()
+
+      editorRef.current?.dispose?.()
       editorRef.current = null
       monacoRef.current = null
+      setIsMonacoReady(false)
     }
-  }, [])
+  }, [compareMode])
 
   useEffect(() => {
-    if (!monacoRef.current || !editorRef.current) return
+    if (!monacoRef.current) return
     monacoRef.current.editor.setTheme(editorTheme)
   }, [editorTheme])
 
   useEffect(() => {
+    if (compareMode) {
+      if (!monacoRef.current || !diffEditorRef.current) return
+      const monaco = monacoRef.current
+      const formattedPrimary = formatXml(content)
+      const formattedComparison = formatXml(comparisonContent ?? '')
+
+      const oldModel = diffEditorRef.current.getModel?.()
+      const originalModel = monaco.editor.createModel(formattedPrimary, 'xml')
+      const modifiedModel = monaco.editor.createModel(formattedComparison, 'xml')
+      diffEditorRef.current.setModel({ original: originalModel, modified: modifiedModel })
+      oldModel?.original?.dispose?.()
+      oldModel?.modified?.dispose?.()
+      return
+    }
+
     const formatted = formatXml(content)
     setLocalContent(formatted)
     onChange(formatted)
@@ -178,9 +240,10 @@ export function XmlEditor({ content, partPath, onChange, getPluginContext }: Xml
       editorRef.current.setValue(formatted)
       editorRef.current.trigger('xml-editor', 'editor.unfoldAll', null)
     }
-  }, [content, partPath])
+  }, [content, comparisonContent, partPath, compareMode])
 
   const handleFormat = () => {
+    if (compareMode) return
     const result = formatXml(editorRef.current?.getValue() ?? localContent)
     setLocalContent(result)
     onChange(result)
@@ -190,33 +253,56 @@ export function XmlEditor({ content, partPath, onChange, getPluginContext }: Xml
   }
 
   const handleCollapseAll = () => {
+    if (compareMode) return
     editorRef.current?.trigger('xml-editor', 'editor.foldAll', null)
   }
 
   const handleExpandAll = () => {
+    if (compareMode) return
     editorRef.current?.trigger('xml-editor', 'editor.unfoldAll', null)
   }
 
   return (
-    <div className="xml-editor" data-editor-theme={editorTheme}>
+    <div
+      className={`xml-editor${compareMode ? ' xml-editor--compare' : ''}`}
+      data-editor-theme={editorTheme}
+    >
       <div className="editor-header">
         <div className="editor-meta">
           <span className="part-path">{partPath}</span>
+          {compareMode ? (
+            <span className="compare-labels">
+              <span className="compare-label compare-label--primary">
+                ◀ {primaryLabel ?? 'Primary'}
+              </span>
+              <span className="compare-label compare-label--comparison">
+                {comparisonLabel ?? 'Comparison'} ▶
+              </span>
+            </span>
+          ) : null}
           <span className="editor-theme-badge" aria-label={`Current editor theme: ${editorTheme}`}>
             {getEditorThemeLabel(editorTheme)}
           </span>
         </div>
         <div className="editor-actions">
-          <button onClick={handleCollapseAll} className="editor-btn" disabled={!isMonacoReady}>
+          <button
+            onClick={handleCollapseAll}
+            className="editor-btn"
+            disabled={!isMonacoReady || compareMode}
+          >
             전체 접기
           </button>
-          <button onClick={handleExpandAll} className="editor-btn" disabled={!isMonacoReady}>
+          <button
+            onClick={handleExpandAll}
+            className="editor-btn"
+            disabled={!isMonacoReady || compareMode}
+          >
             전체 펼치기
           </button>
           <button
             onClick={handleFormat}
             className="editor-btn"
-            disabled={!isMonacoReady && !monacoLoadError}
+            disabled={(!isMonacoReady && !monacoLoadError) || compareMode}
           >
             Format
           </button>

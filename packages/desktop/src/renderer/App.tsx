@@ -138,6 +138,7 @@ export default function App() {
   const loadDocument = useDocumentStore((state) => state.loadDocument)
   const saveDocument = useDocumentStore((state) => state.saveDocument)
   const validateDocument = useDocumentStore((state) => state.validate)
+  const loadComparison = useDocumentStore((state) => state.loadComparison)
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const effectiveEditorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
   const isMac = navigator.platform.includes('Mac')
@@ -242,12 +243,39 @@ export default function App() {
       }
 
       setRecentError(null)
+
+      // 2개 파일이 모두 XML Editor 호환 포맷이면 Compare 모드로 진입
+      if (filePaths.length === 2 && filePaths.every(isSupportedOfficePath)) {
+        const [primaryPath, comparisonPath] = filePaths
+        if (!primaryPath || !comparisonPath) return
+
+        setBatchInitialFilePaths(null)
+        setCurrentScreen('xml-editor')
+        setFilePath(primaryPath)
+
+        const loaded = await loadDocument(primaryPath)
+        if (!loaded) return
+
+        await recordRecentFile(primaryPath, 'xml-editor')
+        await loadComparison(comparisonPath)
+        return
+      }
+
       setBatchInitialFilePaths(filePaths)
       setCurrentScreen('batch-validator')
     })
 
     return cleanup
-  }, [closeSettings, confirmFileChangeIfNeeded, currentScreen, isSettingsOpen])
+  }, [
+    closeSettings,
+    confirmFileChangeIfNeeded,
+    currentScreen,
+    isSettingsOpen,
+    loadComparison,
+    loadDocument,
+    recordRecentFile,
+    setFilePath,
+  ])
 
   useEffect(() => {
     const onDragEnter = (event: DragEvent) => {
@@ -287,7 +315,14 @@ export default function App() {
         return
       }
 
-      if (droppedPaths.length > 1 && droppedPaths.some((path) => !isBatchOfficePath(path))) {
+      const isCompareDrop =
+        droppedPaths.length === 2 && droppedPaths.every(isSupportedOfficePath)
+
+      if (
+        !isCompareDrop &&
+        droppedPaths.length > 1 &&
+        droppedPaths.some((path) => !isBatchOfficePath(path))
+      ) {
         setRecentError('ODF files can be dropped only one at a time in XML Editor.')
         return
       }

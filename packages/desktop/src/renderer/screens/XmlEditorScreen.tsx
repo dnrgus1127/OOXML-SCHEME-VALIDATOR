@@ -49,6 +49,13 @@ export function XmlEditorScreen({
     saveDocumentAs,
     validate,
     clearError,
+    isCompareMode,
+    comparisonFilePath,
+    comparisonDocumentData,
+    comparisonPartContent,
+    partDiffStatus,
+    loadComparison,
+    exitCompare,
   } = useDocumentStore()
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const revalidateShortcut = useSettingsStore((state) => state.xmlEditor.revalidateShortcut)
@@ -60,7 +67,17 @@ export function XmlEditorScreen({
   const [isSchemaReferenceLoading, setIsSchemaReferenceLoading] = useState(false)
   const [schemaReferenceError, setSchemaReferenceError] = useState<string | null>(null)
 
-  const isDirty = modifiedContent !== null && modifiedContent !== partContent
+  const isDirty = !isCompareMode && modifiedContent !== null && modifiedContent !== partContent
+
+  const handleToggleCompare = useCallback(async () => {
+    if (isCompareMode) {
+      exitCompare()
+      return
+    }
+    const path = await window.electronAPI.openFile()
+    if (!path) return
+    await loadComparison(path)
+  }, [isCompareMode, exitCompare, loadComparison])
 
   const confirmFileChangeIfNeeded = useCallback(async () => {
     if (!isDirty) return true
@@ -305,6 +322,8 @@ export function XmlEditorScreen({
         filePath={filePath}
         isDirty={isDirty}
         onNavigateHome={onNavigateHome}
+        isCompareMode={isCompareMode}
+        onToggleCompare={() => void handleToggleCompare()}
       />
 
       {error && (
@@ -330,6 +349,10 @@ export function XmlEditorScreen({
                 parts={documentData.parts}
                 selectedPart={selectedPart}
                 onSelectPart={handleSelectPart}
+                comparisonParts={
+                  isCompareMode ? comparisonDocumentData?.parts : undefined
+                }
+                partDiffStatus={isCompareMode ? partDiffStatus : undefined}
               />
             </aside>
 
@@ -340,6 +363,12 @@ export function XmlEditorScreen({
                   partPath={selectedPart}
                   onChange={handleContentChange}
                   getPluginContext={getPluginContext}
+                  compareMode={isCompareMode}
+                  comparisonContent={isCompareMode ? comparisonPartContent : null}
+                  primaryLabel={filePath ? filePath.split(/[\\/]/).pop() : undefined}
+                  comparisonLabel={
+                    comparisonFilePath ? comparisonFilePath.split(/[\\/]/).pop() : undefined
+                  }
                 />
               ) : isLoading ? (
                 <div className="loading">Loading...</div>

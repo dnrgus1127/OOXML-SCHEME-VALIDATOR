@@ -50,6 +50,13 @@ interface ValidationResult {
   summary?: ValidationSummary
 }
 
+export type PartDiffStatus =
+  | 'identical'
+  | 'modified'
+  | 'only-primary'
+  | 'only-comparison'
+  | 'pending'
+
 export function isOriginalDocumentPath(
   filePath: string | null,
   originalFilePath: string | null
@@ -58,7 +65,7 @@ export function isOriginalDocumentPath(
 }
 
 interface DocumentState {
-  // State
+  // Primary document state
   filePath: string | null
   originalFilePath: string | null
   fileData: string | null // base64
@@ -70,6 +77,14 @@ interface DocumentState {
   isLoading: boolean
   error: string | null
 
+  // Comparison document state
+  isCompareMode: boolean
+  comparisonFilePath: string | null
+  comparisonFileData: string | null
+  comparisonDocumentData: DocumentData | null
+  comparisonPartContent: string | null
+  partDiffStatus: Record<string, PartDiffStatus>
+
   // Actions
   setFilePath: (path: string | null) => void
   shouldWarnBeforeOverwrite: () => boolean
@@ -79,6 +94,8 @@ interface DocumentState {
   saveDocument: (path: string) => Promise<boolean>
   saveDocumentAs: (path: string) => Promise<boolean>
   validate: () => Promise<void>
+  loadComparison: (path: string) => Promise<boolean>
+  exitCompare: () => void
   clearError: () => void
   reset: () => void
 }
@@ -94,6 +111,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   validationResults: null,
   isLoading: false,
   error: null,
+
+  isCompareMode: false,
+  comparisonFilePath: null,
+  comparisonFileData: null,
+  comparisonDocumentData: null,
+  comparisonPartContent: null,
+  partDiffStatus: {},
 
   setFilePath: (path) => set({ filePath: path }),
 
@@ -130,6 +154,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         modifiedContent: null,
         validationResults: null,
         isLoading: false,
+        // 새 문서 로드 시 비교 상태 해제
+        isCompareMode: false,
+        comparisonFilePath: null,
+        comparisonFileData: null,
+        comparisonDocumentData: null,
+        comparisonPartContent: null,
+        partDiffStatus: {},
       })
       return true
     } catch (error) {
@@ -142,11 +173,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   selectPart: async (partPath) => {
-    const { fileData, modifiedContent, selectedPart } = get()
+    const state = get()
+    const { fileData, modifiedContent, selectedPart, isCompareMode } = state
     if (!fileData) return
 
-    // Save modified content before switching
-    if (modifiedContent !== null && selectedPart) {
+    // 비교 모드가 아닐 때만 수정 내용을 패키지에 반영(read-only 보장)
+    if (!isCompareMode && modifiedContent !== null && selectedPart) {
       const updateResult = await window.electronAPI.updatePart(
         fileData,
         selectedPart,
@@ -161,20 +193,44 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     set({ isLoading: true, error: null })
 
     try {
-      const currentFileData = get().fileData!
-      const result = await window.electronAPI.getPart(
-        currentFileData,
-        partPath,
-        get().filePath ?? undefined
-      )
+      const fresh = get()
+      const currentFileData = fresh.fileData!
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to get part content')
+      const primaryHas = fresh.documentData?.parts[partPath] !== undefined
+      const comparisonHas =
+        fresh.isCompareMode &&
+        fresh.comparisonDocumentData?.parts[partPath] !== undefined
+
+      const [primaryResult, comparisonResult] = await Promise.all([
+        primaryHas
+          ? window.electronAPI.getPart(
+              currentFileData,
+              partPath,
+              fresh.filePath ?? undefined
+            )
+          : Promise.resolve(null),
+        comparisonHas && fresh.comparisonFileData
+          ? window.electronAPI.getPart(
+              fresh.comparisonFileData,
+              partPath,
+              fresh.comparisonFilePath ?? undefined
+            )
+          : Promise.resolve(null),
+      ])
+
+      if (primaryResult && !primaryResult.success) {
+        throw new Error(primaryResult.error || 'Failed to get part content')
+      }
+      if (comparisonResult && !comparisonResult.success) {
+        throw new Error(comparisonResult.error || 'Failed to get comparison part content')
       }
 
       set({
         selectedPart: partPath,
-        partContent: result.data!,
+        partContent: primaryResult?.data ?? '',
+        comparisonPartContent: fresh.isCompareMode
+          ? (comparisonResult?.data ?? '')
+          : null,
         modifiedContent: null,
         isLoading: false,
       })
@@ -311,6 +367,85 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
+  loadComparison: async (path) => {
+    const state = get()
+    if (!state.fileData || !state.documentData) {
+      set({ error: '먼저 비교의 기준이 될 파일을 열어주세요.' })
+      return false
+    }
+
+    set({ isLoading: true, error: null })
+
+    try {
+      const readResult = await window.electronAPI.readFile(path)
+      if (!readResult.success) {
+        throw new Error(readResult.error || 'Failed to read comparison file')
+      }
+      const comparisonFileData = readResult.data!
+
+      const parseResult = await window.electronAPI.parseDocument(comparisonFileData, path)
+      if (!parseResult.success) {
+        throw new Error(parseResult.error || 'Failed to parse comparison file')
+      }
+
+      const comparisonDocumentData: DocumentData = parseResult.data
+
+      const primaryParts = state.documentData.parts
+      const comparisonParts = comparisonDocumentData.parts
+      const allPaths = Array.from(
+        new Set([...Object.keys(primaryParts), ...Object.keys(comparisonParts)])
+      )
+
+      // 1차: 존재 여부만 즉시 판정 → 양쪽에 있는 part는 'pending'으로 두고 백그라운드 비교
+      const initialStatus: Record<string, PartDiffStatus> = {}
+      const bothSidePaths: string[] = []
+      for (const partPath of allPaths) {
+        const inPrimary = primaryParts[partPath] !== undefined
+        const inComparison = comparisonParts[partPath] !== undefined
+        if (inPrimary && !inComparison) initialStatus[partPath] = 'only-primary'
+        else if (!inPrimary && inComparison) initialStatus[partPath] = 'only-comparison'
+        else {
+          initialStatus[partPath] = 'pending'
+          bothSidePaths.push(partPath)
+        }
+      }
+
+      set({
+        isCompareMode: true,
+        comparisonFilePath: path,
+        comparisonFileData,
+        comparisonDocumentData,
+        partDiffStatus: initialStatus,
+        // 비교 모드 진입 시 편집 보류분은 폐기(read-only)
+        modifiedContent: null,
+        comparisonPartContent: null,
+        isLoading: false,
+      })
+
+      // 2차: 양쪽에 존재하는 part 텍스트를 병렬 fetch해서 점진 비교
+      void compareBothSideParts(bothSidePaths)
+
+      return true
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        isLoading: false,
+      })
+      return false
+    }
+  },
+
+  exitCompare: () => {
+    set({
+      isCompareMode: false,
+      comparisonFilePath: null,
+      comparisonFileData: null,
+      comparisonDocumentData: null,
+      comparisonPartContent: null,
+      partDiffStatus: {},
+    })
+  },
+
   clearError: () => set({ error: null }),
 
   reset: () =>
@@ -325,5 +460,55 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       validationResults: null,
       isLoading: false,
       error: null,
+      isCompareMode: false,
+      comparisonFilePath: null,
+      comparisonFileData: null,
+      comparisonDocumentData: null,
+      comparisonPartContent: null,
+      partDiffStatus: {},
     }),
 }))
+
+async function compareBothSideParts(partPaths: string[]): Promise<void> {
+  // 청크 단위 병렬 처리(과도한 IPC 폭주 방지)
+  const concurrency = 6
+  for (let i = 0; i < partPaths.length; i += concurrency) {
+    const chunk = partPaths.slice(i, i + concurrency)
+    await Promise.all(chunk.map(comparePartOnce))
+  }
+}
+
+async function comparePartOnce(partPath: string): Promise<void> {
+  const state = useDocumentStore.getState()
+  if (!state.isCompareMode) return
+  if (!state.fileData || !state.comparisonFileData) return
+
+  try {
+    const [primaryResult, comparisonResult] = await Promise.all([
+      window.electronAPI.getPart(
+        state.fileData,
+        partPath,
+        state.filePath ?? undefined
+      ),
+      window.electronAPI.getPart(
+        state.comparisonFileData,
+        partPath,
+        state.comparisonFilePath ?? undefined
+      ),
+    ])
+
+    // 비교 도중 사용자가 Compare 모드를 종료했으면 결과 무시
+    if (!useDocumentStore.getState().isCompareMode) return
+
+    if (!primaryResult?.success || !comparisonResult?.success) return
+
+    const status: PartDiffStatus =
+      primaryResult.data === comparisonResult.data ? 'identical' : 'modified'
+
+    useDocumentStore.setState((current) => ({
+      partDiffStatus: { ...current.partDiffStatus, [partPath]: status },
+    }))
+  } catch {
+    // 단일 part 비교 실패는 조용히 pending 유지
+  }
+}

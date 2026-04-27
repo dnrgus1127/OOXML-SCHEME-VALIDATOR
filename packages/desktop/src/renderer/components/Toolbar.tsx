@@ -12,6 +12,9 @@ interface ToolbarProps {
   filePath: string | null
   isDirty: boolean
   onNavigateHome?: () => void
+  // Compare 모드
+  isCompareMode?: boolean
+  onToggleCompare?: () => void
 }
 
 export function Toolbar({
@@ -25,8 +28,11 @@ export function Toolbar({
   filePath,
   isDirty,
   onNavigateHome,
+  isCompareMode = false,
+  onToggleCompare,
 }: ToolbarProps) {
   const fileName = filePath ? filePath.split(/[\\/]/).pop() : null
+  const writeDisabled = !hasDocument || isCompareMode
 
   return (
     <WindowTopBar
@@ -34,7 +40,7 @@ export function Toolbar({
       leading={
         <>
           {onNavigateHome && <HomeNavigationButton onNavigateHome={onNavigateHome} />}
-          <button onClick={onOpenFile} className="toolbar-btn">
+          <button onClick={onOpenFile} className="toolbar-btn" disabled={isCompareMode}>
             📂 {openLabel}
           </button>
           {onOpenSettings && (
@@ -45,16 +51,26 @@ export function Toolbar({
           <button
             onClick={onSave}
             className={`toolbar-btn${isDirty ? ' toolbar-btn--dirty' : ''}`}
-            disabled={!hasDocument}
+            disabled={writeDisabled}
           >
             💾 Save
           </button>
-          <button onClick={onSaveAs} className="toolbar-btn" disabled={!hasDocument}>
+          <button onClick={onSaveAs} className="toolbar-btn" disabled={writeDisabled}>
             💾 Save As
           </button>
-          <button onClick={onValidate} className="toolbar-btn" disabled={!hasDocument}>
+          <button onClick={onValidate} className="toolbar-btn" disabled={writeDisabled}>
             ✓ Validate
           </button>
+          {onToggleCompare && (
+            <button
+              onClick={onToggleCompare}
+              className={`toolbar-btn${isCompareMode ? ' toolbar-btn--active' : ''}`}
+              disabled={!hasDocument}
+              title={isCompareMode ? '비교 모드 종료' : '다른 파일과 비교'}
+            >
+              🔀 {isCompareMode ? 'Exit Compare' : 'Compare with…'}
+            </button>
+          )}
         </>
       }
       center={
@@ -62,6 +78,7 @@ export function Toolbar({
           <span className={`file-name${isDirty ? ' file-name--dirty' : ''}`}>
             {isDirty && '● '}
             {fileName}
+            {isCompareMode && <span className="compare-mode-badge"> · Compare</span>}
           </span>
         )
       }
