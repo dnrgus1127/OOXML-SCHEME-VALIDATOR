@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   editorThemeOptions,
   getEditorThemeLabel,
@@ -21,6 +21,50 @@ interface ShortcutHelpItem {
   shortcut: string
   isCustomizable?: boolean
 }
+
+interface SectionMeta {
+  id: SettingsSection
+  label: string
+  glyph: string
+  desc: string
+  title: string
+  sub: string
+}
+
+const SECTIONS: SectionMeta[] = [
+  {
+    id: 'general',
+    label: '기본',
+    glyph: '◐',
+    desc: '앱 동작 · 시작 옵션',
+    title: '기본 설정',
+    sub: '앱이 시작되고 동작하는 방식을 설정합니다.',
+  },
+  {
+    id: 'xml-editor',
+    label: 'XML Editor',
+    glyph: '⌘',
+    desc: '에디터 테마 · 단축키',
+    title: 'XML Editor',
+    sub: '에디터 테마와 단축키, 자동 검증 옵션을 설정합니다.',
+  },
+  {
+    id: 'batch-validator',
+    label: 'Batch Validator',
+    glyph: '✓',
+    desc: '일괄 검증 옵션',
+    title: 'Batch Validator',
+    sub: '일괄 검증 화면의 동작을 설정합니다.',
+  },
+  {
+    id: 'extensions',
+    label: 'Extensions',
+    glyph: '⎔',
+    desc: '확장 · 플러그인 관리',
+    title: 'Extensions',
+    sub: 'XML Editor에서 동작하는 보조 기능을 켜고 끌 수 있습니다.',
+  },
+]
 
 function getPluginInitials(name: string): string {
   const words = name
@@ -80,6 +124,50 @@ const xmlEditorShortcutHelp: ShortcutHelpItem[] = [
   },
 ]
 
+function Row({
+  label,
+  hint,
+  align = 'center',
+  children,
+}: {
+  label: string
+  hint?: string
+  align?: 'center' | 'start'
+  children: ReactNode
+}) {
+  return (
+    <div className={`settings-row align-${align}`}>
+      <div className="settings-row-label">
+        <div className="settings-row-label-text">{label}</div>
+        {hint && <div className="settings-row-label-hint">{hint}</div>}
+      </div>
+      <div className="settings-row-control">{children}</div>
+    </div>
+  )
+}
+
+function Toggle({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: boolean
+  onChange: (next: boolean) => void
+  ariaLabel?: string
+}) {
+  return (
+    <button
+      type="button"
+      className={`settings-toggle ${value ? 'on' : 'off'}`}
+      onClick={() => onChange(!value)}
+      aria-pressed={value}
+      aria-label={ariaLabel}
+    >
+      <span className="settings-toggle-knob" />
+    </button>
+  )
+}
+
 export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const {
     xmlEditor,
@@ -94,9 +182,8 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [shortcutInput, setShortcutInput] = useState(xmlEditor.revalidateShortcut)
   const [shortcutError, setShortcutError] = useState<string | null>(null)
-  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false)
   const [expandedPluginIds, setExpandedPluginIds] = useState<Set<string>>(new Set())
-  const themeMenuRef = useRef<HTMLDivElement>(null)
+  const themeListRef = useRef<HTMLDivElement>(null)
 
   const togglePluginExpanded = (id: string) => {
     setExpandedPluginIds((prev) => {
@@ -107,35 +194,15 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
     })
   }
 
-  const sections = useMemo(
-    () => [
-      { id: 'general' as const, label: '기본' },
-      { id: 'xml-editor' as const, label: 'XML Editor' },
-      { id: 'batch-validator' as const, label: 'Batch Validator' },
-      { id: 'extensions' as const, label: 'Extensions' },
-    ],
-    []
-  )
-
   useEffect(() => {
     setShortcutInput(xmlEditor.revalidateShortcut)
   }, [xmlEditor.revalidateShortcut])
 
   useEffect(() => {
-    if (!isThemeMenuOpen) {
+    return () => {
       clearPreviewEditorTheme()
-      return
     }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!themeMenuRef.current?.contains(event.target as Node)) {
-        setIsThemeMenuOpen(false)
-      }
-    }
-
-    window.addEventListener('mousedown', handlePointerDown)
-    return () => window.removeEventListener('mousedown', handlePointerDown)
-  }, [clearPreviewEditorTheme, isThemeMenuOpen])
+  }, [clearPreviewEditorTheme])
 
   const handleShortcutInputChange = (value: string) => {
     setShortcutInput(value)
@@ -159,10 +226,10 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const handleThemeSelect = (themeId: EditorThemeId) => {
     updateXmlEditorSettings({ editorTheme: themeId })
     setPreviewEditorTheme(themeId)
-    setIsThemeMenuOpen(false)
   }
 
   const displayedTheme = previewEditorTheme ?? xmlEditor.editorTheme
+  const activeSectionMeta = SECTIONS.find((s) => s.id === activeSection) ?? SECTIONS[0]!
 
   return (
     <div
@@ -171,374 +238,385 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
       aria-modal="true"
       aria-labelledby="settings-title"
     >
-      <header className="settings-header">
-        <h1 id="settings-title">Settings</h1>
-        <button onClick={onClose} className="toolbar-btn">
-          Close
+      <header className="settings-topbar">
+        <div className="settings-topbar-title" id="settings-title">
+          OOXML Validator — Settings
+        </div>
+        <button
+          type="button"
+          className="settings-topbar-close"
+          onClick={onClose}
+          aria-label="설정 닫기"
+        >
+          ← Close
         </button>
       </header>
 
-      <div className="settings-layout">
+      <div className="settings-shell">
         <aside className="settings-sidebar" aria-label="Settings sections">
+          <div className="settings-sidebar-eyebrow">
+            <span className="dot" />
+            <span>SETTINGS</span>
+          </div>
+          <h2 className="settings-sidebar-title">
+            Configure
+            <br />
+            <em>your engine.</em>
+          </h2>
+          <p className="settings-sidebar-tagline">
+            에디터 테마, 검증 옵션과 확장을
+            <br />
+            한 화면에서 관리하세요.
+          </p>
+
           <nav className="settings-nav">
-            {sections.map((section) => (
+            {SECTIONS.map((s) => (
               <button
-                key={section.id}
+                key={s.id}
                 type="button"
-                className={`settings-nav-item${activeSection === section.id ? ' active' : ''}`}
-                onClick={() => setActiveSection(section.id)}
-                aria-current={activeSection === section.id ? 'page' : undefined}
+                className={`settings-nav-item${activeSection === s.id ? ' is-active' : ''}`}
+                onClick={() => setActiveSection(s.id)}
+                aria-current={activeSection === s.id ? 'page' : undefined}
               >
-                {section.label}
+                <span className="settings-nav-glyph">{s.glyph}</span>
+                <span className="settings-nav-text">
+                  <span className="settings-nav-label">{s.label}</span>
+                  <span className="settings-nav-desc">{s.desc}</span>
+                </span>
+                <span className="settings-nav-caret">›</span>
               </button>
             ))}
           </nav>
         </aside>
 
-        <main className="settings-content" aria-live="polite">
-          {activeSection === 'general' && (
-            <section className="settings-section" aria-labelledby="settings-general-title">
-              <h2 id="settings-general-title">기본 설정</h2>
-              <p className="settings-placeholder">
-                기본 설정 항목은 추후 추가될 예정입니다.
-              </p>
-            </section>
-          )}
-
-          {activeSection === 'xml-editor' && (
-            <section className="settings-section" aria-labelledby="settings-xml-editor-title">
-              <h2 id="settings-xml-editor-title">XML Editor 설정</h2>
-
-              <div className="settings-field-row">
-                <label htmlFor="validate-on-open" className="settings-toggle-label">
-                  <span>파일 오픈 시 즉시 검증</span>
-                  <input
-                    id="validate-on-open"
-                    type="checkbox"
-                    checked={xmlEditor.validateOnOpen}
-                    onChange={(event) =>
-                      updateXmlEditorSettings({ validateOnOpen: event.target.checked })
-                    }
-                  />
-                </label>
-                <p className="settings-help-text">
-                  파일을 열자마자 문서 검증을 자동으로 실행합니다.
-                </p>
+        <main className="settings-main" aria-live="polite">
+          <div className="settings-section-wrap">
+            <header className="settings-section-header">
+              <div className="settings-section-eyebrow">
+                <span>{activeSectionMeta.glyph}</span>
+                <span>SECTION · {activeSectionMeta.label.toUpperCase()}</span>
               </div>
+              <h1 className="settings-section-title">{activeSectionMeta.title}</h1>
+              <p className="settings-section-sub">{activeSectionMeta.sub}</p>
+            </header>
 
-              <div className="settings-field-row">
-                <div>
-                  <h3 className="settings-subtitle">에디터 테마</h3>
-                  <p className="settings-help-text">
-                    Monaco Editor가 기본 제공하는 모든 테마를 드롭다운에서 선택할 수 있습니다.
-                    항목에 마우스를 올리면 앱과 에디터에 즉시 미리보기 됩니다.
+            <div className="settings-section-body">
+              {activeSection === 'general' && (
+                <div className="settings-form">
+                  <p className="settings-placeholder">
+                    기본 설정 항목은 추후 추가될 예정입니다.
                   </p>
                 </div>
+              )}
 
-                <div
-                  className={`settings-select${isThemeMenuOpen ? ' is-open' : ''}`}
-                  ref={themeMenuRef}
-                  onMouseLeave={() => {
-                    if (isThemeMenuOpen) {
-                      clearPreviewEditorTheme()
-                    }
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="settings-select-trigger"
-                    aria-haspopup="listbox"
-                    aria-expanded={isThemeMenuOpen}
-                    onClick={() => setIsThemeMenuOpen((open) => !open)}
+              {activeSection === 'xml-editor' && (
+                <div className="settings-form">
+                  <Row
+                    label="파일 오픈 시 즉시 검증"
+                    hint="파일을 열자마자 문서 검증을 자동으로 실행합니다."
                   >
-                    <span className="settings-select-trigger-copy">
-                      <span className="settings-select-label">현재 선택</span>
-                      <span className="settings-select-value">
-                        {getEditorThemeLabel(xmlEditor.editorTheme)}
-                      </span>
-                    </span>
-                    <span
-                      className="editor-theme-preview"
-                      style={getEditorThemePreviewVars(displayedTheme)}
-                      aria-hidden="true"
-                    >
-                      <span className="editor-theme-preview__gutter" />
-                      <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
-                      <span className="editor-theme-preview__line" />
-                      <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
-                    </span>
-                  </button>
+                    <Toggle
+                      value={xmlEditor.validateOnOpen}
+                      onChange={(next) => updateXmlEditorSettings({ validateOnOpen: next })}
+                      ariaLabel="파일 오픈 시 즉시 검증"
+                    />
+                  </Row>
 
-                  {isThemeMenuOpen && (
-                    <div className="settings-select-menu" role="listbox" aria-label="Editor theme">
-                      {editorThemeOptions.map((theme) => {
-                        const selected = xmlEditor.editorTheme === theme.id
+                  <Row
+                    label="에디터 테마"
+                    hint="Monaco Editor가 제공하는 모든 테마를 선택할 수 있습니다. 항목에 마우스를 올리면 즉시 미리보기됩니다."
+                    align="start"
+                  >
+                    <div className="settings-theme-picker">
+                      <div className="settings-theme-current">
+                        <div className="settings-theme-current-text">
+                          <span className="settings-theme-current-label">현재 선택</span>
+                          <span className="settings-theme-current-value">
+                            {getEditorThemeLabel(xmlEditor.editorTheme)}
+                          </span>
+                        </div>
+                        <span
+                          className="editor-theme-preview editor-theme-preview--lg"
+                          style={getEditorThemePreviewVars(displayedTheme)}
+                          aria-hidden="true"
+                        >
+                          <span className="editor-theme-preview__gutter" />
+                          <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
+                          <span className="editor-theme-preview__line" />
+                          <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
+                        </span>
+                      </div>
+
+                      <div
+                        className="settings-theme-list"
+                        role="listbox"
+                        aria-label="Editor theme"
+                        ref={themeListRef}
+                        onMouseLeave={() => clearPreviewEditorTheme()}
+                      >
+                        {editorThemeOptions.map((theme) => {
+                          const selected = xmlEditor.editorTheme === theme.id
+                          return (
+                            <button
+                              key={theme.id}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              className={`settings-theme-card${selected ? ' is-selected' : ''}`}
+                              onMouseEnter={() => handleThemePreview(theme.id)}
+                              onFocus={() => handleThemePreview(theme.id)}
+                              onClick={() => handleThemeSelect(theme.id)}
+                            >
+                              <span
+                                className="editor-theme-preview editor-theme-preview--md"
+                                style={getEditorThemePreviewVars(theme.id)}
+                                aria-hidden="true"
+                              >
+                                <span className="editor-theme-preview__gutter" />
+                                <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
+                                <span className="editor-theme-preview__line" />
+                                <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
+                              </span>
+                              <span className="settings-theme-card-text">
+                                <span className="settings-theme-card-title">
+                                  <span>{theme.label}</span>
+                                  <span className="settings-theme-card-family">{theme.family}</span>
+                                </span>
+                                <span className="settings-theme-card-desc">{theme.description}</span>
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </Row>
+
+                  <Row
+                    label="현재 파일 재검증 단축키"
+                    hint="XML Editor 화면에서만 동작합니다. 입력 즉시 유효성 검사를 수행합니다."
+                    align="start"
+                  >
+                    <div className="settings-shortcut-input-wrap">
+                      <input
+                        id="revalidate-shortcut"
+                        className={`settings-input${shortcutError ? ' settings-input--error' : ''}`}
+                        type="text"
+                        value={shortcutInput}
+                        onChange={(event) => handleShortcutInputChange(event.target.value)}
+                        placeholder="CmdOrCtrl+Shift+V"
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                      {shortcutError && <p className="settings-error-text">{shortcutError}</p>}
+                    </div>
+                  </Row>
+
+                  <Row
+                    label="XML Editor 단축키 도움말"
+                    hint="아래는 Monaco Editor에서 기본으로 제공되는 주요 단축키입니다."
+                    align="start"
+                  >
+                    <ul className="settings-shortcut-list">
+                      {xmlEditorShortcutHelp.map((item) => (
+                        <li key={item.action} className="settings-shortcut-item">
+                          <div>
+                            <p className="settings-shortcut-action">{item.action}</p>
+                            {item.isCustomizable ? (
+                              <p className="settings-shortcut-customizable">설정에서 커스텀 가능</p>
+                            ) : (
+                              <p className="settings-shortcut-fixed">현재 버전에서는 기본 단축키만 지원</p>
+                            )}
+                          </div>
+                          <code className="settings-shortcut-code">{item.shortcut}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  </Row>
+                </div>
+              )}
+
+              {activeSection === 'batch-validator' && (
+                <div className="settings-form">
+                  <p className="settings-placeholder">
+                    Batch Validator 설정 항목은 추후 추가될 예정입니다.
+                  </p>
+                </div>
+              )}
+
+              {activeSection === 'extensions' && (
+                <div className="settings-form">
+                  <div className="ext-section-header">
+                    <h2 className="ext-section-title">
+                      Extensions
+                      <span className="ext-section-count">{allPlugins.length}</span>
+                    </h2>
+                    <p className="ext-section-subtitle">
+                      각 확장은 적용 가능한 문서 컨텍스트에서만 동작합니다.
+                    </p>
+                  </div>
+
+                  {allPlugins.length === 0 ? (
+                    <p className="settings-placeholder">등록된 확장이 없습니다.</p>
+                  ) : (
+                    <ul className="ext-list">
+                      {allPlugins.map((plugin) => {
+                        const enabled = plugins.enabled[plugin.id] !== false
+                        const expanded = expandedPluginIds.has(plugin.id)
+                        const detailsId = `plugin-details-${plugin.id}`
+                        const initials = getPluginInitials(plugin.name)
+                        const accent = getPluginAccent(plugin.id)
 
                         return (
-                          <button
-                            key={theme.id}
-                            type="button"
-                            role="option"
-                            aria-selected={selected}
-                            className={`settings-select-option${selected ? ' is-selected' : ''}`}
-                            onMouseEnter={() => handleThemePreview(theme.id)}
-                            onFocus={() => handleThemePreview(theme.id)}
-                            onClick={() => handleThemeSelect(theme.id)}
+                          <li
+                            key={plugin.id}
+                            className={`ext-row${expanded ? ' is-expanded' : ''}${enabled ? '' : ' is-disabled'}`}
                           >
-                            <span
-                              className="editor-theme-preview"
-                              style={getEditorThemePreviewVars(theme.id)}
-                              aria-hidden="true"
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              className="ext-row-summary"
+                              aria-expanded={expanded}
+                              aria-controls={detailsId}
+                              onClick={() => togglePluginExpanded(plugin.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  togglePluginExpanded(plugin.id)
+                                }
+                              }}
                             >
-                              <span className="editor-theme-preview__gutter" />
-                              <span className="editor-theme-preview__line editor-theme-preview__line--accent" />
-                              <span className="editor-theme-preview__line" />
-                              <span className="editor-theme-preview__line editor-theme-preview__line--soft" />
-                            </span>
-                            <span className="settings-option-copy">
-                              <span className="settings-option-title">
-                                {theme.label}
-                                <span className="settings-option-family">{theme.family}</span>
+                              <span
+                                className="ext-row-icon"
+                                style={{ background: accent.gradient, color: accent.fg }}
+                                aria-hidden="true"
+                              >
+                                {initials}
                               </span>
-                              <span className="settings-option-description">{theme.description}</span>
-                            </span>
-                          </button>
+
+                              <div className="ext-row-body">
+                                <div className="ext-row-title">
+                                  <span className="ext-row-name">{plugin.name}</span>
+                                  <span className="ext-row-version">v{plugin.version}</span>
+                                </div>
+                                <p className="ext-row-description">{plugin.description}</p>
+                                <div className="ext-row-meta">
+                                  <span className="ext-row-publisher">{plugin.author}</span>
+                                  <span className="ext-row-meta-sep">·</span>
+                                  <code className="ext-row-id">{plugin.id}</code>
+                                </div>
+                              </div>
+
+                              <div
+                                className="ext-row-actions"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  className={`ext-action-btn${enabled ? '' : ' is-primary'}`}
+                                  onClick={() => updatePluginEnabled(plugin.id, !enabled)}
+                                  aria-pressed={enabled}
+                                >
+                                  {enabled ? 'Disable' : 'Enable'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {expanded && (
+                              <div id={detailsId} className="ext-detail">
+                                <div className="ext-detail-header">
+                                  <span className="ext-detail-tab is-active">Details</span>
+                                </div>
+
+                                <div className="ext-detail-body">
+                                  {plugin.detailedDescription && (
+                                    <article className="ext-detail-section">
+                                      <h3 className="ext-detail-section-title">Description</h3>
+                                      <MarkdownLite
+                                        className="ext-detail-prose"
+                                        source={plugin.detailedDescription}
+                                      />
+                                    </article>
+                                  )}
+
+                                  {plugin.preview && (
+                                    <article className="ext-detail-section">
+                                      <h3 className="ext-detail-section-title">Preview</h3>
+                                      <div className="ext-preview-grid">
+                                        <div className="ext-preview-cell">
+                                          <header className="ext-preview-header">
+                                            <span className="ext-preview-kind">
+                                              {plugin.preview.inputLabel ?? 'Input'}
+                                            </span>
+                                            {plugin.preview.input.label ? (
+                                              <span className="ext-preview-source">
+                                                {plugin.preview.input.label}
+                                              </span>
+                                            ) : null}
+                                          </header>
+                                          <pre className="ext-preview-block">
+                                            <code>{plugin.preview.input.body}</code>
+                                          </pre>
+                                        </div>
+                                        <div className="ext-preview-cell">
+                                          <header className="ext-preview-header">
+                                            <span className="ext-preview-kind">
+                                              {plugin.preview.outputLabel ?? 'Output'}
+                                            </span>
+                                            {plugin.preview.output.label ? (
+                                              <span className="ext-preview-source">
+                                                {plugin.preview.output.label}
+                                              </span>
+                                            ) : null}
+                                          </header>
+                                          <pre className="ext-preview-block">
+                                            <code>{plugin.preview.output.body}</code>
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    </article>
+                                  )}
+
+                                  <article className="ext-detail-section">
+                                    <h3 className="ext-detail-section-title">More info</h3>
+                                    <dl className="ext-meta-grid">
+                                      <div>
+                                        <dt>Identifier</dt>
+                                        <dd>
+                                          <code>{plugin.id}</code>
+                                        </dd>
+                                      </div>
+                                      <div>
+                                        <dt>Version</dt>
+                                        <dd>{plugin.version}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Publisher</dt>
+                                        <dd>{plugin.author}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Status</dt>
+                                        <dd>
+                                          <span
+                                            className={`ext-status-badge${enabled ? ' is-on' : ' is-off'}`}
+                                          >
+                                            {enabled ? 'Enabled' : 'Disabled'}
+                                          </span>
+                                        </dd>
+                                      </div>
+                                    </dl>
+                                  </article>
+                                </div>
+                              </div>
+                            )}
+                          </li>
                         )
                       })}
-                    </div>
+                    </ul>
                   )}
                 </div>
-              </div>
-
-              <div className="settings-field-row">
-                <label htmlFor="revalidate-shortcut" className="settings-input-label">
-                  현재 파일 재검증 단축키
-                </label>
-                <input
-                  id="revalidate-shortcut"
-                  className={`settings-input${shortcutError ? ' settings-input--error' : ''}`}
-                  type="text"
-                  value={shortcutInput}
-                  onChange={(event) => handleShortcutInputChange(event.target.value)}
-                  placeholder="CmdOrCtrl+Shift+V"
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-                <p className="settings-help-text">
-                  XML Editor 화면에서만 동작합니다. 입력 즉시 유효성 검사를 수행합니다.
-                </p>
-                {shortcutError && <p className="settings-error-text">{shortcutError}</p>}
-              </div>
-
-              <div className="settings-field-row" aria-labelledby="xml-editor-shortcut-help-title">
-                <h3 id="xml-editor-shortcut-help-title" className="settings-subtitle">
-                  XML Editor 단축키 도움말
-                </h3>
-                <p className="settings-help-text">
-                  아래는 Monaco Editor에서 기본으로 제공되는 주요 단축키입니다.
-                </p>
-
-                <ul className="settings-shortcut-list">
-                  {xmlEditorShortcutHelp.map((item) => (
-                    <li key={item.action} className="settings-shortcut-item">
-                      <div>
-                        <p className="settings-shortcut-action">{item.action}</p>
-                        {item.isCustomizable ? (
-                          <p className="settings-shortcut-customizable">설정에서 커스텀 가능</p>
-                        ) : (
-                          <p className="settings-shortcut-fixed">현재 버전에서는 기본 단축키만 지원</p>
-                        )}
-                      </div>
-                      <code className="settings-shortcut-code">{item.shortcut}</code>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          )}
-
-          {activeSection === 'batch-validator' && (
-            <section className="settings-section" aria-labelledby="settings-batch-validator-title">
-              <h2 id="settings-batch-validator-title">Batch Validator 설정</h2>
-              <p className="settings-placeholder">
-                Batch Validator 설정 항목은 추후 추가될 예정입니다.
-              </p>
-            </section>
-          )}
-
-          {activeSection === 'extensions' && (
-            <section className="settings-section ext-section" aria-labelledby="settings-extensions-title">
-              <header className="ext-section-header">
-                <h2 id="settings-extensions-title" className="ext-section-title">
-                  Extensions
-                  <span className="ext-section-count">{allPlugins.length}</span>
-                </h2>
-                <p className="ext-section-subtitle">
-                  XML Editor에서 동작하는 보조 기능을 켜고 끌 수 있습니다. 각 확장은 적용 가능한 문서
-                  컨텍스트에서만 동작합니다.
-                </p>
-              </header>
-
-              {allPlugins.length === 0 ? (
-                <p className="settings-placeholder">등록된 확장이 없습니다.</p>
-              ) : (
-                <ul className="ext-list">
-                  {allPlugins.map((plugin) => {
-                    const enabled = plugins.enabled[plugin.id] !== false
-                    const expanded = expandedPluginIds.has(plugin.id)
-                    const detailsId = `plugin-details-${plugin.id}`
-                    const initials = getPluginInitials(plugin.name)
-                    const accent = getPluginAccent(plugin.id)
-
-                    return (
-                      <li
-                        key={plugin.id}
-                        className={`ext-row${expanded ? ' is-expanded' : ''}${enabled ? '' : ' is-disabled'}`}
-                      >
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="ext-row-summary"
-                          aria-expanded={expanded}
-                          aria-controls={detailsId}
-                          onClick={() => togglePluginExpanded(plugin.id)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              togglePluginExpanded(plugin.id)
-                            }
-                          }}
-                        >
-                          <span
-                            className="ext-row-icon"
-                            style={{ background: accent.gradient, color: accent.fg }}
-                            aria-hidden="true"
-                          >
-                            {initials}
-                          </span>
-
-                          <div className="ext-row-body">
-                            <div className="ext-row-title">
-                              <span className="ext-row-name">{plugin.name}</span>
-                              <span className="ext-row-version">v{plugin.version}</span>
-                            </div>
-                            <p className="ext-row-description">{plugin.description}</p>
-                            <div className="ext-row-meta">
-                              <span className="ext-row-publisher">{plugin.author}</span>
-                              <span className="ext-row-meta-sep">·</span>
-                              <code className="ext-row-id">{plugin.id}</code>
-                            </div>
-                          </div>
-
-                          <div
-                            className="ext-row-actions"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              className={`ext-action-btn${enabled ? '' : ' is-primary'}`}
-                              onClick={() => updatePluginEnabled(plugin.id, !enabled)}
-                              aria-pressed={enabled}
-                            >
-                              {enabled ? 'Disable' : 'Enable'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {expanded && (
-                          <div id={detailsId} className="ext-detail">
-                            <div className="ext-detail-header">
-                              <span className="ext-detail-tab is-active">Details</span>
-                            </div>
-
-                            <div className="ext-detail-body">
-                              {plugin.detailedDescription && (
-                                <article className="ext-detail-section">
-                                  <h3 className="ext-detail-section-title">Description</h3>
-                                  <MarkdownLite
-                                    className="ext-detail-prose"
-                                    source={plugin.detailedDescription}
-                                  />
-                                </article>
-                              )}
-
-                              {plugin.preview && (
-                                <article className="ext-detail-section">
-                                  <h3 className="ext-detail-section-title">Preview</h3>
-                                  <div className="ext-preview-grid">
-                                    <div className="ext-preview-cell">
-                                      <header className="ext-preview-header">
-                                        <span className="ext-preview-kind">
-                                          {plugin.preview.inputLabel ?? 'Input'}
-                                        </span>
-                                        {plugin.preview.input.label ? (
-                                          <span className="ext-preview-source">
-                                            {plugin.preview.input.label}
-                                          </span>
-                                        ) : null}
-                                      </header>
-                                      <pre className="ext-preview-block">
-                                        <code>{plugin.preview.input.body}</code>
-                                      </pre>
-                                    </div>
-                                    <div className="ext-preview-cell">
-                                      <header className="ext-preview-header">
-                                        <span className="ext-preview-kind">
-                                          {plugin.preview.outputLabel ?? 'Output'}
-                                        </span>
-                                        {plugin.preview.output.label ? (
-                                          <span className="ext-preview-source">
-                                            {plugin.preview.output.label}
-                                          </span>
-                                        ) : null}
-                                      </header>
-                                      <pre className="ext-preview-block">
-                                        <code>{plugin.preview.output.body}</code>
-                                      </pre>
-                                    </div>
-                                  </div>
-                                </article>
-                              )}
-
-                              <article className="ext-detail-section">
-                                <h3 className="ext-detail-section-title">More info</h3>
-                                <dl className="ext-meta-grid">
-                                  <div>
-                                    <dt>Identifier</dt>
-                                    <dd>
-                                      <code>{plugin.id}</code>
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Version</dt>
-                                    <dd>{plugin.version}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Publisher</dt>
-                                    <dd>{plugin.author}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Status</dt>
-                                    <dd>
-                                      <span
-                                        className={`ext-status-badge${enabled ? ' is-on' : ' is-off'}`}
-                                      >
-                                        {enabled ? 'Enabled' : 'Disabled'}
-                                      </span>
-                                    </dd>
-                                  </div>
-                                </dl>
-                              </article>
-                            </div>
-                          </div>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
               )}
-            </section>
-          )}
+            </div>
+          </div>
         </main>
       </div>
     </div>

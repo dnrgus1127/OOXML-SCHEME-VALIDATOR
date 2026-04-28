@@ -691,9 +691,38 @@ export function getEditorThemeOption(themeId: EditorThemeId): EditorThemeOption 
   return editorThemeRegistry[themeId] ?? editorThemeRegistry['vs-dark']
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '')
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalized
+
+  if (expanded.length !== 6) return hex
+
+  const red = Number.parseInt(expanded.slice(0, 2), 16)
+  const green = Number.parseInt(expanded.slice(2, 4), 16)
+  const blue = Number.parseInt(expanded.slice(4, 6), 16)
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
 export function getEditorThemeCssVars(themeId: EditorThemeId): Record<string, string> {
   const theme = getEditorThemeOption(themeId)
   return {
+    '--bg-0': theme.app.bgPrimary,
+    '--bg-1': theme.app.bgSecondary,
+    '--bg-2': theme.app.bgTertiary,
+    '--bg-3': theme.app.bgHover,
+    '--line': theme.app.borderColor,
+    '--line-soft': hexToRgba(theme.app.borderColor, 0.7),
+    '--text-0': theme.app.textPrimary,
+    '--text-1': theme.app.textPrimary,
+    '--text-2': theme.app.textSecondary,
+    '--text-3': theme.app.textMuted,
     '--bg-primary': theme.app.bgPrimary,
     '--bg-secondary': theme.app.bgSecondary,
     '--bg-tertiary': theme.app.bgTertiary,
@@ -704,6 +733,8 @@ export function getEditorThemeCssVars(themeId: EditorThemeId): Record<string, st
     '--text-muted': theme.app.textMuted,
     '--border-color': theme.app.borderColor,
     '--accent': theme.app.accent,
+    '--accent-soft': hexToRgba(theme.app.accent, 0.14),
+    '--accent-strong': theme.app.accent,
     '--success': theme.app.success,
     '--error': theme.app.error,
     '--warning': theme.app.warning,
@@ -736,4 +767,3 @@ export function registerEditorThemes(monaco: {
     monaco.editor.defineTheme(theme.id, theme.monaco)
   }
 }
-
