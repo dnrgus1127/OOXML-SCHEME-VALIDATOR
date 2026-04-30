@@ -21,6 +21,8 @@ const api = {
   readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
   writeFile: (filePath: string, data: string) => ipcRenderer.invoke('fs:writeFile', filePath, data),
   fileExists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
+  pickFolder: (defaultPath?: string) => ipcRenderer.invoke('dialog:pickFolder', defaultPath),
+  listFolders: (folderPaths: string[]) => ipcRenderer.invoke('fs:listFolders', folderPaths),
 
   // Recent files
   getRecentFiles: () => ipcRenderer.invoke('recent-files:list'),
@@ -83,6 +85,11 @@ const api = {
     const listener = () => callback()
     ipcRenderer.on('menu:validate', listener)
     return () => ipcRenderer.removeListener('menu:validate', listener)
+  },
+  onMenuQuickOpen: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('menu:quick-open', listener)
+    return () => ipcRenderer.removeListener('menu:quick-open', listener)
   },
 }
 

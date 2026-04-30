@@ -7,7 +7,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { basename, join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { readFile as readFileAsync } from 'fs/promises'
+import { readFile as readFileAsync, readdir as readdirAsync, stat as statAsync } from 'fs/promises'
 import { OoxmlParser, parseXmlToEventArray } from '@ooxml/parser'
 import {
   loadSchemaRegistry,
@@ -219,6 +219,11 @@ function createMenu(): void {
           click: () => handleOpenFile(),
         },
         {
+          label: 'Quick Open from Folder...',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow?.webContents.send('menu:quick-open'),
+        },
+        {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
           click: () => mainWindow?.webContents.send('menu:save'),
@@ -308,6 +313,70 @@ function setupIpcHandlers(): void {
     const normalizedPaths = normalizeOpenableFilePaths(filePaths)
     emitOpenFilesEvent(normalizedPaths)
     return normalizedPaths
+  })
+
+  ipcMain.handle('dialog:pickFolder', async (_, defaultPath?: string) => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: defaultPath && existsSync(defaultPath) ? defaultPath : undefined,
+    })
+
+    if (result.canceled) return null
+    return result.filePaths[0] ?? null
+  })
+
+  ipcMain.handle('fs:listFolders', async (_, folderPaths: unknown) => {
+    if (!Array.isArray(folderPaths)) {
+      return { success: false, error: '폴더 목록이 올바르지 않습니다.' }
+    }
+
+    type FolderFile = {
+      fileName: string
+      filePath: string
+      modifiedAt: number
+      size: number
+      folderPath: string
+    }
+
+    const files: FolderFile[] = []
+    const missingFolders: string[] = []
+
+    for (const folderPath of folderPaths) {
+      if (typeof folderPath !== 'string' || !folderPath) continue
+      if (!existsSync(folderPath)) {
+        missingFolders.push(folderPath)
+        continue
+      }
+
+      try {
+        const entries = await readdirAsync(folderPath, { withFileTypes: true })
+        const statTasks = entries
+          .filter((entry) => entry.isFile() && isSupportedEditorFile(entry.name))
+          .map(async (entry) => {
+            const fullPath = join(folderPath, entry.name)
+            try {
+              const stats = await statAsync(fullPath)
+              files.push({
+                fileName: entry.name,
+                filePath: fullPath,
+                modifiedAt: stats.mtimeMs,
+                size: stats.size,
+                folderPath,
+              })
+            } catch {
+              // 권한 등으로 stat 실패 시 항목 제외
+            }
+          })
+
+        await Promise.all(statTasks)
+      } catch {
+        missingFolders.push(folderPath)
+      }
+    }
+
+    files.sort((a, b) => b.modifiedAt - a.modifiedAt)
+
+    return { success: true, data: files, missingFolders }
   })
 
   // Save file dialog

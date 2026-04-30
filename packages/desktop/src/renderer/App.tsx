@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BatchValidator } from './components/BatchValidator'
+import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { SupportedSchemasScreen } from './screens/SupportedSchemasScreen'
@@ -20,6 +21,19 @@ declare global {
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>
       writeFile: (filePath: string, data: string) => Promise<{ success: boolean; error?: string }>
       fileExists: (filePath: string) => Promise<boolean>
+      pickFolder: (defaultPath?: string) => Promise<string | null>
+      listFolders: (folderPaths: string[]) => Promise<{
+        success: boolean
+        data?: Array<{
+          fileName: string
+          filePath: string
+          modifiedAt: number
+          size: number
+          folderPath: string
+        }>
+        missingFolders?: string[]
+        error?: string
+      }>
       getRecentFiles: () => Promise<RecentFileEntry[]>
       addRecentFile: (input: {
         filePath: string
@@ -81,6 +95,7 @@ declare global {
       onMenuSave: (callback: () => void) => () => void
       onMenuSaveAs: (callback: () => void) => () => void
       onMenuValidate: (callback: () => void) => () => void
+      onMenuQuickOpen: (callback: () => void) => () => void
     }
   }
 }
@@ -126,6 +141,7 @@ function getDroppedFilePaths(dataTransfer: DataTransfer): string[] {
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false)
   const [recentFiles, setRecentFiles] = useState<RecentFileEntry[]>([])
   const [recentError, setRecentError] = useState<string | null>(null)
   const [batchInitialFilePaths, setBatchInitialFilePaths] = useState<string[] | null>(null)
@@ -140,6 +156,7 @@ export default function App() {
   const validateDocument = useDocumentStore((state) => state.validate)
   const loadComparison = useDocumentStore((state) => state.loadComparison)
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
+  const downloadFolders = useSettingsStore((state) => state.general.downloadFolders)
   const effectiveEditorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
   const isMac = navigator.platform.includes('Mac')
 
@@ -179,6 +196,25 @@ export default function App() {
       await refreshRecentFiles()
     },
     [refreshRecentFiles]
+  )
+
+  const openPathInEditor = useCallback(
+    async (path: string) => {
+      setRecentError(null)
+      setBatchInitialFilePaths(null)
+      setCurrentScreen('xml-editor')
+      setFilePath(path)
+
+      const loaded = await loadDocument(path)
+      if (!loaded) return false
+
+      if (validateOnOpen) {
+        await validateDocument()
+      }
+      await recordRecentFile(path, 'xml-editor')
+      return true
+    },
+    [loadDocument, recordRecentFile, setFilePath, validateDocument, validateOnOpen]
   )
 
   const confirmFileChangeIfNeeded = useCallback(async () => {
@@ -417,6 +453,31 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [closeSettings, isSettingsOpen])
 
+  useEffect(() => {
+    const cleanup = window.electronAPI.onMenuQuickOpen(async () => {
+      if (isSettingsOpen) closeSettings()
+      if (currentScreen === 'xml-editor') {
+        const canChangeFile = await confirmFileChangeIfNeeded()
+        if (!canChangeFile) return
+      }
+      setIsQuickOpenOpen(true)
+    })
+    return cleanup
+  }, [closeSettings, confirmFileChangeIfNeeded, currentScreen, isSettingsOpen])
+
+  const handleQuickOpenSelect = useCallback(
+    async (path: string) => {
+      setIsQuickOpenOpen(false)
+      const exists = await window.electronAPI.fileExists(path)
+      if (!exists) {
+        setRecentError(`File no longer exists: ${path}`)
+        return
+      }
+      await openPathInEditor(path)
+    },
+    [openPathInEditor]
+  )
+
   const handleOpenXmlFromHome = async () => {
     const path = await window.electronAPI.openFile()
     if (!path) return
@@ -508,6 +569,14 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <QuickOpenPalette
+        isOpen={isQuickOpenOpen}
+        folders={downloadFolders}
+        onClose={() => setIsQuickOpenOpen(false)}
+        onSelect={handleQuickOpenSelect}
+        onOpenSettings={openSettings}
+      />
     </div>
   )
 }

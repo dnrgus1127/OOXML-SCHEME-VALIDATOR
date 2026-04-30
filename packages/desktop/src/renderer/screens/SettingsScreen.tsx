@@ -170,9 +170,11 @@ function Toggle({
 
 export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const {
+    general,
     xmlEditor,
     previewEditorTheme,
     plugins,
+    updateGeneralSettings,
     updateXmlEditorSettings,
     setPreviewEditorTheme,
     clearPreviewEditorTheme,
@@ -303,9 +305,76 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
             <div className="settings-section-body">
               {activeSection === 'general' && (
                 <div className="settings-form">
-                  <p className="settings-placeholder">
-                    기본 설정 항목은 추후 추가될 예정입니다.
-                  </p>
+                  <Row
+                    label="다운로드 폴더 경로"
+                    hint="등록된 폴더의 파일을 Quick Open(CmdOrCtrl+Shift+O)에서 통합 검색해 열 수 있습니다. 여러 폴더를 등록할 수 있습니다."
+                    align="start"
+                  >
+                    <div className="settings-folder-picker">
+                      {general.downloadFolders.length === 0 ? (
+                        <div className="settings-folder-current">
+                          <span className="settings-folder-empty">등록된 폴더가 없습니다.</span>
+                        </div>
+                      ) : (
+                        <ul className="settings-folder-list">
+                          {general.downloadFolders.map((path) => {
+                            const segments = path.split(/[\\/]/).filter(Boolean)
+                            const label = segments[segments.length - 1] ?? path
+                            return (
+                              <li key={path} className="settings-folder-item">
+                                <div className="settings-folder-item-text">
+                                  <span className="settings-folder-item-label">{label}</span>
+                                  <code className="settings-folder-path" title={path}>
+                                    {path}
+                                  </code>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="settings-folder-btn settings-folder-btn--ghost"
+                                  onClick={() =>
+                                    updateGeneralSettings({
+                                      downloadFolders: general.downloadFolders.filter(
+                                        (item) => item !== path
+                                      ),
+                                    })
+                                  }
+                                  aria-label={`${label} 폴더 등록 해제`}
+                                >
+                                  제거
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+
+                      <div className="settings-folder-actions">
+                        <button
+                          type="button"
+                          className="settings-folder-btn"
+                          onClick={async () => {
+                            const picked = await window.electronAPI.pickFolder()
+                            if (!picked) return
+                            if (general.downloadFolders.includes(picked)) return
+                            updateGeneralSettings({
+                              downloadFolders: [...general.downloadFolders, picked],
+                            })
+                          }}
+                        >
+                          폴더 추가
+                        </button>
+                        {general.downloadFolders.length > 0 && (
+                          <button
+                            type="button"
+                            className="settings-folder-btn settings-folder-btn--ghost"
+                            onClick={() => updateGeneralSettings({ downloadFolders: [] })}
+                          >
+                            전체 해제
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </Row>
                 </div>
               )}
 

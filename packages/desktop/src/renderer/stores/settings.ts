@@ -10,6 +10,7 @@ export interface XmlEditorSettings {
 
 export interface GeneralSettings {
   startupTool: 'home'
+  downloadFolders: string[]
 }
 
 export interface BatchValidatorSettings {
@@ -27,8 +28,14 @@ export interface SettingsData {
   plugins: PluginsSettings
 }
 
+interface LegacyGeneralSettings {
+  startupTool?: 'home'
+  downloadFolder?: string | null
+  downloadFolders?: string[]
+}
+
 export interface PersistedSettingsData {
-  general?: Partial<GeneralSettings>
+  general?: LegacyGeneralSettings
   xmlEditor?: Partial<XmlEditorSettings>
   batchValidator?: Partial<BatchValidatorSettings>
   plugins?: { enabled?: Record<string, boolean> }
@@ -37,6 +44,7 @@ export interface PersistedSettingsData {
 interface SettingsState extends SettingsData {
   previewEditorTheme: EditorThemeId | null
   effectiveEditorTheme: EditorThemeId
+  updateGeneralSettings: (updates: Partial<GeneralSettings>) => void
   updateXmlEditorSettings: (updates: Partial<XmlEditorSettings>) => void
   setPreviewEditorTheme: (theme: EditorThemeId | null) => void
   clearPreviewEditorTheme: () => void
@@ -47,6 +55,7 @@ interface SettingsState extends SettingsData {
 const defaultSettings: SettingsData = {
   general: {
     startupTool: 'home',
+    downloadFolders: [],
   },
   xmlEditor: {
     validateOnOpen: true,
@@ -63,6 +72,32 @@ const defaultSettings: SettingsData = {
   },
 }
 
+function dedupeFolderPaths(paths: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const path of paths) {
+    if (typeof path !== 'string') continue
+    const trimmed = path.trim()
+    if (!trimmed || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    result.push(trimmed)
+  }
+  return result
+}
+
+function migrateDownloadFolders(persistedGeneral: LegacyGeneralSettings | undefined): string[] {
+  if (!persistedGeneral) return []
+
+  const candidates: Array<string | null | undefined> = []
+  if (Array.isArray(persistedGeneral.downloadFolders)) {
+    candidates.push(...persistedGeneral.downloadFolders)
+  }
+  if (typeof persistedGeneral.downloadFolder === 'string') {
+    candidates.push(persistedGeneral.downloadFolder)
+  }
+  return dedupeFolderPaths(candidates)
+}
+
 export function mergeSettingsData(
   persistedState: PersistedSettingsData | undefined,
   currentState: SettingsState
@@ -73,13 +108,15 @@ export function mergeSettingsData(
     ...persisted.xmlEditor,
   }
 
+  const general: GeneralSettings = {
+    startupTool: persisted.general?.startupTool ?? currentState.general.startupTool,
+    downloadFolders: migrateDownloadFolders(persisted.general),
+  }
+
   return {
     ...currentState,
     ...persisted,
-    general: {
-      ...currentState.general,
-      ...persisted.general,
-    },
+    general,
     xmlEditor,
     batchValidator: {
       ...currentState.batchValidator,
@@ -101,6 +138,14 @@ export const useSettingsStore = create<SettingsState>()(
       ...defaultSettings,
       previewEditorTheme: null,
       effectiveEditorTheme: defaultSettings.xmlEditor.editorTheme,
+
+      updateGeneralSettings: (updates) =>
+        set((state) => ({
+          general: {
+            ...state.general,
+            ...updates,
+          },
+        })),
 
       updateXmlEditorSettings: (updates) =>
         set((state) => {
