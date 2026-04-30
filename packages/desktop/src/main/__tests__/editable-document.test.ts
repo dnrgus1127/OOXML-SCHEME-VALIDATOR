@@ -55,4 +55,26 @@ describe('editable document ODF handling', () => {
 
     expect(getEditablePartText(updated, '/content.xml', 'C:/docs/sample.ods')).toContain('updated')
   })
+
+  it('strips formatting-only whitespace nodes when saving XML parts', () => {
+    const buffer = createOdfBuffer({ includeMimetype: false })
+
+    const updated = updateEditablePartText(
+      buffer,
+      '/content.xml',
+      `<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content>
+  <office:body>
+    <office:text>
+      <text:p>Hello</text:p>
+    </office:text>
+  </office:body>
+</office:document-content>`,
+      'C:/docs/sample.ods'
+    )
+
+    expect(getEditablePartText(updated, '/content.xml', 'C:/docs/sample.ods')).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?><office:document-content><office:body><office:text><text:p>Hello</text:p></office:text></office:body></office:document-content>'
+    )
+  })
 })

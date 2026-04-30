@@ -1,4 +1,10 @@
-import { OoxmlBuilder, OoxmlParser, ZipReader, ZipWriter } from '@ooxml/parser'
+import {
+  OoxmlBuilder,
+  OoxmlParser,
+  ZipReader,
+  ZipWriter,
+} from '@ooxml/parser'
+import { stripInsignificantWhitespace } from './xml-whitespace'
 
 export type EditableDocumentFormat = 'ooxml' | 'odf'
 export type ValidationSupportStatus = 'supported' | 'unsupported'
@@ -192,16 +198,17 @@ export function updateEditablePartText(
   filePath?: string
 ): Buffer {
   const format = detectDocumentFormatFromBuffer(buffer, filePath)
+  const normalizedContent = stripInsignificantWhitespace(content)
 
   if (format === 'ooxml') {
     const builder = OoxmlBuilder.fromBuffer(buffer)
-    builder.setPart(partPath, content)
+    builder.setPart(partPath, normalizedContent)
     return builder.toBuffer()
   }
 
   if (format === 'odf') {
     const writer = ZipWriter.fromBuffer(buffer)
-    writer.addEntry(partPath, content)
+    writer.addEntry(partPath, normalizedContent)
     return writer.toBuffer()
   }
 

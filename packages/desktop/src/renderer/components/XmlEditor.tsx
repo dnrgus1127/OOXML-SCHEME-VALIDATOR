@@ -80,7 +80,7 @@ export function XmlEditor({
   const hoverProviderRef = useRef<{ dispose: () => void } | null>(null)
   const pluginCtxProviderRef = useRef<PluginContextProvider | undefined>(getPluginContext)
 
-  const [localContent, setLocalContent] = useState(content)
+  const [localContent, setLocalContent] = useState(() => formatXml(content))
   const [isMonacoReady, setIsMonacoReady] = useState(false)
   const [monacoLoadError, setMonacoLoadError] = useState(false)
   const editorTheme = useSettingsStore((state) => state.effectiveEditorTheme)
@@ -234,7 +234,6 @@ export function XmlEditor({
 
     const formatted = formatXml(content)
     setLocalContent(formatted)
-    onChange(formatted)
 
     if (editorRef.current && editorRef.current.getValue() !== formatted) {
       editorRef.current.setValue(formatted)

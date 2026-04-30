@@ -21,7 +21,7 @@ export { ZipReader, type ZipReaderOptions } from './zip'
 export { ZipWriter, type ZipWriterOptions } from './zip'
 
 // XML handling
-export { xmlToJson, jsonToXml, formatXml } from './xml'
+export { xmlToJson, jsonToXml, formatXml, stripInsignificantWhitespace } from './xml'
 export {
   parseXmlToEvents,
   parseXmlToEventArray,
