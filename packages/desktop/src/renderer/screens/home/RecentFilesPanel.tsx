@@ -1,12 +1,11 @@
 import type { RecentFileEntry, OpenTool } from '../../../shared/recent-files'
 
-interface RecentFilesPanelProps {
+export interface RecentFilesPanelProps {
   recentFiles: RecentFileEntry[]
   recentError: string | null
   onDismissRecentError: () => void
   onOpenRecent: (entry: RecentFileEntry) => void
   onRemoveRecent: (filePath: string) => void
-  onClearRecent: () => void
 }
 
 type ValidationStatus = 'valid' | 'invalid' | 'warning'
@@ -123,24 +122,9 @@ export function RecentFilesPanel({
   onDismissRecentError,
   onOpenRecent,
   onRemoveRecent,
-  onClearRecent,
 }: RecentFilesPanelProps) {
   return (
-    <aside className="bold-right">
-      <div className="bold-right-header">
-        <span className="bold-right-title">Recent · {recentFiles.length}</span>
-        <div className="bold-right-actions">
-          <button
-            type="button"
-            className="bold-right-clear-btn"
-            onClick={onClearRecent}
-            disabled={recentFiles.length === 0}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-
+    <>
       {recentError && (
         <div className="bold-recent-error">
           <span>{recentError}</span>
@@ -171,6 +155,6 @@ export function RecentFilesPanel({
           ))}
         </ul>
       )}
-    </aside>
+    </>
   )
 }

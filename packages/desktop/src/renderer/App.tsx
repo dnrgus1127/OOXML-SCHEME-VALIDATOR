@@ -528,6 +528,8 @@ export default function App() {
           onOpenRecent={handleOpenRecent}
           onRemoveRecent={handleRemoveRecent}
           onClearRecent={handleClearRecent}
+          downloadFolders={downloadFolders}
+          onOpenStorageFile={(path) => void openPathInEditor(path)}
         />
       )}
 

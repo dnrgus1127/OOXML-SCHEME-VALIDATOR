@@ -1,6 +1,6 @@
 import { useState, type DragEvent, type KeyboardEvent } from 'react'
 import type { RecentFileEntry } from '../../shared/recent-files'
-import { RecentFilesPanel } from './home/RecentFilesPanel'
+import { HomeRightPanel } from './home/HomeRightPanel'
 
 interface HomeScreenProps {
   onOpenXmlFromHome: () => void | Promise<void>
@@ -13,6 +13,8 @@ interface HomeScreenProps {
   onOpenRecent: (entry: RecentFileEntry) => void
   onRemoveRecent: (filePath: string) => void
   onClearRecent: () => void
+  downloadFolders: string[]
+  onOpenStorageFile: (filePath: string) => void
 }
 
 export function HomeScreen({
@@ -26,6 +28,8 @@ export function HomeScreen({
   onOpenRecent,
   onRemoveRecent,
   onClearRecent,
+  downloadFolders,
+  onOpenStorageFile,
 }: HomeScreenProps) {
   const [isDropOver, setIsDropOver] = useState(false)
 
@@ -145,13 +149,16 @@ export function HomeScreen({
           </div>
         </div>
 
-        <RecentFilesPanel
+        <HomeRightPanel
           recentFiles={recentFiles}
           recentError={recentError}
           onDismissRecentError={onDismissRecentError}
           onOpenRecent={onOpenRecent}
           onRemoveRecent={onRemoveRecent}
           onClearRecent={onClearRecent}
+          downloadFolders={downloadFolders}
+          onOpenStorageFile={onOpenStorageFile}
+          onOpenSettings={onOpenSettingsFromHome}
         />
       </div>
 

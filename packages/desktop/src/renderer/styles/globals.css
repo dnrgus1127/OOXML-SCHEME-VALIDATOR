@@ -1175,6 +1175,60 @@ body {
   font-family: var(--mono);
 }
 
+.bold-right-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.bold-right-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.bold-right-tab:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.bold-right-tab.is-active {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+
+.bold-right-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bold-storage-empty-btn {
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-1);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.bold-storage-empty-btn:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
 .bold-right-actions {
   display: flex;
   gap: 6px;
