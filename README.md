@@ -12,6 +12,64 @@ OOXML(.xlsx / .docx / .pptx)과 ODF(.ods / .odt / .odp) 문서를 열어 내부 
 - **비교**: 두 패키지(또는 XML 파일) 간 구조/내용 차이를 diff 로 확인
 - **검증**: 로드된 XSD 스키마(OOXML sml/wml/pml/dml/shared 등)에 맞춰 XML 유효성 검사 및 오류 위치 표시
 
+## 데스크톱 앱 빌드 (Windows exe)
+
+`packages/desktop`는 Electron 앱이며, `electron-builder` 로 Windows 설치 파일(.exe)과 portable 실행 파일을 만들 수 있습니다.
+
+### 사전 요구사항
+
+- Node.js 18 이상
+- pnpm 9 (없으면 아래 절차로 설치)
+- Windows 환경 (다른 OS에서 win 타겟 빌드 시 wine 등 별도 설정 필요)
+
+#### pnpm 설치
+
+`pnpm` 이 설치되어 있지 않다면 다음 중 한 가지 방법으로 설치합니다.
+
+```bash
+# 1) Node.js 16.13 이상이 설치된 경우 — Corepack 사용 (권장)
+corepack enable
+corepack prepare pnpm@9 --activate
+
+# 2) npm 으로 전역 설치
+npm install -g pnpm@9
+
+# 3) Windows PowerShell 단독 설치 스크립트
+iwr https://get.pnpm.io/install.ps1 -useb | iex
+```
+
+설치 후 버전 확인:
+
+```bash
+pnpm -v
+```
+
+### 빌드 절차
+
+```bash
+# 1. 의존성 설치 (모노레포 루트)
+pnpm install
+
+# 2. core / parser / desktop 빌드 산출물 준비
+pnpm run build
+
+# 3. desktop 패키지에서 Windows 타겟 패키징
+pnpm --filter @ooxml/desktop run package:win
+```
+
+### 산출물
+
+`packages/desktop/release/` 아래에 다음이 생성됩니다 (`electron-builder.yml` 기준).
+
+- `OOXML Validator Setup <version>.exe` — NSIS 인스톨러 (설치 경로 변경 가능)
+- `OOXML Validator <version>.exe` — portable 실행 파일 (설치 없이 실행)
+
+### 참고 스크립트
+
+- `pnpm --filter @ooxml/desktop run package` — 현재 OS 기본 타겟
+- `pnpm --filter @ooxml/desktop run package:mac` — macOS dmg/zip
+- `pnpm --filter @ooxml/desktop run package:linux` — Linux AppImage/deb
+
 ## 주요 구성
 
 - `SchemaRegistry`/`SchemaRegistryBuilder`: 네임스페이스별 스키마 관리
@@ -66,41 +124,6 @@ pnpm run test
 pnpm run lint
 pnpm run typecheck
 ```
-
-## 데스크톱 앱 빌드 (Windows exe)
-
-`packages/desktop`는 Electron 앱이며, `electron-builder` 로 Windows 설치 파일(.exe)과 portable 실행 파일을 만들 수 있습니다.
-
-### 사전 요구사항
-
-- Node.js 18 이상, pnpm 9
-- Windows 환경 (다른 OS에서 win 타겟 빌드 시 wine 등 별도 설정 필요)
-
-### 빌드 절차
-
-```bash
-# 1. 의존성 설치 (모노레포 루트)
-pnpm install
-
-# 2. core / parser / desktop 빌드 산출물 준비
-pnpm run build
-
-# 3. desktop 패키지에서 Windows 타겟 패키징
-pnpm --filter @ooxml/desktop run package:win
-```
-
-### 산출물
-
-`packages/desktop/release/` 아래에 다음이 생성됩니다 (`electron-builder.yml` 기준).
-
-- `OOXML Validator Setup <version>.exe` — NSIS 인스톨러 (설치 경로 변경 가능)
-- `OOXML Validator <version>.exe` — portable 실행 파일 (설치 없이 실행)
-
-### 참고 스크립트
-
-- `pnpm --filter @ooxml/desktop run package` — 현재 OS 기본 타겟
-- `pnpm --filter @ooxml/desktop run package:mac` — macOS dmg/zip
-- `pnpm --filter @ooxml/desktop run package:linux` — Linux AppImage/deb
 
 ## 개발 우선순위
 
