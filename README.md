@@ -1,8 +1,16 @@
 # OOXML Schema Validator
 
-OOXML XSD 스키마를 JSON 런타임 타입으로 변환해 XML 문서를 스트리밍 방식으로 검증하는 엔진 구현입니다.
+OOXML(.xlsx / .docx / .pptx)과 ODF(.ods / .odt / .odp) 문서를 열어 내부 XML을 **편집**하고, 두 문서/패키지를 **비교**하며, XSD 스키마 기반으로 **검증**할 수 있는 데스크톱 앱입니다.
+내부적으로는 OOXML XSD 스키마를 JSON 런타임 타입으로 변환해 XML을 스트리밍 방식으로 검증하는 엔진을 사용하며, 그 위에 Monaco 에디터 기반의 데스크톱 UI를 얹어 편집/비교 워크플로우를 제공합니다.
 `docs/ooxml-validation-engine-design.md`와 `docs/ooxml-schema-types.ts` 설계를 기반으로 핵심 런타임을 구성했습니다.
 현재 저장소는 **모노레포**로 구성되어 검증 엔진(`core`)과 데스크톱 UI(`desktop`)를 중심으로 개발 중입니다.
+
+## 주요 기능
+
+- **열기**: OOXML/ODF 패키지(zip)를 풀어 내부 XML 파트(파일) 트리를 탐색
+- **편집**: Monaco 기반 에디터로 XML 파트를 직접 수정하고 패키지로 저장
+- **비교**: 두 패키지(또는 XML 파일) 간 구조/내용 차이를 diff 로 확인
+- **검증**: 로드된 XSD 스키마(OOXML sml/wml/pml/dml/shared 등)에 맞춰 XML 유효성 검사 및 오류 위치 표시
 
 ## 주요 구성
 
@@ -58,6 +66,41 @@ pnpm run test
 pnpm run lint
 pnpm run typecheck
 ```
+
+## 데스크톱 앱 빌드 (Windows exe)
+
+`packages/desktop`는 Electron 앱이며, `electron-builder` 로 Windows 설치 파일(.exe)과 portable 실행 파일을 만들 수 있습니다.
+
+### 사전 요구사항
+
+- Node.js 18 이상, pnpm 9
+- Windows 환경 (다른 OS에서 win 타겟 빌드 시 wine 등 별도 설정 필요)
+
+### 빌드 절차
+
+```bash
+# 1. 의존성 설치 (모노레포 루트)
+pnpm install
+
+# 2. core / parser / desktop 빌드 산출물 준비
+pnpm run build
+
+# 3. desktop 패키지에서 Windows 타겟 패키징
+pnpm --filter @ooxml/desktop run package:win
+```
+
+### 산출물
+
+`packages/desktop/release/` 아래에 다음이 생성됩니다 (`electron-builder.yml` 기준).
+
+- `OOXML Validator Setup <version>.exe` — NSIS 인스톨러 (설치 경로 변경 가능)
+- `OOXML Validator <version>.exe` — portable 실행 파일 (설치 없이 실행)
+
+### 참고 스크립트
+
+- `pnpm --filter @ooxml/desktop run package` — 현재 OS 기본 타겟
+- `pnpm --filter @ooxml/desktop run package:mac` — macOS dmg/zip
+- `pnpm --filter @ooxml/desktop run package:linux` — Linux AppImage/deb
 
 ## 개발 우선순위
 
