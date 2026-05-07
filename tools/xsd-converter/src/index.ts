@@ -295,9 +295,14 @@ export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
     })
   }
 
-  // Process simple types
+  // Process simple types (인라인 익명 simpleType 멤버를 합성 이름으로 풀어 누적)
   for (const st of findByTag(schemaChildren, 'simpleType')) {
-    result.simpleTypes.push(parseSimpleType(st))
+    const extras: ParsedSimpleType[] = []
+    const parsed = parseSimpleType(st, extras)
+    result.simpleTypes.push(parsed)
+    for (const extra of extras) {
+      result.simpleTypes.push(extra)
+    }
   }
 
   // Process complex types
@@ -323,8 +328,12 @@ export function convertXsd(xsdContent: string, filename: string): ParsedSchema {
   return result
 }
 
-function parseSimpleType(stNode: any): ParsedSimpleType {
-  const name = attr(stNode, 'name') || ''
+function parseSimpleType(
+  stNode: any,
+  extraTypes: ParsedSimpleType[] = [],
+  syntheticBase?: string
+): ParsedSimpleType {
+  const name = attr(stNode, 'name') || syntheticBase || ''
   const children = nodeChildren(stNode)
   const restriction = findFirstByTag(children, 'restriction')
   const union = findFirstByTag(children, 'union')
@@ -338,13 +347,36 @@ function parseSimpleType(stNode: any): ParsedSimpleType {
       facets: extractFacets(restriction),
     }
   } else if (union) {
-    const memberTypes = attr(union, 'memberTypes')
-    result.union = {
-      memberTypes: memberTypes ? memberTypes.split(/\s+/) : [],
-    }
+    // memberTypes 속성과 인라인 익명 simpleType 자식을 모두 수집
+    const memberTypeAttr = attr(union, 'memberTypes')
+    const memberTypes = memberTypeAttr ? memberTypeAttr.split(/\s+/) : []
+
+    const inlineMembers = findByTag(nodeChildren(union), 'simpleType')
+    inlineMembers.forEach((memberNode, index) => {
+      const synthName = `${name}__unionMember${index}`
+      const synth = parseSimpleType(memberNode, extraTypes, synthName)
+      synth.name = synthName
+      extraTypes.push(synth)
+      memberTypes.push(synthName)
+    })
+
+    result.union = { memberTypes }
   } else if (list) {
-    result.list = {
-      itemType: attr(list, 'itemType') || '',
+    // itemType 속성이 있으면 그대로 사용, 없으면 인라인 익명 simpleType 자식 사용
+    const itemTypeAttr = attr(list, 'itemType')
+    if (itemTypeAttr) {
+      result.list = { itemType: itemTypeAttr }
+    } else {
+      const inlineItem = findFirstByTag(nodeChildren(list), 'simpleType')
+      if (inlineItem) {
+        const synthName = `${name}__listItem`
+        const synth = parseSimpleType(inlineItem, extraTypes, synthName)
+        synth.name = synthName
+        extraTypes.push(synth)
+        result.list = { itemType: synthName }
+      } else {
+        result.list = { itemType: '' }
+      }
     }
   }
 
