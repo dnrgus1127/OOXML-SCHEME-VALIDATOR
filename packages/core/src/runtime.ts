@@ -71,6 +71,8 @@ export interface RuntimeValidationContext {
     includeWarnings?: boolean
     customValidators?: Map<string, (value: string) => boolean>
     allowWhitespace?: boolean
+    locale?: 'en' | 'ko'
+    nonStandardNamespace?: 'warn' | 'error'
   }
 }
 

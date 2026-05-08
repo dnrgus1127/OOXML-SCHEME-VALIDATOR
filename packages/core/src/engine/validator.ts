@@ -9,9 +9,11 @@ import type {
 } from '../types'
 import { hasComplexContent, hasElementContent, hasSimpleContent, isElement, isAny } from '../types'
 import {
+  CompositorState,
   ElementStackFrame,
   XmlElementInfo,
   createRuntimeContext,
+  makeQualifiedName,
   normalizeNamespace,
   resolveNamespaceUri,
   withNamespaceContext,
@@ -129,10 +131,27 @@ export class ValidationEngine {
       namespaceContext,
       parentFrame
     )
-    const effectiveElement =
+    let effectiveElement =
       namespaceResolution.namespaceUri === element.namespaceUri
         ? element
         : { ...element, namespaceUri: namespaceResolution.namespaceUri }
+
+    const nonStandardNs = this.resolveNonStandardNamespace(effectiveElement, parentFrame)
+    if (nonStandardNs) {
+      effectiveElement = { ...effectiveElement, namespaceUri: nonStandardNs.correctedNamespaceUri }
+      const policy = this.context.options.nonStandardNamespace ?? 'warn'
+      const message = formatMessage(
+        'ELEMENT.NON_STANDARD_NAMESPACE',
+        element.name,
+        nonStandardNs.observedNamespaceUri,
+        nonStandardNs.correctedNamespaceUri
+      )
+      if (policy === 'error') {
+        this.errorHandler.pushError('NON_STANDARD_NAMESPACE', message)
+      } else {
+        this.errorHandler.pushWarning('NON_STANDARD_NAMESPACE', message)
+      }
+    }
 
     if (this.isUnsupportedAlternateContent(effectiveElement)) {
       this.context.elementStack.push(this.createSkippedFrame(effectiveElement))
@@ -409,6 +428,55 @@ export class ValidationEngine {
       violation.minOccurs - violation.actualCount,
       violation.actualCount
     )
+  }
+
+  /**
+   * Excel 호환 패턴 감지: parent compositor가 허용하는 element 중
+   * 같은 localName을 가진 다른 namespace가 정확히 1개 있으면 그것으로 보정
+   */
+  private resolveNonStandardNamespace(
+    effectiveElement: XmlElementInfo,
+    parentFrame?: ElementStackFrame
+  ): { correctedNamespaceUri: string; observedNamespaceUri: string } | undefined {
+    if (!parentFrame?.compositorState) return undefined
+
+    const observedQualifiedName = makeQualifiedName(
+      effectiveElement.namespaceUri,
+      effectiveElement.localName
+    )
+
+    const allowed = this.collectAllAllowedNames(parentFrame.compositorState)
+    if (allowed.size === 0) return undefined
+    if (allowed.has(observedQualifiedName)) return undefined
+
+    const observedNormalizedNs = normalizeNamespace(effectiveElement.namespaceUri)
+    const candidates = new Set<string>()
+    for (const allowedName of allowed) {
+      const colonIdx = allowedName.lastIndexOf(':')
+      if (colonIdx === -1) continue
+      const allowedNs = allowedName.substring(0, colonIdx)
+      const allowedLocal = allowedName.substring(colonIdx + 1)
+      if (allowedLocal === effectiveElement.localName && allowedNs !== observedNormalizedNs) {
+        candidates.add(allowedNs)
+      }
+    }
+
+    if (candidates.size !== 1) return undefined
+
+    return {
+      correctedNamespaceUri: Array.from(candidates)[0]!,
+      observedNamespaceUri: effectiveElement.namespaceUri,
+    }
+  }
+
+  private collectAllAllowedNames(state: CompositorState): Set<string> {
+    const out = new Set<string>()
+    for (const fp of state.flattenedParticles) {
+      if (fp.allowedNames) {
+        for (const name of fp.allowedNames) out.add(name)
+      }
+    }
+    return out
   }
 
   private resolveEffectiveElementNamespace(

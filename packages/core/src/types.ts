@@ -562,6 +562,7 @@ export type ValidationErrorCode =
   | 'INVALID_CONTENT' // 내용 모델 불일치
   | 'UNEXPECTED_TEXT' // element-only에 텍스트 존재
   | 'CHOICE_NOT_SATISFIED' // choice 조건 미충족
+  | 'NON_STANDARD_NAMESPACE' // 비표준 네임스페이스로 작성된 요소(Excel 호환 패턴)
 
 /** 검증 결과 */
 export interface ValidationResult {
@@ -593,6 +594,12 @@ export interface ValidationOptions {
   allowWhitespace?: boolean
   /** 에러 메시지 로케일 */
   locale?: 'en' | 'ko'
+  /**
+   * 비표준 네임스페이스(Excel 호환 패턴) 처리 정책
+   * - 'warn'(기본): warning으로 보고하고 element 자체는 정상 검증 진행
+   * - 'error': error로 보고하지만 type은 복구하여 자손 cascade 에러는 억제
+   */
+  nonStandardNamespace?: 'warn' | 'error'
 }
 
 /** 검증 컨텍스트 (순회 중 상태 관리) */

@@ -50,6 +50,12 @@ export const ERROR_MESSAGES: MessageMap = {
     ko: (element: string, namespaceUri: string) =>
       `'${element}' \uC694\uC18C\uB294 default namespace\uAC00 \uC5C6\uC5B4 \uC120\uC5B8\uB41C prefix\uB85C namespace '${namespaceUri}'\uB97C \uCD94\uB860\uD588\uC2B5\uB2C8\uB2E4.`,
   },
+  'ELEMENT.NON_STANDARD_NAMESPACE': {
+    en: (element: string, observedNs: string, expectedNs: string) =>
+      `Element '${element}' uses non-standard namespace '${observedNs}'; OOXML spec expects '${expectedNs}'. Accepted for Excel compatibility.`,
+    ko: (element: string, observedNs: string, expectedNs: string) =>
+      `'${element}' 요소가 비표준 네임스페이스 '${observedNs}'로 작성되었습니다. OOXML 스펙상 네임스페이스는 '${expectedNs}' 입니다. Excel 호환을 위해 허용됩니다.`,
+  },
   'ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT': {
     en: () =>
       'Unsupported Markup Compatibility element AlternateContent was found. Its subtree was skipped.',
