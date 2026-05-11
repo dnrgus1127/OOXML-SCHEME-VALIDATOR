@@ -15,6 +15,9 @@ interface ToolbarProps {
   // Compare 모드
   isCompareMode?: boolean
   onToggleCompare?: () => void
+  // Search
+  isSearchOpen?: boolean
+  onToggleSearch?: () => void
 }
 
 export function Toolbar({
@@ -30,6 +33,8 @@ export function Toolbar({
   onNavigateHome,
   isCompareMode = false,
   onToggleCompare,
+  isSearchOpen = false,
+  onToggleSearch,
 }: ToolbarProps) {
   const fileName = filePath ? filePath.split(/[\\/]/).pop() : null
   const writeDisabled = !hasDocument || isCompareMode
@@ -69,6 +74,16 @@ export function Toolbar({
               title={isCompareMode ? '비교 모드 종료' : '다른 파일과 비교'}
             >
               🔀 {isCompareMode ? 'Exit Compare' : 'Compare with…'}
+            </button>
+          )}
+          {onToggleSearch && (
+            <button
+              onClick={onToggleSearch}
+              className={`toolbar-btn${isSearchOpen ? ' toolbar-btn--active' : ''}`}
+              disabled={!hasDocument}
+              title="문서 전체 XML 검색"
+            >
+              🔍 Search
             </button>
           )}
         </>

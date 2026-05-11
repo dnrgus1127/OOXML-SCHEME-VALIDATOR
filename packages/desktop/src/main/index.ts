@@ -26,6 +26,7 @@ import {
   isSupportedBatchFile,
   isSupportedEditorFile,
   parseEditableDocument,
+  searchEditableDocument,
   updateEditablePartText,
 } from './editable-document'
 import {
@@ -556,6 +557,16 @@ function setupIpcHandlers(): void {
       }
 
       return { success: true, data: content }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
+  })
+
+  // Search document
+  ipcMain.handle('ooxml:search', async (_, base64Data: string, query: string, filePath?: string) => {
+    try {
+      const buffer = Buffer.from(base64Data, 'base64')
+      return { success: true, data: searchEditableDocument(buffer, query, filePath) }
     } catch (error) {
       return { success: false, error: String(error) }
     }

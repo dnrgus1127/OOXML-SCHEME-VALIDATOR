@@ -79,6 +79,11 @@ declare global {
       analyzeSchemaReferences: (
         base64Data: string
       ) => Promise<{ success: boolean; data?: any; error?: string }>
+      searchDocument: (
+        base64Data: string,
+        query: string,
+        filePath?: string
+      ) => Promise<{ success: boolean; data?: any; error?: string }>
       openFiles: () => Promise<string[] | null>
       batchValidate: (
         filePaths: string[]

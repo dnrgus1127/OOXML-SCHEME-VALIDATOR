@@ -8,6 +8,7 @@ import {
   SchemaReferencePanel,
   type OoxmlSchemaReferenceSummary,
 } from '../components/SchemaReferencePanel'
+import { SearchPanel } from '../components/SearchPanel'
 import { Toolbar } from '../components/Toolbar'
 import { useSettingsStore } from '../stores/settings'
 import { matchesShortcut } from '../utils/shortcuts'
@@ -56,11 +57,16 @@ export function XmlEditorScreen({
     partDiffStatus,
     loadComparison,
     exitCompare,
+    searchResults,
+    isSearching,
+    searchDocument,
+    clearSearch,
   } = useDocumentStore()
   const validateOnOpen = useSettingsStore((state) => state.xmlEditor.validateOnOpen)
   const revalidateShortcut = useSettingsStore((state) => state.xmlEditor.revalidateShortcut)
 
   const [showValidation, setShowValidation] = useState(true)
+  const [showSearch, setShowSearch] = useState(false)
 
   const [schemaReferenceSummary, setSchemaReferenceSummary] =
     useState<OoxmlSchemaReferenceSummary | null>(null)
@@ -324,6 +330,8 @@ export function XmlEditorScreen({
         onNavigateHome={onNavigateHome}
         isCompareMode={isCompareMode}
         onToggleCompare={() => void handleToggleCompare()}
+        isSearchOpen={showSearch}
+        onToggleSearch={() => setShowSearch((prev) => !prev)}
       />
 
       {error && (
@@ -378,6 +386,19 @@ export function XmlEditorScreen({
             </main>
 
             <aside className="right-panels">
+              {showSearch && (
+                <div className="search-panel-wrapper">
+                  <SearchPanel
+                    results={searchResults}
+                    isSearching={isSearching}
+                    onSearch={(q) => void searchDocument(q)}
+                    onClear={clearSearch}
+                    onNavigate={handleSelectPart}
+                    onClose={() => setShowSearch(false)}
+                  />
+                </div>
+              )}
+
               {showValidation ? (
                 <div className="validation-panel">
                   <ValidationPanel

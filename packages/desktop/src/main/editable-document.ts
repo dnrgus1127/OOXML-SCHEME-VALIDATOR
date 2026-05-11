@@ -191,6 +191,73 @@ export function getEditablePartText(
   return undefined
 }
 
+export interface SearchMatch {
+  line: number
+  lineContent: string
+}
+
+export interface SearchPartResult {
+  partPath: string
+  matches: SearchMatch[]
+}
+
+export interface DocumentSearchResult {
+  query: string
+  totalMatches: number
+  results: SearchPartResult[]
+}
+
+function isSearchableEntry(path: string): boolean {
+  const lower = path.toLowerCase()
+  return lower.endsWith('.xml') || lower.endsWith('.rels')
+}
+
+export function searchEditableDocument(
+  buffer: Buffer,
+  query: string,
+  filePath?: string
+): DocumentSearchResult {
+  if (!query.trim()) {
+    return { query, totalMatches: 0, results: [] }
+  }
+
+  const format = detectDocumentFormatFromBuffer(buffer, filePath)
+  if (!format) {
+    return { query, totalMatches: 0, results: [] }
+  }
+
+  const zip = ZipReader.fromBuffer(buffer)
+  const entryPaths = zip.getEntryPaths()
+  const lowerQuery = query.toLowerCase()
+  const results: SearchPartResult[] = []
+
+  for (const entryPath of entryPaths) {
+    if (!isSearchableEntry(entryPath)) continue
+
+    const text = zip.readEntryAsText(entryPath)
+    if (!text) continue
+
+    const matches: SearchMatch[] = []
+    const lines = text.split('\n')
+
+    lines.forEach((line, idx) => {
+      if (line.toLowerCase().includes(lowerQuery)) {
+        matches.push({ line: idx + 1, lineContent: line.trim() })
+      }
+    })
+
+    if (matches.length > 0) {
+      results.push({ partPath: entryPath, matches })
+    }
+  }
+
+  return {
+    query,
+    totalMatches: results.reduce((sum, r) => sum + r.matches.length, 0),
+    results,
+  }
+}
+
 export function updateEditablePartText(
   buffer: Buffer,
   partPath: string,

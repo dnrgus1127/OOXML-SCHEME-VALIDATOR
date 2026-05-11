@@ -47,6 +47,8 @@ const api = {
     ipcRenderer.invoke('ooxml:validate', base64Data, filePath),
   analyzeSchemaReferences: (base64Data: string) =>
     ipcRenderer.invoke('ooxml:analyzeSchemaReferences', base64Data),
+  searchDocument: (base64Data: string, query: string, filePath?: string) =>
+    ipcRenderer.invoke('ooxml:search', base64Data, query, filePath),
 
   // Batch operations
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),

@@ -50,6 +50,22 @@ interface ValidationResult {
   summary?: ValidationSummary
 }
 
+export interface SearchMatch {
+  line: number
+  lineContent: string
+}
+
+export interface SearchPartResult {
+  partPath: string
+  matches: SearchMatch[]
+}
+
+export interface DocumentSearchResult {
+  query: string
+  totalMatches: number
+  results: SearchPartResult[]
+}
+
 export type PartDiffStatus =
   | 'identical'
   | 'modified'
@@ -85,6 +101,10 @@ interface DocumentState {
   comparisonPartContent: string | null
   partDiffStatus: Record<string, PartDiffStatus>
 
+  // Search state
+  searchResults: DocumentSearchResult | null
+  isSearching: boolean
+
   // Actions
   setFilePath: (path: string | null) => void
   shouldWarnBeforeOverwrite: () => boolean
@@ -98,6 +118,8 @@ interface DocumentState {
   exitCompare: () => void
   clearError: () => void
   reset: () => void
+  searchDocument: (query: string) => Promise<void>
+  clearSearch: () => void
 }
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
@@ -118,6 +140,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   comparisonDocumentData: null,
   comparisonPartContent: null,
   partDiffStatus: {},
+
+  searchResults: null,
+  isSearching: false,
 
   setFilePath: (path) => set({ filePath: path }),
 
@@ -448,6 +473,29 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
+  searchDocument: async (query) => {
+    const { fileData, filePath } = get()
+    if (!fileData) return
+
+    set({ isSearching: true })
+    try {
+      const result = await window.electronAPI.searchDocument(
+        fileData,
+        query,
+        filePath ?? undefined
+      )
+      if (result.success) {
+        set({ searchResults: result.data, isSearching: false })
+      } else {
+        set({ isSearching: false })
+      }
+    } catch {
+      set({ isSearching: false })
+    }
+  },
+
+  clearSearch: () => set({ searchResults: null }),
+
   reset: () =>
     set({
       filePath: null,
@@ -466,6 +514,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       comparisonDocumentData: null,
       comparisonPartContent: null,
       partDiffStatus: {},
+      searchResults: null,
+      isSearching: false,
     }),
 }))
 
