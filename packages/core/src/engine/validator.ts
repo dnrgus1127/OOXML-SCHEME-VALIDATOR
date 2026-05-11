@@ -162,6 +162,26 @@ export class ValidationEngine {
       return
     }
 
+    if (this.isCompletelyUnknownNamespace(effectiveElement)) {
+      const isNewNsContext =
+        !parentFrame ||
+        normalizeNamespace(parentFrame.namespaceUri) !== normalizeNamespace(effectiveElement.namespaceUri)
+      if (isNewNsContext) {
+        const message = formatMessage(
+          'ELEMENT.UNKNOWN_NAMESPACE',
+          effectiveElement.name,
+          effectiveElement.namespaceUri
+        )
+        if (this.context.options.strict) {
+          this.errorHandler.pushError('UNKNOWN_NAMESPACE', message)
+        } else {
+          this.errorHandler.pushWarning('UNKNOWN_NAMESPACE', message)
+        }
+      }
+      this.context.elementStack.push(this.createSkippedFrame(effectiveElement))
+      return
+    }
+
     let shouldResolveSchema = true
 
     if (parentFrame?.compositorState) {
@@ -555,6 +575,20 @@ export class ValidationEngine {
       normalizeNamespace(element.namespaceUri) === MC_NAMESPACE &&
       element.localName === 'AlternateContent'
     )
+  }
+
+  private isCompletelyUnknownNamespace(element: XmlElementInfo): boolean {
+    const { namespaceUri, localName } = element
+    if (!namespaceUri) return false
+    const normalized = normalizeNamespace(namespaceUri)
+    if (this.registry.schemas.has(namespaceUri) || this.registry.schemas.has(normalized)) {
+      return false
+    }
+    // localName이 등록된 스키마의 최상위 요소로 존재하면 "잘못된 네임스페이스"로 간주해 skip하지 않음
+    for (const schema of this.registry.schemas.values()) {
+      if (schema.elements.has(localName)) return false
+    }
+    return true
   }
 
   private createSkippedFrame(element: XmlElementInfo): ElementStackFrame {

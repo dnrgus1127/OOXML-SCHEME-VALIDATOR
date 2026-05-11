@@ -563,6 +563,7 @@ export type ValidationErrorCode =
   | 'UNEXPECTED_TEXT' // element-only에 텍스트 존재
   | 'CHOICE_NOT_SATISFIED' // choice 조건 미충족
   | 'NON_STANDARD_NAMESPACE' // 비표준 네임스페이스로 작성된 요소(Excel 호환 패턴)
+  | 'UNKNOWN_NAMESPACE' // 스키마 레지스트리에 등록되지 않은 네임스페이스
 
 /** 검증 결과 */
 export interface ValidationResult {

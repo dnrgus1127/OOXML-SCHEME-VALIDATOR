@@ -56,6 +56,12 @@ export const ERROR_MESSAGES: MessageMap = {
     ko: (element: string, observedNs: string, expectedNs: string) =>
       `'${element}' 요소가 비표준 네임스페이스 '${observedNs}'로 작성되었습니다. OOXML 스펙상 네임스페이스는 '${expectedNs}' 입니다. Excel 호환을 위해 허용됩니다.`,
   },
+  'ELEMENT.UNKNOWN_NAMESPACE': {
+    en: (element: string, namespaceUri: string) =>
+      `Element '${element}' belongs to namespace '${namespaceUri}' which has no registered schema. The element and its subtree will be skipped.`,
+    ko: (element: string, namespaceUri: string) =>
+      `'${element}' 요소가 속한 네임스페이스 '${namespaceUri}'에 등록된 스키마가 없습니다. 해당 요소와 하위 요소는 검증을 건너뜁니다.`,
+  },
   'ELEMENT.UNSUPPORTED_ALTERNATE_CONTENT': {
     en: () =>
       'Unsupported Markup Compatibility element AlternateContent was found. Its subtree was skipped.',
